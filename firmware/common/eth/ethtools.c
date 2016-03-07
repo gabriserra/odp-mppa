@@ -16,6 +16,7 @@
 #include "rpc-server.h"
 #include "internal/rpc-server.h"
 #include "internal/eth.h"
+#include <odp/rpc/helpers.h>
 
 enum mppa_eth_mac_ethernet_mode_e mac_get_default_mode(unsigned lane_id)
 {
@@ -110,7 +111,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 		return 0;
 
 	ret = mppa_routing_get_dnoc_unicast_route(externalAddress,
-						  remoteClus, &config, &header);
+						  odp_rpc_undensify_cluster_id(remoteClus), &config, &header);
 	if (ret != MPPA_ROUTING_RET_SUCCESS) {
 		fprintf(stderr, "[ETH] Error: Failed to route to cluster %d\n", remoteClus);
 		return -1;

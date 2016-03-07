@@ -25,6 +25,14 @@ static inline int ODP_RPC_FUNCTION(densify_cluster_id)(unsigned cluster_id){
 	return cluster_id;
 }
 
+static inline int ODP_RPC_FUNCTION(undensify_cluster_id)(unsigned cluster_id){
+	if(cluster_id == 16)
+		cluster_id = 128;
+	else if(cluster_id == 20)
+		cluster_id = 192;
+	return cluster_id;
+}
+
 static inline int ODP_RPC_FUNCTION(get_io_dma_id)(unsigned io_id, unsigned cluster_id){
 	int dense_id = ODP_RPC_FUNCTION(densify_cluster_id)(cluster_id);
 	int dma_offset = (dense_id / 4) % 4;
