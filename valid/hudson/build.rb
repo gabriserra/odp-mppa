@@ -206,9 +206,11 @@ b.target("package") do
     tar_package = File.expand_path("odp.tar")
     depends = []
     depends.push b.depends_info_struct.new("k1-tools","=", options["k1version"], "")
-    if options["toolchainversion"].to_s != "" then
-        depends.push b.depends_info_struct.new("k1-toolchain","=", options["toolchainversion"], "")
-    end
+    libraries_version_file = File.join(odp_path,"k1-libraries-version.txt")
+    b.run("echo 'Unable to found #{libraries_version_file}' && false") unless File.exists?(libraries_version_file)
+    libraries_version = `cat #{libraries_version_file}`.chomp() if File.exists?(libraries_version_file)
+    depends.push b.depends_info_struct.new("k1-libraries","=", libraries_version, "")
+
     package_description = "K1 ODP package (k1-odp-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp", release_info,
                            package_description,
@@ -255,7 +257,6 @@ b.target("package") do
     b.run("echo 'INTEGRATION_BRANCH=#{ENV.fetch("INTEGRATION_BRANCH",options["branch"])}' >> #{output_parameters}")
     b.run("echo 'REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
     b.run("#{workspace}/metabuild/bin/packages.rb --tar=#{File.join(artifacts,"package.tar")} tar")
-
 end
 
 b.target("clean") do
