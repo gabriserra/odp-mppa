@@ -15,7 +15,7 @@
 
 #define RPC_PKT_SIZE (sizeof(odp_rpc_t) + RPC_MAX_PAYLOAD)
 
-odp_rpc_handler_t __rpc_handlers[MAX_RPC_HANDLERS];
+odp_rpc_handler_t __rpc_handlers[ODP_RPC_N_CLASS];
 int __n_rpc_handlers;
 static uint64_t __rpc_ev_masks[BSP_NB_DMA_IO_MAX][4];
 static uint64_t __rpc_fair_masks[BSP_NB_DMA_IO_MAX][4];
@@ -150,43 +150,50 @@ int odp_rpc_server_handle(odp_rpc_t ** unhandled_msg)
 	int remoteClus;
 	odp_rpc_t *msg;
 	uint8_t *payload = NULL;
+
 	remoteClus = odp_rpc_server_poll_msg(&msg, &payload);
 	if(remoteClus >= 0) {
-		for (int i = 0; i < __n_rpc_handlers; ++i) {
-			if (!__rpc_handlers[i](remoteClus, msg, payload))
-				return 1;
-		}
 		*unhandled_msg = msg;
-		return -1;
+
+		if (msg->pkt_class >= ODP_RPC_N_CLASS ||
+		    __rpc_handlers[msg->pkt_class] == NULL) {
+			/* Unhandled message type */
+			*unhandled_msg = msg;
+			return -ODP_RPC_ERR_BAD_COS;
+		}
+		return __rpc_handlers[msg->pkt_class](remoteClus, msg, payload);
 	}
-	return 0;
+
+	/* No message */
+	return -ODP_RPC_ERR_NONE;
 }
 
 static int bas_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
 {
 	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
 
+	if (msg->pkt_class != ODP_RPC_CLASS_BAS)
+		return -ODP_RPC_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != ODP_RPC_BAS_VERSION)
+		return -ODP_RPC_ERR_VERSION_MISMATCH;
+
 	(void)remoteClus;
 	(void)payload;
-	switch (msg->pkt_type){
+
+	switch (msg->pkt_subtype){
 	case ODP_RPC_CMD_BAS_PING:
 		ack.status = 0;
 		break;
 	default:
-		return -1;
+		return -ODP_RPC_ERR_BAD_SUBTYPE;
 	}
 	odp_rpc_server_ack(msg, ack, NULL, 0);
-	return 0;
+	return -ODP_RPC_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __bas_rpc_constructor()
 {
-	if(__n_rpc_handlers < MAX_RPC_HANDLERS) {
-		__rpc_handlers[__n_rpc_handlers++] = bas_rpc_handler;
-	} else {
-		fprintf(stderr, "Failed to register BAS RPC handlers\n");
-		exit(EXIT_FAILURE);
-	}
+	__rpc_handlers[ODP_RPC_CLASS_BAS] = bas_rpc_handler;
 }
 
 
@@ -201,10 +208,16 @@ int odp_rpc_server_thread()
 
 	while (1) {
 		odp_rpc_t *msg;
+		int ret;
+		ret = odp_rpc_server_handle(&msg);
+		if (ret < 0) {
+			unsigned interface = get_rpc_local_dma_id(msg->dma_id);
 
-		if (odp_rpc_server_handle(&msg) < 0) {
-			fprintf(stderr, "[RPC] Error: Unhandled message\n");
-			exit(1);
+			/* Error in handling. Send a RPC command with error flag */
+			msg->ack = 1;
+			msg->rpc_err = -ret;
+			msg->data_len = 0;
+			odp_rpc_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
 		}
 	}
 	return 0;

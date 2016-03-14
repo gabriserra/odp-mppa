@@ -102,15 +102,21 @@ rnd_send_buffer(unsigned remoteClus, odp_rpc_t * msg) {
 
 static int rnd_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
 {
+	if (msg->pkt_class != ODP_RPC_CLASS_RND)
+		return -ODP_RPC_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != ODP_RPC_RND_VERSION)
+		return -ODP_RPC_ERR_VERSION_MISMATCH;
+
 	(void)payload;
-	switch (msg->pkt_type){
+	switch (msg->pkt_subtype){
 	case ODP_RPC_CMD_RND_GET:
 		rnd_send_buffer(remoteClus, msg);
 		break;
 	default:
-		return -1;
+		return -ODP_RPC_ERR_BAD_SUBTYPE;
 	}
-	return 0;
+
+	return -ODP_RPC_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __rnd_rpc_constructor()
@@ -120,10 +126,5 @@ void  __attribute__ ((constructor)) __rnd_rpc_constructor()
 	return;
 #endif
 	odp_rnd_gen_init();
-	if(__n_rpc_handlers < MAX_RPC_HANDLERS) {
-		__rpc_handlers[__n_rpc_handlers++] = rnd_rpc_handler;
-	} else {
-		fprintf(stderr, "Failed to register RND RPC handlers\n");
-		exit(EXIT_FAILURE);
-	}
+	__rpc_handlers[ODP_RPC_CLASS_RND] = rnd_rpc_handler;
 }

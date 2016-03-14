@@ -121,7 +121,7 @@ static odp_rpc_ack_t pcie_open(unsigned remoteClus, odp_rpc_t * msg)
 	}
 	if (n_rx < MPPA_PCIE_NOC_RX_NB) {
 		err_printf("failed to allocate %d contiguous Rx ports\n", MPPA_PCIE_NOC_RX_NB);
-		exit(1);
+		return ack;
 	}
 	unsigned int min_tx_tag = first_rx;
 	unsigned int max_tx_tag = first_rx + MPPA_PCIE_NOC_RX_NB - 1;
@@ -170,8 +170,13 @@ static int pcie_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payloa
 {
 	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
 
+	if (msg->pkt_class != ODP_RPC_CLASS_PCIE)
+		return -ODP_RPC_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != ODP_RPC_PCIE_VERSION)
+		return -ODP_RPC_ERR_VERSION_MISMATCH;
+
 	(void)payload;
-	switch (msg->pkt_type){
+	switch (msg->pkt_subtype){
 	case ODP_RPC_CMD_PCIE_OPEN:
 		ack = pcie_open(remoteClus, msg);
 		break;
@@ -179,10 +184,11 @@ static int pcie_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payloa
 		ack = pcie_close(remoteClus, msg);
 		break;
 	default:
-		return -1;
+		return -ODP_RPC_ERR_BAD_SUBTYPE;
 	}
+
 	odp_rpc_server_ack(msg, ack, NULL, 0);
-	return 0;
+	return -ODP_RPC_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __pcie_rpc_constructor()
@@ -190,10 +196,5 @@ void  __attribute__ ((constructor)) __pcie_rpc_constructor()
 #if defined(MAGIC_SCALL)
 	return;
 #endif
-	if(__n_rpc_handlers < MAX_RPC_HANDLERS) {
-		__rpc_handlers[__n_rpc_handlers++] = pcie_rpc_handler;
-	} else {
-		fprintf(stderr, "Failed to register PCIE RPC handlers\n");
-		exit(EXIT_FAILURE);
-	}
+	__rpc_handlers[ODP_RPC_CLASS_PCIE] = pcie_rpc_handler;
 }

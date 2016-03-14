@@ -16,12 +16,11 @@
 
 int odp_cpumask_default_worker(odp_cpumask_t *mask, int num_in)
 {
-	int i;
-	int first_cpu = 1;
+	int i, count;
 	int num = num_in;
 	int cpu_count;
-
-	cpu_count = odp_cpu_count();
+	const int abs_cpu_count = odp_cpu_count();
+	cpu_count = abs_cpu_count - odp_global_data.n_rx_thr;
 
 	/*
 	 * If no user supplied number or it's too large, then attempt
@@ -32,20 +31,18 @@ int odp_cpumask_default_worker(odp_cpumask_t *mask, int num_in)
 	if (cpu_count < num)
 		num = cpu_count;
 
-	/*
-	 * Always force "first_cpu" to a valid CPU
-	 */
-	if (first_cpu > cpu_count)
-		first_cpu = cpu_count - 1;
 
 	/* Build the mask */
 	odp_cpumask_zero(mask);
-	for (i = 0; i < num; i++) {
-		int cpu;
-		/* Add one for the module as odp_cpu_count only
-		 * returned available CPU (ie [1..cpucount]) */
-		cpu = (first_cpu + i) % (cpu_count + 1);
+	for (i = 1, count = 0; i < abs_cpu_count && count < num; i++) {
+		int cpu = i;
+		/* If this is a slot reserved by Rx threads, skip */
+		if (cpu % 2 == 1 &&
+		    (unsigned)((abs_cpu_count - 1 - i) / 2) < odp_global_data.n_rx_thr)
+			continue;
+
 		odp_cpumask_set(mask, cpu);
+		count++;
 	}
 
        if (odp_cpumask_isset(mask, 0))

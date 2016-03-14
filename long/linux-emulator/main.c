@@ -66,7 +66,9 @@ int main(){
 		};
 		odp_rpc_t cmd = {
 			.data_len = 0,
-			.pkt_type = ODP_RPC_CMD_ETH_DUAL_MAC,
+			.pkt_class = ODP_RPC_CLASS_ETH,
+			.pkt_subtype = ODP_RPC_CMD_ETH_DUAL_MAC,
+			.cos_version = ODP_RPC_ETH_VERSION,
 			.inl_data = mac_cmd.inl_data,
 			.flags = 0,
 		};
@@ -114,7 +116,9 @@ int main(){
 			};
 			odp_rpc_t cmd = {
 				.data_len = 0,
-				.pkt_type = ODP_RPC_CMD_ETH_OPEN_DEF,
+				.pkt_class = ODP_RPC_CLASS_ETH,
+				.pkt_subtype = ODP_RPC_CMD_ETH_OPEN_DEF,
+				.cos_version = ODP_RPC_ETH_VERSION,
 				.inl_data = open_cmd.inl_data,
 				.flags = 0,
 			};
@@ -149,7 +153,9 @@ int main(){
 				}
 			};
 			odp_rpc_t cmd = {
-				.pkt_type = ODP_RPC_CMD_ETH_CLOS,
+				.pkt_class = ODP_RPC_CLASS_ETH,
+				.pkt_subtype = ODP_RPC_CMD_ETH_CLOS,
+				.cos_version = ODP_RPC_ETH_VERSION,
 				.data_len = 0,
 				.flags = 0,
 				.inl_data = close_cmd.inl_data

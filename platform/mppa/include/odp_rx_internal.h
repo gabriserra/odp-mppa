@@ -82,6 +82,8 @@ int rx_thread_init(void);
 int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy);
 int rx_thread_link_close(uint8_t pktio_id);
 int rx_thread_destroy(void);
+int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
+			  uint64_t *oom);
 
 #ifdef __cplusplus
 }

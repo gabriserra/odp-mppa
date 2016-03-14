@@ -7,9 +7,7 @@
 #include <mppa_bsp.h>
 #include <mppa/osconfig.h>
 #include <errno.h>
-#include <odp/rpc/rpc.h>
 
-#include "internal/rpc-server.h"
 #include "boot.h"
 
 #define MAX_ARGS                       256
@@ -31,7 +29,6 @@ struct clus_bin_boot {
 	mppa_power_pid_t pid;
 };
 
-static unsigned int clus_count;
 static unsigned has_booted;
 static struct clus_bin_boot clus_bin_boots[BSP_NB_CLUSTER_MAX];
 
@@ -82,9 +79,6 @@ int join_clusters(void)
 	return 0;
 }
 
-void boot_set_nb_clusters(int nb_clusters) {
-	clus_count = nb_clusters;
-}
 int boot_cluster(int clus_id, const char bin_file[], const char * argv[] ) {
 	if (__k1_get_cluster_id() != 128)
 		return -1;
@@ -125,6 +119,7 @@ int boot_clusters(int argc, char * const argv[])
 	if (__k1_get_cluster_id() != 128)
 		return -1;
 
+	unsigned clus_count = 0;
 	while ((opt = getopt(argc, argv, "c:a:")) != -1) {
 		switch (opt) {
 		case 'c':

@@ -71,6 +71,54 @@ The K1-ODP files will be installed under the
 \texttt{/usr/local/k1tools} directory.
 
 \section{What's new}
+\subsection{K1-ODP 0.4}
+\begin{itemize}
+\item[-]{New firmware system}
+\item[-]{Remove synchronisation barrier at cluster
+  initialization. \texttt{boot\_set\_nb\_clusters} should not be
+  called anymore.}
+\item[-]{Add non-standard \texttt{\_odp\_pktio\_stats} function to get
+ethernet counters}
+\item[-]{Ethernet lane is now UP when calling
+  \texttt{odp\_pktio\_start} instead of open}
+\end{itemize}
+
+\subsubsection{Firmwares}
+
+Firmware build system and behaviour has been revised.
+Although the main thread still runs on IODDR, the main does not need
+to poll for message anymore.
+The call to \texttt{odp\_rpc\_server\_start} starts a background
+thread on IOETH that handles all the clusters request directly.
+The main thread should not exit before the spawned clusters ave been
+joined by calling \texttt{join\_clusters}.
+If no clusters were spawned, the firmare should never exit.
+
+Firmware build system has been changed to inherit compilation flags
+from the \texttt{platforms.inc} file already used for building ODP
+applications and now use the same board names.
+
+\subsection{K1-ODP 0.3.3}
+
+\texttt{verbose} option has been added for Ethernet pktio.
+
+\subsubsection{Bug Fixes}
+\begin{itemize}
+\item[-]{Fix packet leaked by the first \texttt{odp\_pktio\_send}}
+\end{itemize}
+
+\subsection{K1-ODP 0.3.2}
+\subsubsection{Bug Fixes}
+\begin{itemize}
+\item[-]{Fix issue for cluster-cluster pktio when one side closes the
+  interface}
+\item[-]{Fix issue when opening a 40G lane from miltiple clusters}
+\item[-]{Fix clean target for firmware in template project.}
+\item[-]{Fix another issue in packet ordering.}
+\item[-]{Fix SEGV/traps when Rx thread are under heavy loads.}
+\item[-]{Add missing cache invalidation when pulling packets from a queue.}
+\end{itemize}
+
 \subsection{K1-ODP 0.3.1}
 
 \subsubsection{Makefile.apps}
@@ -306,6 +354,13 @@ destination MAC address:
 e0:hashpolicy=[P0{@12/0x3=0x0800}{@26#0xf}][P1{@6#0x3f/0x1c=0x0077cafe0000}][P2{@0#0x3f}]
 \end{lstlisting}
 
+\subsubsection{Verbose}
+
+When activating verbose mode on an Ethernet lane, the firmware will
+output messages for debugging link issues.
+\begin{lstlisting}
+e0:verbose
+\end{lstlisting}
 
 \section{Compiling and Running}
 
@@ -375,7 +430,10 @@ k1-cluster   --functional  --mboard=developer --march=bostan --user-syscall=/usr
 \item[-]{Only promiscuous mode is currently available.}
 \item[-]{Multi-Lane (4x10G) it not supported yet.}
 \item[-]{It is currently not possible to reopen an Ethernet interface
-  with a different hash policy even if all the clusters have closed it.}
+  with a different hash policy even if all the clusters have closed
+  it.}
+\item[-]{When clusters transmits to an ethernet port more than the port
+  bandwidth can handle, packets may be dropped.}
 \end{itemize}
 
 \end{document}

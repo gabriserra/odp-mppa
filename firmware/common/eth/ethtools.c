@@ -248,7 +248,7 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 	return 0;
 }
 
-int ethtool_start_lane(unsigned if_id, int loopback)
+int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
 {
 	int ret;
 	int eth_if = if_id % 4;
@@ -269,25 +269,25 @@ int ethtool_start_lane(unsigned if_id, int loopback)
 	switch (status[eth_if].initialized) {
 	case ETH_LANE_OFF:
 		if (loopback) {
-#ifdef VERBOSE
-			printf("[ETH] Initializing lane %d in loopback\n", eth_if);
-#endif
+			if (verbose)
+				printf("[ETH] Initializing lane %d in loopback\n", eth_if);
+
 			mppabeth_mac_enable_loopback_bypass((void *)&(mppa_ethernet[0]->mac));
 			lb_status.loopback = 1;
 		} else {
 			enum mppa_eth_mac_ethernet_mode_e link_speed = ethtool_get_mac_speed(if_id);
 			if ((int)link_speed < 0)
 				return link_speed;
-				mac_get_default_mode(eth_if);
-#ifdef VERBOSE
-			printf("[ETH] Initializing global MAC @ %d\n", link_speed);
-#endif
+
+			if (verbose)
+				printf("[ETH] Initializing global MAC @ %d\n", link_speed);
+
 			mppabeth_mac_cfg_mode((void*) &(mppa_ethernet[0]->mac), link_speed);
 
 			/* Init MAC */
-#ifdef VERBOSE
-			printf("[ETH] Initializing MAC for lane %d\n", eth_if);
-#endif
+			if (verbose)
+				printf("[ETH] Initializing MAC for lane %d\n", eth_if);
+
 			ret = mppa_eth_utils_init_mac(eth_if, link_speed);
 			if (ret == BAD_VENDOR) {
 				fprintf(stderr,
@@ -312,9 +312,9 @@ int ethtool_start_lane(unsigned if_id, int loopback)
 				&(mppa_ethernet[0]->mac));
 			mppabeth_mac_enable_rx_check_preambule((void*)
 				&(mppa_ethernet[0]->mac));
-#ifdef VERBOSE
-			printf("[ETH] Starting MAC for lane %d\n", eth_if);
-#endif
+
+			if (verbose)
+				printf("[ETH] Starting MAC for lane %d\n", eth_if);
 			mppa_eth_utils_start_lane(eth_if, link_speed);
 
 		}
@@ -807,9 +807,17 @@ int ethtool_lane_stats(unsigned if_id,
 {
 	const int eth_if = if_id % 4;
 
+	if(status[eth_if].initialized == ETH_LANE_OFF)
+		return -1;
+
+	if (lb_status.loopback){
+		memset(stats, 0, sizeof(*stats));
+		return 0;
+	}
+
 	stats->in_octets =
 		mppabeth_mac_get_good_rx_bytes_nb((void *)&(mppa_ethernet[0]->mac),
-						   eth_if);
+						  eth_if);
 	stats->in_ucast_pkts =
 		mppabeth_mac_get_good_rx_packet_nb((void *)&(mppa_ethernet[0]->mac),
 						   eth_if)-
@@ -821,19 +829,18 @@ int ethtool_lane_stats(unsigned if_id,
 		mppabeth_lb_get_dropped_counter((void*)&(mppa_ethernet[0]->lb),
 						eth_if);;
 	stats->in_errors =
- 		mppabeth_mac_get_total_rx_packet_nb((void *)&(mppa_ethernet[0]->mac),
+		mppabeth_mac_get_total_rx_packet_nb((void *)&(mppa_ethernet[0]->mac),
 						    eth_if) -
- 		mppabeth_mac_get_good_rx_packet_nb((void *)&(mppa_ethernet[0]->mac),
+		mppabeth_mac_get_good_rx_packet_nb((void *)&(mppa_ethernet[0]->mac),
 						   eth_if);
 
-	stats->in_unknown_protos = 0;
 	stats->out_octets =
- 		mppabeth_mac_get_total_tx_bytes_nb((void *)&(mppa_ethernet[0]->mac),
+		mppabeth_mac_get_total_tx_bytes_nb((void *)&(mppa_ethernet[0]->mac),
 						   eth_if);
 
 	stats->out_ucast_pkts =
 		mppabeth_mac_get_total_tx_packet_nb((void *)&(mppa_ethernet[0]->mac),
-						   eth_if)-
+						    eth_if)-
 		mppabeth_mac_get_tx_multicast((void *)&(mppa_ethernet[0]->mac),
 					      eth_if) -
 		mppabeth_mac_get_tx_broadcast((void *)&(mppa_ethernet[0]->mac),

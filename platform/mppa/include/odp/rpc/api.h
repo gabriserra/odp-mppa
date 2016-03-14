@@ -1,8 +1,7 @@
 #ifndef __ODP_RPC_API_H__
 #define __ODP_RPC_API_H__
 
-/* Pre definition */
-struct odp_rpc;
+#include <odp/rpc/rpc.h>
 
 /**
  * Initialize the RPC client.
@@ -56,6 +55,6 @@ int odp_rpc_do_query(uint16_t dest_id, uint16_t dest_tag,
  * @retval 0 Timeout
  * @retval 1 OK
  */
-int odp_rpc_wait_ack(struct odp_rpc ** cmd, void ** payload, uint64_t timeout);
+odp_rpc_cmd_err_e odp_rpc_wait_ack(struct odp_rpc ** cmd, void ** payload, uint64_t timeout);
 
 #endif /* __ODP_RPC_API_H__ */

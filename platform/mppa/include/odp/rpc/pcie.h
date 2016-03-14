@@ -3,9 +3,14 @@
 
 #include <odp/rpc/defines.h>
 
-#define ODP_RPC_CMD_LIST_PCIE									\
-	ODP_RPC_CMD_PCIE_OPEN    /**< PCIe: Forward Rx traffic to a cluster */,			\
-		ODP_RPC_CMD_PCIE_CLOS    /**< PCIe: Stop forwarding Rx trafic to a cluster */
+/** Version of the PCIE CoS */
+#define ODP_RPC_PCIE_VERSION 0x1
+
+typedef enum {
+	ODP_RPC_CMD_PCIE_OPEN    /**< PCIe: Forward Rx traffic to a cluster */,
+	ODP_RPC_CMD_PCIE_CLOS    /**< PCIe: Stop forwarding Rx trafic to a cluster */,
+	ODP_RPC_CMD_PCIE_N_CMD
+} odp_rpc_cmd_pcie_e;
 
 #define ODP_RPC_CMD_NAMES_PCIE			\
 	"PCIE OPEN",				\

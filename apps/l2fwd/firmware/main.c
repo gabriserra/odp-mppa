@@ -46,7 +46,6 @@ int main(int argc, char *const argv[])
 		exit(EXIT_FAILURE);
 	}
 	if ( __k1_get_cluster_id() == 128 ) {
-		boot_set_nb_clusters(n_clusters);
 		printf("Spawning clusters\n");
 		{
 			static char const * _argv[] = {

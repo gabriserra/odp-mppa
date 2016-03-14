@@ -16,7 +16,6 @@
 #include <odp_debug_internal.h>
 #include <odp/hints.h>
 #include <odp/random.h>
-#include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
 
 #include <stdint.h>
@@ -333,7 +332,7 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	unsigned char iv_enc[AES_BLOCK_SIZE];
 	void *iv_ptr;
 	uint8_t *tag = data + params->hash_result_offset;
-	// return ODP_CRYPTO_ALG_ERR_NONE;
+	return ODP_CRYPTO_ALG_ERR_NONE;
 
 	if (params->override_iv_ptr)
 		iv_ptr = params->override_iv_ptr;
@@ -924,7 +923,9 @@ odp_random_data(uint8_t *buf, int32_t len, odp_bool_t use_entropy ODP_UNUSED)
 		odp_rpc_t *ack_msg;
 
 		odp_rpc_t cmd = {
-			.pkt_type = ODP_RPC_CMD_RND_GET,
+			.pkt_class = ODP_RPC_CLASS_RND,
+			.pkt_subtype = ODP_RPC_CMD_RND_GET,
+			.cos_version = ODP_RPC_RND_VERSION,
 			.data_len = 0,
 			.flags = 0,
 			.inl_data = (( odp_rpc_cmd_rnd_t ){

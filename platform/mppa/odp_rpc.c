@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <HAL/hal/hal.h>
-#include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
 
 #include <mppa_bsp.h>
@@ -79,112 +78,190 @@ int odp_rpc_client_get_default_server(void)
 	return rpc_default_server_id;
 }
 
-static const char * rpc_cmd_names[ODP_RPC_CMD_N_CMD] = {
-	ODP_RPC_CMD_NAMES_BAS,
-	ODP_RPC_CMD_NAMES_ETH,
-	ODP_RPC_CMD_NAMES_PCIE,
-	ODP_RPC_CMD_NAMES_C2C,
-	ODP_RPC_CMD_NAMES_RND,
+static const char * const rpc_cmd_bas_names[ODP_RPC_CMD_BAS_N_CMD] = {
+	ODP_RPC_CMD_NAMES_BAS
 };
+
+static const char * const rpc_cmd_eth_names[ODP_RPC_CMD_ETH_N_CMD] = {
+	ODP_RPC_CMD_NAMES_ETH
+};
+
+static const char * const rpc_cmd_pcie_names[ODP_RPC_CMD_PCIE_N_CMD] = {
+	ODP_RPC_CMD_NAMES_PCIE
+};
+
+static const char * const rpc_cmd_c2c_names[ODP_RPC_CMD_C2C_N_CMD] = {
+	ODP_RPC_CMD_NAMES_C2C
+};
+
+static const char * const rpc_cmd_rnd_names[ODP_RPC_CMD_RND_N_CMD] = {
+	ODP_RPC_CMD_NAMES_RND
+};
+
+static const char * const * const rpc_cmd_names[ODP_RPC_N_CLASS] = {
+	[ODP_RPC_CLASS_BAS] = rpc_cmd_bas_names,
+	[ODP_RPC_CLASS_ETH] = rpc_cmd_eth_names,
+	[ODP_RPC_CLASS_PCIE] = rpc_cmd_pcie_names,
+	[ODP_RPC_CLASS_C2C] = rpc_cmd_c2c_names,
+	[ODP_RPC_CLASS_RND] = rpc_cmd_rnd_names,
+};
+
+static const int rpc_n_cmds[ODP_RPC_N_CLASS] = {
+	[ODP_RPC_CLASS_BAS] = ODP_RPC_CMD_BAS_N_CMD,
+	[ODP_RPC_CLASS_ETH] = ODP_RPC_CMD_ETH_N_CMD,
+	[ODP_RPC_CLASS_PCIE] = ODP_RPC_CMD_PCIE_N_CMD,
+	[ODP_RPC_CLASS_C2C] = ODP_RPC_CMD_C2C_N_CMD,
+	[ODP_RPC_CLASS_RND] = ODP_RPC_CMD_RND_N_CMD,
+};
+
 void odp_rpc_print_msg(const odp_rpc_t * cmd)
 {
-	if (cmd->pkt_type >=  ODP_RPC_CMD_N_CMD) {
-		printf("Invalid Packet ! Type = %d\n", cmd->pkt_type);
+	if (cmd->pkt_class >=  ODP_RPC_N_CLASS) {
+		printf("Invalid packet class ! Class = %d\n", cmd->pkt_class);
 		return;
 	}
+	if (cmd->pkt_subtype >= rpc_n_cmds[cmd->pkt_class]){
+		printf("Invalid packet subtype ! Class = %d, Subtype = %u\n", cmd->pkt_class, cmd->pkt_subtype);
+		return;
+	}
+
 	printf("RPC CMD:\n"
-	       "\tType: %u | %s\n"
-	       "\tData: %u\n"
-	       "\tDMA : %u\n"
-	       "\tTag : %u\n"
-	       "\tFlag: %x\n"
+	       "\tClass: %u\n"
+	       "\tType : %u | %s\n"
+	       "\tData : %u\n"
+	       "\tDMA  : %u\n"
+	       "\tTag  : %u\n"
+	       "\tFlag :\n"
+	       "\t\tAck : %u\n"
+	       "\t\tRPC Err: : %x\n"
 	       "\tInl Data:\n",
-	       cmd->pkt_type, rpc_cmd_names[cmd->pkt_type],
+	       cmd->pkt_class, cmd->pkt_subtype,
+	       rpc_cmd_names[cmd->pkt_class][cmd->pkt_subtype],
 	       cmd->data_len, cmd->dma_id,
-	       cmd->dnoc_tag, cmd->flags);
+	       cmd->dnoc_tag, cmd->ack, cmd->rpc_err);
+
 	if (cmd->ack) {
 		odp_rpc_ack_t ack = { .inl_data = cmd->inl_data };
-		printf("\t\tstatus: %d\n", ack.status);
+		printf("\t\tAck status: %d\n", ack.status);
 	}
-	switch (cmd->pkt_type){
-	case ODP_RPC_CMD_ETH_OPEN:
-	case ODP_RPC_CMD_ETH_OPEN_DEF:
-		{
-			odp_rpc_cmd_eth_open_t open = { .inl_data = cmd->inl_data };
-			printf("\t\tifId: %d\n"
-				"\t\tRx(s): [%d:%d]\n"
-				"\t\tLoopback: %d\n",
-				open.ifId,
-			       open.min_rx, open.max_rx,
-			       open.loopback);
-		}
-		break;
-	case ODP_RPC_CMD_ETH_CLOS:
-	case ODP_RPC_CMD_ETH_CLOS_DEF:
-		{
-			odp_rpc_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
-			printf("\t\tifId: %d\n", clos.ifId);
-		}
-		break;
-	case ODP_RPC_CMD_ETH_DUAL_MAC:
-		{
-			odp_rpc_cmd_eth_dual_mac_t dmac = { .inl_data = cmd->inl_data };
-			printf("\t\tenabled: %d\n", dmac.enabled);
-		}
-		break;
-	case ODP_RPC_CMD_ETH_PROMISC:
-	case ODP_RPC_CMD_ETH_STATE:
-		{
-			odp_rpc_cmd_eth_promisc_t promisc = { .inl_data = cmd->inl_data };
-			printf("\t\tifId: %d\n"
-			       "\t\tEnabled: %d\n",
-			       promisc.ifId, promisc.enabled);
-		}
-		break;
-	case ODP_RPC_CMD_PCIE_OPEN:
-		{
-			odp_rpc_cmd_pcie_open_t open = { .inl_data = cmd->inl_data };
-			printf("\t\tpcie_eth_id: %d\n"
-				"\t\tRx(s): [%d:%d]\n",
-				open.pcie_eth_if_id,
-				open.min_rx, open.max_rx);
-		}
-		break;
-	case ODP_RPC_CMD_PCIE_CLOS:
-		{
-			odp_rpc_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
-			printf("\t\tifId: %d\n", clos.ifId);
-		}
-		break;
-	case ODP_RPC_CMD_C2C_OPEN:
-		{
-			odp_rpc_cmd_c2c_open_t open = { .inl_data = cmd->inl_data };
-			printf("\t\tdstClus: %d\n"
-				"\t\tRx(s): [%d:%d]\n"
-				"\t\tMTU: %d\n",
-			       open.cluster_id,
-			       open.min_rx, open.max_rx,
-			       open.mtu);
-		}
-		break;
-	case ODP_RPC_CMD_C2C_CLOS:
-		{
-			odp_rpc_cmd_c2c_clos_t clos = { .inl_data = cmd->inl_data };
-			printf("\t\tdstClus: %d\n", clos.cluster_id);
-		}
-		break;
 
-	case ODP_RPC_CMD_RND_GET:
-		{
-			int i;
-			for ( i = 0; i < 4; ++i ) {
-				printf("%llx ", ((uint64_t*)cmd->inl_data.data)[i]);
+	switch (cmd->pkt_class){
+	case ODP_RPC_CLASS_BAS:
+		break;
+	case ODP_RPC_CLASS_ETH:
+		switch(cmd->pkt_subtype) {
+		case ODP_RPC_CMD_ETH_OPEN:
+		case ODP_RPC_CMD_ETH_OPEN_DEF:
+			{
+				odp_rpc_cmd_eth_open_t open = { .inl_data = cmd->inl_data };
+				printf("\t\tifId: %d\n"
+				       "\t\tRx(s): [%d:%d]\n"
+				       "\t\tLoopback: %u\n"
+				       "\t\tRx Enbl : %d\n"
+				       "\t\tTx Enbl : %d\n"
+				       "\t\tJumbo   : %u\n"
+				       "\t\tNbRules : %u\n",
+				       open.ifId,
+				       open.min_rx, open.max_rx,
+				       open.loopback,
+				       open.rx_enabled, open.tx_enabled,
+				       open.jumbo, open.nb_rules);
 			}
-			printf("\n");
+			break;
+		case ODP_RPC_CMD_ETH_CLOS:
+		case ODP_RPC_CMD_ETH_CLOS_DEF:
+			{
+				odp_rpc_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
+				printf("\t\tifId: %d\n", clos.ifId);
+			}
+			break;
+		case ODP_RPC_CMD_ETH_DUAL_MAC:
+			{
+				odp_rpc_cmd_eth_dual_mac_t dmac = { .inl_data = cmd->inl_data };
+				printf("\t\tenabled: %d\n", dmac.enabled);
+			}
+			break;
+		case ODP_RPC_CMD_ETH_PROMISC:
+		case ODP_RPC_CMD_ETH_STATE:
+			{
+				odp_rpc_cmd_eth_promisc_t promisc = { .inl_data = cmd->inl_data };
+				printf("\t\tifId: %d\n"
+				       "\t\tEnabled: %d\n",
+				       promisc.ifId, promisc.enabled);
+			}
+			break;
+		case ODP_RPC_CMD_ETH_GET_STAT:
+			{
+				odp_rpc_cmd_eth_get_stat_t stats =
+					{ .inl_data = cmd->inl_data };
+				printf("\t\tifId: %d\n"
+				       "\t\tLaneStats: %d\n",
+				       stats.ifId, stats.link_stats);
+			}
+			break;
+		default:
+			break;
 		}
 		break;
-	case ODP_RPC_CMD_BAS_INVL:
-	case ODP_RPC_CMD_BAS_PING:
+	case ODP_RPC_CLASS_PCIE:
+		switch(cmd->pkt_subtype) {
+		case ODP_RPC_CMD_PCIE_OPEN:
+			{
+				odp_rpc_cmd_pcie_open_t open = { .inl_data = cmd->inl_data };
+				printf("\t\tpcie_eth_id: %d\n"
+				       "\t\tRx(s): [%d:%d]\n",
+				       open.pcie_eth_if_id,
+				       open.min_rx, open.max_rx);
+			}
+			break;
+		case ODP_RPC_CMD_PCIE_CLOS:
+			{
+				odp_rpc_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
+				printf("\t\tifId: %d\n", clos.ifId);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	case ODP_RPC_CLASS_C2C:
+		switch(cmd->pkt_subtype) {
+		case ODP_RPC_CMD_C2C_OPEN:
+			{
+				odp_rpc_cmd_c2c_open_t open = { .inl_data = cmd->inl_data };
+				printf("\t\tdstClus: %d\n"
+				       "\t\tRx(s): [%d:%d]\n"
+				       "\t\tMTU: %d\n",
+				       open.cluster_id,
+				       open.min_rx, open.max_rx,
+				       open.mtu);
+			}
+			break;
+		case ODP_RPC_CMD_C2C_CLOS:
+			{
+				odp_rpc_cmd_c2c_clos_t clos = { .inl_data = cmd->inl_data };
+				printf("\t\tdstClus: %d\n", clos.cluster_id);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	case ODP_RPC_CLASS_RND:
+		switch(cmd->pkt_subtype) {
+		case ODP_RPC_CMD_RND_GET:
+			{
+				int i;
+				for ( i = 0; i < 4; ++i ) {
+					printf("%llx ", ((uint64_t*)cmd->inl_data.data)[i]);
+				}
+				printf("\n");
+			}
+			break;
+		default:
+			break;
+		}
+		break;
 	default:
 		break;
 	}
@@ -285,7 +362,7 @@ int odp_rpc_do_query(uint16_t dest_id,
 	return odp_rpc_send_msg(0, dest_id, dest_tag, cmd, payload);
 }
 
-int odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t timeout)
+odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t timeout)
 {
 	int ret;
 
@@ -300,11 +377,14 @@ int odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t timeout)
 
 	}
 	if (!ret)
-		return 0;
+		return ODP_RPC_ERR_TIMEOUT;
 
 	odp_rpc_t * msg = &odp_rpc_ack_buf.rpc_cmd;
 	INVALIDATE(msg);
 	*cmd = msg;
+
+	if (msg->rpc_err)
+		return -msg->rpc_err;
 
 	if (payload && msg->data_len) {
 		if ( msg->data_len > RPC_MAX_PAYLOAD ) {

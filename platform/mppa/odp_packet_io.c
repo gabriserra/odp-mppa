@@ -762,6 +762,32 @@ int odp_pktio_term_global(void)
 	return ret;
 }
 
+int _odp_pktio_stats(odp_pktio_t pktio,
+		     _odp_pktio_stats_t *stats)
+{
+	pktio_entry_t *entry;
+	int ret = -1;
+
+	entry = get_pktio_entry(pktio);
+	if (entry == NULL) {
+		ODP_DBG("pktio entry %d does not exist\n", pktio);
+		return -1;
+	}
+
+	lock_entry(entry);
+
+	if (odp_unlikely(is_free(entry))) {
+		unlock_entry(entry);
+		ODP_DBG("already freed pktio\n");
+		return -1;
+	}
+
+	if (entry->s.ops->stats)
+		ret = entry->s.ops->stats(entry, stats);
+	unlock_entry(entry);
+	return ret;
+}
+
 void odp_pktio_print(odp_pktio_t id)
 {
 	pktio_entry_t *entry;
