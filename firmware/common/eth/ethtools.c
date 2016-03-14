@@ -2,6 +2,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <errno.h>
 #include <HAL/hal/hal.h>
 
 #include <odp/rpc/rpc.h>
