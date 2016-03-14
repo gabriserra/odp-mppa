@@ -81,6 +81,9 @@ The K1-ODP files will be installed under the
 ethernet counters}
 \item[-]{Ethernet lane is now UP when calling
   \texttt{odp\_pktio\_start} instead of open}
+\item[-]{Loopback between MPPA interfaces using a cable is now
+  supported. Both pktio must be created before starting them to allow
+  the link to get UP.}
 \end{itemize}
 
 \subsubsection{Firmwares}
@@ -423,10 +426,6 @@ k1-cluster   --functional  --mboard=developer --march=bostan --user-syscall=/usr
   (default), packets may not be returned in order to the ODP
   application. If order is required, the number of Rx thread must be
   set to one.}
-\item[-]{It is currently not possible to do loopback between multiple
-  Ethernet lane of a single MPPA board. Because odp\_pktio\_open waits
-  for the link to be up before returning (with a timeout), it needs
-  the opposite side of the link to be up.}
 \item[-]{Only promiscuous mode is currently available.}
 \item[-]{Multi-Lane (4x10G) it not supported yet.}
 \item[-]{It is currently not possible to reopen an Ethernet interface
