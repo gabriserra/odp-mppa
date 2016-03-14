@@ -20,7 +20,7 @@ int odp_cpumask_default_worker(odp_cpumask_t *mask, int num_in)
 	int num = num_in;
 	int cpu_count;
 	const int abs_cpu_count = odp_cpu_count();
-	cpu_count = abs_cpu_count - odp_global_data.n_rx_thr;
+	cpu_count = abs_cpu_count - 1 - odp_global_data.n_rx_thr;
 
 	/*
 	 * If no user supplied number or it's too large, then attempt
@@ -38,7 +38,7 @@ int odp_cpumask_default_worker(odp_cpumask_t *mask, int num_in)
 		int cpu = i;
 		/* If this is a slot reserved by Rx threads, skip */
 		if (cpu % 2 == 1 &&
-		    (unsigned)((abs_cpu_count - 1 - i)) < odp_global_data.n_rx_thr)
+		    (unsigned)((abs_cpu_count - 1 - i) / 2) < odp_global_data.n_rx_thr)
 			continue;
 
 		odp_cpumask_set(mask, cpu);

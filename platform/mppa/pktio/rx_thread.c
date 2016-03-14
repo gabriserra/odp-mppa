@@ -699,12 +699,12 @@ int rx_thread_init(void)
 	for (uint32_t i = 0; i < odp_global_data.n_rx_thr; ++i) {
 		/* Start threads */
 
+		unsigned pe_id = BSP_NB_PE_P - 2 * i - 1;
 #ifdef K1_NODEOS
 		odp_cpumask_t thd_mask;
 		pthread_attr_t attr;
-
 		odp_cpumask_zero(&thd_mask);
-		odp_cpumask_set(&thd_mask, BSP_NB_PE_P - i - 1);
+		odp_cpumask_set(&thd_mask, pe_id);
 
 		pthread_attr_init(&attr);
 		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t),
@@ -717,7 +717,7 @@ int rx_thread_init(void)
 #else
 		if (utask_start_pe(&rx_hdl.th[i].task, _rx_thread_start,
 				   (void *)(unsigned long)(i),
-				   BSP_NB_PE_P - i - 1))
+				   pe_id))
 			ODP_ABORT("Thread failed");
 #endif
 	}
