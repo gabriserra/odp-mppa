@@ -38,7 +38,7 @@ run_test()
 			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
 			;;
 		"konic80")
-			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="e0 e1 -- e1 e0 -- e0:jumbo e1:jumbo -- e1:jumbo e0:jumbo -- loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
 			;;
 		"explorer")
 			IFLIST="loop -- e1:loop:tags=100 -- e1:jumbo:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
