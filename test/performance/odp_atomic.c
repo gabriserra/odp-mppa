@@ -303,6 +303,7 @@ int odp_test_thread_exit(pthrd_arg *arg)
 /** test init globals and call odp_init_global() */
 int odp_test_global_init(void)
 {
+	odp_cpumask_t mask;
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
 	if (odp_init_global(NULL, NULL)) {
@@ -310,7 +311,7 @@ int odp_test_global_init(void)
 		return -1;
 	}
 
-	num_workers = odp_cpu_count();
+	num_workers = odp_cpumask_default_worker(&mask, odp_cpu_count());
 	/* force to max CPU count */
 	if (num_workers > MAX_WORKERS)
 		num_workers = MAX_WORKERS;
@@ -386,7 +387,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (pthrdnum == 0)
-		pthrdnum = odp_cpu_count();
+		pthrdnum = num_workers;
 
 	test_atomic_init();
 	test_atomic_store();
