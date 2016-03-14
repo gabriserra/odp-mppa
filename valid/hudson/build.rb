@@ -14,6 +14,7 @@ options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path t
                         "output-dir"    => [nil, "Output directory for RPMs."],
                         "k1version"     => ["unknown", "K1 Tools version required for building ODP applications"],
                         "toolchainversion"     => ["", "K1 Toolchain version required for building ODP applications"],
+                        "librariesversion" => ["", "k1-libraries version required for building ODP applications"],
                      })
 
 if options["list-configs"] == true then
@@ -208,6 +209,9 @@ b.target("package") do
     depends.push b.depends_info_struct.new("k1-tools","=", options["k1version"], "")
     if options["toolchainversion"].to_s != "" then
         depends.push b.depends_info_struct.new("k1-toolchain","=", options["toolchainversion"], "")
+    end
+    if not options["librariesversion"].to_s.empty? then
+      depends.push b.depends_info_struct.new("k1-libraries","=", options["librariesversion"], "")
     end
     package_description = "K1 ODP package (k1-odp-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp", release_info,
