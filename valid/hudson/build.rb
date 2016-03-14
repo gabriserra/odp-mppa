@@ -38,7 +38,7 @@ repo = Git.new(odp_clone,workspace)
 local_valid = options["local-valid"]
 
 clean = Target.new("clean", repo, [])
-build = ParallelTarget.new("build", repo, [])
+build = Target.new("build", repo, [])
 install = Target.new("install", repo, [build])
 valid = ParallelTarget.new("valid", repo, [install])
 valid_packages = ParallelTarget.new("valid-packages", repo, [])
