@@ -177,6 +177,8 @@ static args_t *args;
  * Buffer pool for packet IO
  */
 #ifdef __k1__
+//#define SHM_PKT_POOL_BUF_COUNT 600
+//#define SHM_PKT_POOL_BUF_SIZE  1100
 #define SHM_PKT_POOL_BUF_COUNT 1500
 #define SHM_PKT_POOL_BUF_SIZE  500
 #else

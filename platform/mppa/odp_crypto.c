@@ -333,6 +333,7 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	unsigned char iv_enc[AES_BLOCK_SIZE];
 	void *iv_ptr;
 	uint8_t *tag = data + params->hash_result_offset;
+	// return ODP_CRYPTO_ALG_ERR_NONE;
 
 	if (params->override_iv_ptr)
 		iv_ptr = params->override_iv_ptr;
@@ -359,6 +360,7 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 
 	/* Encrypt it */
 	EVP_CIPHER_CTX *ctx = session->cipher.data.aes_gcm.ctx;
+#if 1
 	unsigned int cipher_len = 0;
 
   cipher_len = plain_len;
@@ -368,7 +370,10 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
     return ODP_CRYPTO_ALG_ERR_DATA_SIZE;
   }
 
-#if 0
+#else
+	int cipher_len = 0;
+
+  cipher_len = plain_len;
 	EVP_EncryptInit_ex(ctx, NULL, NULL, NULL, iv_enc);
 
 	/* Authenticate header data (if any) without encrypting them */
