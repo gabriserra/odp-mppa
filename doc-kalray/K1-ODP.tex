@@ -73,7 +73,18 @@ The K1-ODP files will be installed under the
 \section{What's new}
 \subsection{K1-ODP 0.3.3}
 
-\texttt{verbose} option has been added for Ethernet pktio.
+\begin{itemize}
+\item[-] \texttt{verbose} option has been added for Ethernet pktio.
+\item[-] distribution of clusters in the lookup table has been changed (it
+	should be transparent for most users):
+	\begin{itemize}
+	\item[-] until 0.3.2: LUT entries are allocated contiguously for each
+		cluster (e.g. for 2 clusters, cluster 0 has entries [0..255] and cluster
+		1 has entries [256..511].
+	\item[-] from 0.3.3: LUT entries are allocated interleaved (e.g. for 2
+		clusters, cluster 0 has even entries and cluster 1 has odd entries).
+	\end{itemize}
+\end{itemize}
 
 \subsubsection{Bug Fixes}
 \begin{itemize}

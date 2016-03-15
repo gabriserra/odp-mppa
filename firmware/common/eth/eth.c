@@ -124,30 +124,36 @@ static int eth_apply_rules(int lane_id, pkt_rule_t *rules, int nb_rules, int clu
 	// dispatch hash lut between registered clusters
 	uint32_t clusters = registered_clusters[lane_id];
 	int nb_registered = __k1_cbs(clusters);
-	int chunks[nb_registered];
-	for ( int j = 0; j < nb_registered; ++j ) {
-		chunks[j] = MPPABETHLB_LUT_ARRAY_SIZE / nb_registered +
-			( ( j < ( MPPABETHLB_LUT_ARRAY_SIZE % nb_registered ) ) ? 1 : 0 );
-	}
 
-	for ( int i = 0, j = 0; i < MPPABETHLB_LUT_ARRAY_SIZE ; i+= chunks[j], j++ ) {
-		int registered_cluster = __k1_ctz(clusters);
-		clusters &= ~(1 << registered_cluster);
-		int tx_id = status[lane_id].cluster[registered_cluster].txId;
-		int noc_if = status[lane_id].cluster[registered_cluster].nocIf;
+	for ( int cluster_nb = 0; cluster_nb < nb_registered; ++ cluster_nb ) {
+		int cluster_id = __k1_ctz(clusters);
+		clusters &= ~(1 << cluster_id);
+		int tx_id = status[lane_id].cluster[cluster_id].txId;
+		int noc_if = status[lane_id].cluster[cluster_id].nocIf;
 #ifdef VERBOSE
-		printf("config lut[%3d-%3d] -> C%2d: %d %d %d %d\n",
-			   i, i + chunks[j] - 1, registered_cluster,
+		printf("config lut[%02d, +=%02d] -> C%2d: %d %d %d %d\n",
+			   cluster_nb, nb_registered, cluster_id,
 			   lane_id, tx_id, ETH_DEFAULT_CTX, noc_if - ETH_BASE_TX);
 #endif
-		for ( int lut_id = i; lut_id < i + chunks[j] ; ++lut_id ) {
+		for ( int lut_id = cluster_nb; lut_id < MPPABETHLB_LUT_ARRAY_SIZE; lut_id+=nb_registered ) {
 			mppabeth_lb_cfg_luts((void *) &(mppa_ethernet[0]->lb),
 								 lane_id, lut_id, tx_id,
 								 ETH_DEFAULT_CTX,
 								 noc_if - ETH_BASE_TX);
 		}
 	}
-
+#if 0
+	// Extra verbose: display all LUT entries at each new config
+	for ( int lut_id = 0; lut_id < MPPABETHLB_LUT_ARRAY_SIZE; lut_id++ ) {
+		printf("[%3d] : dma %d tx %d ctx %d\n", lut_id,
+		mppabeth_lb_get_luts_dma_id((void *) &(mppa_ethernet[0]->lb),
+								 lane_id, lut_id),
+		mppabeth_lb_get_luts_tx_id((void *) &(mppa_ethernet[0]->lb),
+								 lane_id, lut_id),
+		mppabeth_lb_get_luts_context((void *) &(mppa_ethernet[0]->lb),
+								 lane_id, lut_id));
+	}
+#endif
 	return 0;
 }
 
