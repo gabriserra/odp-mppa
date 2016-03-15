@@ -165,7 +165,7 @@ static int send_recv(odp_packet_t packet, int send_nb, int expt_nb)
 	}
 	int ret = 0;
 
-	int start = __k1_read_dsu_timestamp();
+	uint64_t start = __k1_read_dsu_timestamp();
 	while ( ret >= 0 && ret < expt_nb && ( __k1_read_dsu_timestamp() - start ) < 10 * __bsp_frequency ) {
 		ret += odp_pktio_recv(pktio, pkt_tbl, MAX_PKT_BURST);
 	}
