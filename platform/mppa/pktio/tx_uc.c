@@ -39,7 +39,7 @@ uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 
 	/* Free previous packets */
 	for (uint64_t pos = head; pos < head + count; pos++) {
-		if(pos > MAX_JOB_PER_UC){
+		if(pos >= MAX_JOB_PER_UC){
 			tx_uc_job_ctx_t *job = &ctx->job_ctxs[pos % MAX_JOB_PER_UC];
 			INVALIDATE(job);
 			if (!job->pkt_count || job->nofree)

@@ -4,7 +4,7 @@
 #include <odp/rpc/defines.h>
 
 /** Version of the ETH CoS */
-#define ODP_RPC_ETH_VERSION 0x1
+#define ODP_RPC_ETH_VERSION 0x2
 
 /** Length of a mac address */
 #define ETH_ALEN 6
@@ -50,6 +50,7 @@ typedef union {
 		uint8_t jumbo : 1;       /**< Enable Jumbo frame support */
 		uint8_t nb_rules : 4;    /**< Number of rule to the has policy.
 					  *   Rules are provided in the payload */
+		uint8_t verbose :1;      /**< Make firmware verbose when opening a lane */
 	};
 	odp_rpc_inl_data_t inl_data;
 } odp_rpc_cmd_eth_open_t;
@@ -176,18 +177,6 @@ typedef struct {
 	 * InternalMacReceiveErrors. See ifInErrors in RFC 3635.
 	 */
 	uint64_t in_errors;
-
-	/**
-	 * For packet-oriented interfaces, the number of packets received via
-	 * the interface which were discarded because of an unknown or
-	 * unsupported protocol.  For character-oriented or fixed-length
-	 * interfaces that support protocol multiplexing the number of
-	 * transmission units received via the interface which were discarded
-	 * because of an unknown or unsupported protocol.  For any interface
-	 * that does not support protocol multiplexing, this counter will always
-	 * be 0. See ifInUnknownProtos in RFC 2863, RFC 3635.
-	 */
-	uint64_t in_unknown_protos;
 
 	/**
 	 * The number of octets transmitted in valid MAC frames on this

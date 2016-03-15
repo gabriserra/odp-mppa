@@ -89,7 +89,7 @@ odp_rpc_ack_t  eth_open(unsigned remoteClus, odp_rpc_t *msg,
 					 data.nb_rules, (pkt_rule_t*)payload))
 			goto err;
 	}
-	if (ethtool_start_lane(data.ifId, data.loopback))
+	if (ethtool_start_lane(data.ifId, data.loopback, data.verbose))
 		goto err;
 
 	ack.cmd.eth_open.tx_if = externalAddress;
@@ -261,6 +261,9 @@ static int eth_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload
 		break;
 	case ODP_RPC_CMD_ETH_DUAL_MAC:
 		ack = eth_dual_mac(remoteClus, msg);
+		break;
+	case ODP_RPC_CMD_ETH_GET_STAT:
+		ack = eth_get_stat(remoteClus, msg, ack_payload, &ack_payload_len);
 		break;
 	default:
 		return -ODP_RPC_ERR_BAD_SUBTYPE;

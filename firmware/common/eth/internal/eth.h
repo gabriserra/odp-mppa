@@ -36,7 +36,7 @@ int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
 int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id);
 int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id);
 
-int ethtool_start_lane(unsigned if_id, int loopback);
+int ethtool_start_lane(unsigned if_id, int loopback, int verbose);
 int ethtool_stop_lane(unsigned if_id);
 
 int ethtool_poll_lane(unsigned if_id);

@@ -20,9 +20,6 @@ int main(int argc __attribute__((unused)),
 
 	/* Only spawn from IODDR0, not IODDR1 */
 	if ( __k1_get_cluster_id() == 128 ) {
-		/* Set the number of cluster to be spawned
-		 * so they can be synced */
-		boot_set_nb_clusters(2);
 
 		printf("Spawning clusters\n");
 		{

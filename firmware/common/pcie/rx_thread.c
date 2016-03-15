@@ -25,7 +25,7 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 	events = mppa_noc_dnoc_rx_lac_event_counter(iface->iface_id, rx_id);
 	if (!events) {
 		err_printf("Invalid count of events on rx %d\n", rx_id);
-		exit(1);
+		return -1;
 	}
 
 	typeof(mppa_dnoc[iface->iface_id]->rx_queues[0]) * const rx_queue =

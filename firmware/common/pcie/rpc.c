@@ -121,7 +121,7 @@ static odp_rpc_ack_t pcie_open(unsigned remoteClus, odp_rpc_t * msg)
 	}
 	if (n_rx < MPPA_PCIE_NOC_RX_NB) {
 		err_printf("failed to allocate %d contiguous Rx ports\n", MPPA_PCIE_NOC_RX_NB);
-		exit(1);
+		return ack;
 	}
 	unsigned int min_tx_tag = first_rx;
 	unsigned int max_tx_tag = first_rx + MPPA_PCIE_NOC_RX_NB - 1;
