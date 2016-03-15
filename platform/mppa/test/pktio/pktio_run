@@ -35,13 +35,13 @@ run_test()
 
 	case "$BOARD_TYPE" in
 		"ab01")
-			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100"
 			;;
 		"konic80")
-			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100"
 			;;
 		"explorer")
-			IFLIST="loop -- e1:loop:tags=100 -- e1:jumbo:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="loop -- e1:loop:tags=100 -- e1:jumbo:tags=100 -- e1p1:loop:tags=100"
 			;;
 		"")
 			IFLIST="loop"
