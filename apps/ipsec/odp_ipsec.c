@@ -177,10 +177,12 @@ static args_t *args;
  * Buffer pool for packet IO
  */
 #ifdef __k1__
+#define SHM_PKT_POOL_BUF_COUNT 450
+#define SHM_PKT_POOL_BUF_SIZE  1600
 //#define SHM_PKT_POOL_BUF_COUNT 600
 //#define SHM_PKT_POOL_BUF_SIZE  1100
-#define SHM_PKT_POOL_BUF_COUNT 1500
-#define SHM_PKT_POOL_BUF_SIZE  500
+//#define SHM_PKT_POOL_BUF_COUNT 1500
+//#define SHM_PKT_POOL_BUF_SIZE  500
 #else
 #define SHM_PKT_POOL_BUF_COUNT 1024
 #define SHM_PKT_POOL_BUF_SIZE  4096
@@ -780,7 +782,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
 	odp_barrier_wait(&sync_barrier);
 
 	for(;;) {
-		if(thr % 2 == 0 && thr  <= 4){
+		if(thr % 2 == 0 && thr  <= 6){
 			int n_pkt;
 			odp_packet_t pkts[PKT_BURST_SIZE];
 			odp_packet_t crypt_pkts[PKT_BURST_SIZE];
@@ -925,7 +927,7 @@ main(int argc, char *argv[])
 	odp_cpumask_t cpumask;
 	char cpumaskstr[ODP_CPUMASK_STR_SIZE];
 	odp_pool_param_t params;
-	odp_platform_init_t platform_params = { .n_rx_thr = 2 };
+	odp_platform_init_t platform_params = { .n_rx_thr = 1 };
 	/* Init ODP before calling anything else */
 	if (odp_init_global(NULL, &platform_params)) {
 		EXAMPLE_ERR("Error: ODP global init failed.\n");

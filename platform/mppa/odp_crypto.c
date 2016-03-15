@@ -329,10 +329,9 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	uint8_t *aad_tail = data + params->cipher_range.offset +
 		params->cipher_range.length;
 	uint32_t auth_len = params->auth_range.length;
-	unsigned char iv_enc[AES_BLOCK_SIZE];
 	void *iv_ptr;
 	uint8_t *tag = data + params->hash_result_offset;
-	return ODP_CRYPTO_ALG_ERR_NONE;
+	//return ODP_CRYPTO_ALG_ERR_NONE;
 
 	if (params->override_iv_ptr)
 		iv_ptr = params->override_iv_ptr;
@@ -352,10 +351,13 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	 * and if we are processing packets on parallel threads
 	 * we could get corruption.
 	 */
-	memcpy(iv_enc, iv_ptr, AES_BLOCK_SIZE);
+	//unsigned char iv_enc[AES_BLOCK_SIZE];
+	//memcpy(iv_enc, iv_ptr, AES_BLOCK_SIZE);
 
 	/* Adjust pointer for beginning of area to cipher/auth */
 	uint8_t *plaindata = data + params->cipher_range.offset;
+
+	//return ODP_CRYPTO_ALG_ERR_NONE;
 
 	/* Encrypt it */
 	EVP_CIPHER_CTX *ctx = session->cipher.data.aes_gcm.ctx;
@@ -363,7 +365,7 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	unsigned int cipher_len = 0;
 
   cipher_len = plain_len;
-  mppa_aes128_gcm_encrypt(ctx, plaindata, &cipher_len, tag, iv_enc, aad_head, plaindata - aad_head, plaindata);
+  mppa_aes128_gcm_encrypt(ctx, plaindata, &cipher_len, tag, iv_ptr, aad_head, plaindata - aad_head, plaindata);
 	if (aad_head + auth_len > plaindata + plain_len) {
     (void) aad_tail;
     return ODP_CRYPTO_ALG_ERR_DATA_SIZE;

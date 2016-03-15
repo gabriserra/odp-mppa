@@ -33,7 +33,7 @@ int main()
 				"-p", "192.168.222.0/24:192.168.111.0/24:in:both",
 				"-e", "192.168.222.2:192.168.111.2:aesgcm:301:656c8523255ccc23a66c1917aa0cf309",
 				"-a", "192.168.222.2:192.168.111.2:aesgcm:300:656c8523255ccc23a66c1917aa0cf309",
-				"-c", "13", "-m", "ASYNC_IN_PLACE", NULL
+				"-c", "14", "-m", "ASYNC_IN_PLACE", NULL
 			};
 
 			/*for (int i = 0; i < 16; i++) {
@@ -45,11 +45,14 @@ int main()
 			}*/
 			//boot_cluster(1, _argv[0], _argv);
 			boot_cluster(2, _argv[0], _argv);
+			/*
 			boot_cluster(5, _argv[0], _argv);
-			boot_cluster(6, _argv[0], _argv);
-			//boot_cluster(9, _argv[0], _argv);
-			//boot_cluster(10, _argv[0], _argv);
-			//boot_cluster(13, _argv[0], _argv);
+      boot_cluster(6, _argv[0], _argv);
+			boot_cluster(9, _argv[0], _argv);
+			boot_cluster(10, _argv[0], _argv);
+			boot_cluster(13, _argv[0], _argv);
+			boot_cluster(14, _argv[0], _argv);
+      */
 		}
 		{
 			static char const * _argv[] = {
@@ -60,7 +63,7 @@ int main()
 				"--srcip",  "192.168.111.2",
 				"--dstip", "192.168.222.2",
 				"-m", "u",
-				"-i", "0", "-w", "2", "-p", "400", NULL
+				"-i", "0", "-w", "2", "-p", "1500", NULL
 			};
 
 			//for (int i = 0; i < 16; i += 4) {
@@ -74,9 +77,11 @@ int main()
 				//boot_cluster(i, _argv[0], _argv);
 			//}
 			boot_cluster(0, _argv[0], _argv);
+      /*
 			boot_cluster(4, _argv[0], _argv);
-			//boot_cluster(8, _argv[0], _argv);
-			//boot_cluster(12, _argv[0], _argv);
+		  boot_cluster(8, _argv[0], _argv);
+			boot_cluster(12, _argv[0], _argv);
+      */
 		}
 		printf("Cluster booted\n");
 	}
