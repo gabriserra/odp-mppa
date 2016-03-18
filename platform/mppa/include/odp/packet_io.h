@@ -29,6 +29,20 @@ extern "C" {
  */
 
 /**
+ * Get statistics for pktio handle
+ *
+ * @param	pktio	 Packet IO handle
+ * @param[out]	stats	 Output buffer for counters
+ * @retval  0 on success
+ * @retval <0 on failure
+ *
+ * @note: If counter is not supported by platform it has
+ *	  to be set to 0.
+ */
+int _odp_pktio_stats(odp_pktio_t pktio,
+		     _odp_pktio_stats_t *stats);
+
+/**
  * @}
  */
 
