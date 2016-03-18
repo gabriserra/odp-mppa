@@ -854,7 +854,8 @@ int ethtool_lane_stats(unsigned if_id,
 	}
 	stats->out_errors =
 		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_fcs.reg +
-		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_size.reg;
+		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_size._.tx_small +
+		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_size._.tx_large;
 
 	return 0;
 }
