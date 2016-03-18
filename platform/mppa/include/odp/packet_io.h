@@ -43,6 +43,15 @@ int _odp_pktio_stats(odp_pktio_t pktio,
 		     _odp_pktio_stats_t *stats);
 
 /**
+ * Print pktio statistics
+ * @param      pktio    Packet IO handle
+ * @param      stats    Output buffer for counters
+ */
+void _odp_pktio_stats_print(odp_pktio_t pktio,
+			    const _odp_pktio_stats_t *stats);
+
+
+/**
  * @}
  */
 
