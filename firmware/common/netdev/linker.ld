@@ -34,11 +34,6 @@ SECTIONS
     . = ALIGN(8);
   }  > internal_mem
   
-  .eth_control 0x1c200:
-  {
-	eth_control = ABSOLUTE(.);
-  }> internal_mem
- 
   .text   ALIGN(8) :
   {
       KEEP(*(.init))

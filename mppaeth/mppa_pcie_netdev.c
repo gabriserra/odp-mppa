@@ -23,18 +23,13 @@
 #include "mppa_pcie_netdev_priv.h"
 #include "mppa_pcie_fs.h"
 
-/**
- * Limit the number of dma engine used
- */
-unsigned int eth_ctrl_addr = 0x1c200;
-
-module_param(eth_ctrl_addr, int, S_IRUSR | S_IRGRP);
-MODULE_PARM_DESC(eth_ctrl_addr, "Ethernet control structure address");
-
 static uint32_t mppa_pcie_netdev_get_eth_control_addr(struct mppa_pcie_device *pdata)
 {
-	return eth_ctrl_addr;
+	uint32_t control_addr;
+	int ret = mppa_pcie_get_service_addr(pdata, PCIE_SERVICE_ETH, &control_addr);
+	return ret == 0 ? control_addr : 0;
 }
+
 
 
 /* TODO: this function should be provide by mppa dma */
@@ -1060,7 +1055,7 @@ static int mppa_pcie_netdev_init(void)
 {
 	struct mppa_pcie_device *pdata = NULL;
 
-	printk(KERN_INFO "Loading ethernet driver, ethernet control addr 0x%x\n", eth_ctrl_addr);
+	printk(KERN_INFO "Loading ethernet driver\n");
 
 	list_for_each_entry(pdata, &mppa_device_list, link) {
 		struct mppa_pcie_pdata_netdev *netdev;
