@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
+#include <mppa_boot_args.h>
 #include <mppa_power.h>
 #include <mppa_routing.h>
 #include <mppa_noc.h>
@@ -31,6 +32,22 @@ struct clus_bin_boot {
 
 static unsigned has_booted;
 static struct clus_bin_boot clus_bin_boots[BSP_NB_CLUSTER_MAX];
+
+extern void* MPPA_SPAWN_DIRECTORY_ADDRESS __attribute__((weak));
+
+static int has_bootable_elfs(void)
+{
+	mppa_boot_entry_t *table =
+		(mppa_boot_entry_t*) &MPPA_SPAWN_DIRECTORY_ADDRESS;
+	if (table == NULL) {
+		return 0;
+	}
+
+	if (table[0].image_addr)
+		return 1;
+
+	return 0;
+}
 
 int join_cluster(int clus_id, int *status)
 {
@@ -82,6 +99,8 @@ int join_clusters(void)
 int boot_cluster(int clus_id, const char bin_file[], const char * argv[] ) {
 	if (__k1_get_cluster_id() != 128)
 		return -1;
+	if (!has_bootable_elfs())
+		return -1;
 
 	struct clus_bin_boot *clus = &clus_bin_boots[clus_id];
 	has_booted = 1;
@@ -117,6 +136,9 @@ int boot_clusters(int argc, char * const argv[])
 	unsigned int i;
 	int opt;
 	if (__k1_get_cluster_id() != 128)
+		return -1;
+
+	if (!has_bootable_elfs())
 		return -1;
 
 	unsigned clus_count = 0;

@@ -93,9 +93,12 @@ Although the main thread still runs on IODDR, the main does not need
 to poll for message anymore.
 The call to \texttt{odp\_rpc\_server\_start} starts a background
 thread on IOETH that handles all the clusters request directly.
-The main thread should not exit before the spawned clusters ave been
+The main thread should not exit before the spawned clusters have been
 joined by calling \texttt{join\_clusters}.
 If no clusters were spawned, the firmare should never exit.
+If the firmware is spawned uotside a MPK (no additional ELF files),
+\texttt{boot\_cluster} and \texttt{boot\_clusters} do not spawn nor
+parse arguments.
 
 Firmware build system has been changed to inherit compilation flags
 from the \texttt{platforms.inc} file already used for building ODP
