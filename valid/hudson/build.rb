@@ -253,8 +253,9 @@ b.target("package") do
     # Generates k1r_parameters.sh
     output_parameters = File.join(artifacts,"k1odp_parameters.sh")
     b.run("rm -f #{output_parameters}")
-    b.run("echo 'K1ODP_VERSION=#{$version}-#{$buildID}' >> #{output_parameters}")
-    b.run("echo 'K1ODP_RELEASE=#{$version}' >> #{output_parameters}")
+    b.run("echo 'K1ODP_VERSION=#{version}-#{releaseID}' >> #{output_parameters}")
+    b.run("echo 'K1ODP_RELEASE=#{version}' >> #{output_parameters}")
+    b.run("echo 'K1ODP_REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
     b.run("echo 'COMMITER_EMAIL=#{options["email"]}' >> #{output_parameters}")
     b.run("echo 'INTEGRATION_BRANCH=#{ENV.fetch("INTEGRATION_BRANCH",options["branch"])}' >> #{output_parameters}")
     b.run("echo 'REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
