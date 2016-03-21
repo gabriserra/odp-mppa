@@ -10,6 +10,8 @@
 #include "netdev.h"
 #include "internal/cache.h"
 
+#define MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC	0xCAFEBABE
+
 #define DDR_BUFFER_BASE_ADDR	0x80000000
 
 static uintptr_t g_current_pkt_addr = DDR_BUFFER_BASE_ADDR;
@@ -269,7 +271,7 @@ int netdev_start()
 	/* Ensure coherency */
 	__k1_mb();
 	/* Cross fingers for everything to be setup correctly ! */
-	__builtin_k1_swu(&eth_control.magic, 0xCAFEBABE);
+	__builtin_k1_swu(&eth_control.magic, MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC);
 	/* Ensure coherency */
 	__k1_mb();
 
