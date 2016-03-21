@@ -26,6 +26,11 @@ int main (int argc, char *argv[])
 	}
 
 	boot_clusters(argc, argv);
-	join_clusters();
+
+	if ((ret = join_clusters()) != 0) {
+		fprintf(stderr, "Cluster returned with status %d\n", ret);
+		return ret;
+	}
+
 	return 0;
 }
