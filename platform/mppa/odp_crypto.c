@@ -926,21 +926,34 @@ odp_random_data(uint8_t *buf, int32_t len, odp_bool_t use_entropy ODP_UNUSED)
 			.inl_data = (( odp_rpc_cmd_rnd_t ){
 					.rnd_len = pkt_len }).inl_data,
 		};
+		uint8_t *payload;
 		const unsigned int rpc_server_id =
 			odp_rpc_client_get_default_server();
 
 		odp_rpc_do_query(rpc_server_id,
 						 odp_rpc_get_io_tag_id(cluster_id),
 						 &cmd, NULL);
-		int ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S);
+		int ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload,
+					   15 * ODP_RPC_TIMEOUT_1S);
 		if (ret < 0) {
 			fprintf(stderr, "[RND] RPC Error\n");
-			return 1;
+			return rnd_len;
 		} else if (ret == 0){
 			fprintf(stderr, "[RND] Query timed out\n");
-			return 1;
+			return rnd_len;
+		}
+		{
+			odp_rpc_ack_t ack;
+			ack.inl_data = ack_msg->inl_data;
+			if (ack.status) {
+				fprintf(stderr, "Error: Server declined random number generation\n");
+				if (ack_msg->err_str && ack_msg->data_len > 0)
+					fprintf(stderr, "Error Log: %s\n", payload);
+				return rnd_len;
+			}
 		}
 		const odp_rpc_cmd_rnd_t ack = {.inl_data = ack_msg->inl_data};
+
 
 		memcpy(buf + rnd_len, ack.rnd_data, ack.rnd_len);
 		if (!ack.rnd_len)

@@ -133,15 +133,16 @@ int odp_rpc_server_poll_msg(odp_rpc_t **msg, uint8_t **payload)
 	return -1;
 }
 
-int odp_rpc_server_ack(odp_rpc_t * msg, odp_rpc_ack_t ack,
-		       const uint8_t *payload, uint16_t payload_len)
+int odp_rpc_server_ack(odp_rpc_answer_t *answer)
 {
-	msg->ack = 1;
-	msg->data_len = payload_len;
-	msg->inl_data = ack.inl_data;
+	answer->msg->ack = 1;
+	answer->msg->data_len = answer->payload_len;
+	answer->msg->inl_data = answer->ack.inl_data;
 
-	unsigned interface = get_rpc_local_dma_id(msg->dma_id);
-	return odp_rpc_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, payload);
+	unsigned interface = get_rpc_local_dma_id(answer->msg->dma_id);
+	return odp_rpc_send_msg(interface, answer->msg->dma_id,
+				answer->msg->dnoc_tag, answer->msg,
+				answer->payload);
 }
 
 static
@@ -170,7 +171,7 @@ int odp_rpc_server_handle(odp_rpc_t ** unhandled_msg)
 
 static int bas_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
 {
-	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
+	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
 
 	if (msg->pkt_class != ODP_RPC_CLASS_BAS)
 		return -ODP_RPC_ERR_INTERNAL_ERROR;
@@ -182,12 +183,11 @@ static int bas_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload
 
 	switch (msg->pkt_subtype){
 	case ODP_RPC_CMD_BAS_PING:
-		ack.status = 0;
 		break;
 	default:
 		return -ODP_RPC_ERR_BAD_SUBTYPE;
 	}
-	odp_rpc_server_ack(msg, ack, NULL, 0);
+	odp_rpc_server_ack(&answer);
 	return -ODP_RPC_ERR_NONE;
 }
 

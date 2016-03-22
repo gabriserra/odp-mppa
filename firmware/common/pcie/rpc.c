@@ -67,7 +67,8 @@ static int pcie_setup_tx(unsigned int iface_id, unsigned int *tx_id,
 }
 
 static inline int pcie_add_forward(unsigned int pcie_eth_if_id,
-								   struct mppa_pcie_eth_dnoc_tx_cfg *dnoc_tx_cfg)
+				   struct mppa_pcie_eth_dnoc_tx_cfg *dnoc_tx_cfg,
+				   odp_rpc_answer_t *answer)
 {
 	struct mppa_pcie_eth_if_config * cfg = netdev_get_eth_if_config(pcie_eth_if_id);
 	struct mppa_pcie_eth_h2c_ring_buff_entry entry;
@@ -76,13 +77,18 @@ static inline int pcie_add_forward(unsigned int pcie_eth_if_id,
 	entry.pkt_addr = (uint32_t)dnoc_tx_cfg->fifo_addr;
 	entry.flags = MPPA_PCIE_ETH_NEED_PKT_HDR;
 
-	return netdev_h2c_enqueue_buffer(cfg, &entry);
+	if (netdev_h2c_enqueue_buffer(cfg, &entry)) {
+		PCIE_RPC_ERR_MSG(answer, "Failed to register cluster to pcie interface %d\n",
+				 pcie_eth_if_id);
+		return -1;
+	}
+	return 0;
 }
 
-static odp_rpc_ack_t pcie_open(unsigned remoteClus, odp_rpc_t * msg)
+static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
+		      odp_rpc_answer_t *answer)
 {
 	odp_rpc_cmd_pcie_open_t open_cmd = {.inl_data = msg->inl_data};
-	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
 	struct mppa_pcie_eth_dnoc_tx_cfg *tx_cfg;
 	int if_id = remoteClus % MPPA_PCIE_USABLE_DNOC_IF;
 	unsigned int tx_id;
@@ -91,8 +97,8 @@ static odp_rpc_ack_t pcie_open(unsigned remoteClus, odp_rpc_t * msg)
 	int ret = pcie_setup_tx(if_id, &tx_id, remoteClus,
 							open_cmd.min_rx, open_cmd.max_rx);
 	if (ret) {
-		fprintf(stderr, "[PCIe] Error: Failed to setup tx on if %d\n", if_id);
-		return ack;
+		PCIE_RPC_ERR_MSG(answer, "Failed to setup tx on if %d\n", if_id);
+		return;
 	}
 
 	/*
@@ -119,16 +125,21 @@ static odp_rpc_ack_t pcie_open(unsigned remoteClus, odp_rpc_t * msg)
 			break;
 		}
 	}
+
 	if (n_rx < MPPA_PCIE_NOC_RX_NB) {
-		err_printf("failed to allocate %d contiguous Rx ports\n", MPPA_PCIE_NOC_RX_NB);
-		return ack;
+		PCIE_RPC_ERR_MSG(answer, "Failed to allocate %d contiguous Rx ports\n",
+				 MPPA_PCIE_NOC_RX_NB);
+		return;
 	}
+
 	unsigned int min_tx_tag = first_rx;
 	unsigned int max_tx_tag = first_rx + MPPA_PCIE_NOC_RX_NB - 1;
-	for ( unsigned rx_id = min_tx_tag; rx_id <= max_tx_tag; ++rx_id ) {
-		ret = pcie_setup_rx(if_id, rx_id, open_cmd.pcie_eth_if_id);
+	unsigned rx_id;
+
+	for ( rx_id = min_tx_tag; rx_id <= max_tx_tag; ++rx_id ) {
+		ret = pcie_setup_rx(if_id, rx_id, open_cmd.pcie_eth_if_id, answer);
 		if (ret)
-			return ack;
+			return;
 	}
 
 	dbg_printf("if %d RXs [%u..%u] allocated for cluster %d\n",
@@ -140,35 +151,32 @@ static odp_rpc_ack_t pcie_open(unsigned remoteClus, odp_rpc_t * msg)
 	tx_cfg->pcie_eth_if = open_cmd.pcie_eth_if_id;
 	tx_cfg->mtu = open_cmd.pkt_size;
 
-	ret = pcie_add_forward(open_cmd.pcie_eth_if_id, tx_cfg);
+	ret = pcie_add_forward(open_cmd.pcie_eth_if_id, tx_cfg, answer);
 	if (ret)
-		return ack;
+		return;
 
-	ack.cmd.pcie_open.min_tx_tag = min_tx_tag; /* RX ID ! */
-	ack.cmd.pcie_open.max_tx_tag = max_tx_tag; /* RX ID ! */
-	ack.cmd.pcie_open.tx_if = odp_rpc_get_cluster_id(if_id);
+	answer->ack.cmd.pcie_open.min_tx_tag = min_tx_tag; /* RX ID ! */
+	answer->ack.cmd.pcie_open.max_tx_tag = max_tx_tag; /* RX ID ! */
+	answer->ack.cmd.pcie_open.tx_if = odp_rpc_get_cluster_id(if_id);
 	/* FIXME, we send the same MTU as the one received */
-	ack.cmd.pcie_open.mtu = open_cmd.pkt_size;
-	memcpy(ack.cmd.pcie_open.mac,
-		   eth_control.configs[open_cmd.pcie_eth_if_id].mac_addr,
-		   MAC_ADDR_LEN);
-	ack.status = 0;
+	answer->ack.cmd.pcie_open.mtu = open_cmd.pkt_size;
+	memcpy(answer->ack.cmd.pcie_open.mac,
+	       eth_control.configs[open_cmd.pcie_eth_if_id].mac_addr,
+	       MAC_ADDR_LEN);
 
-	return ack;
+	return;
 }
 
-static odp_rpc_ack_t pcie_close(__attribute__((unused)) unsigned remoteClus,
-									__attribute__((unused)) odp_rpc_t * msg)
+static void pcie_close(__attribute__((unused)) unsigned remoteClus,
+		       __attribute__((unused)) odp_rpc_t * msg,
+		       __attribute__((unused)) odp_rpc_answer_t *answer)
 {
-	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
-	ack.status = 0;
-
-	return ack;
+	return;
 }
 
 static int pcie_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
 {
-	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
+	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
 
 	if (msg->pkt_class != ODP_RPC_CLASS_PCIE)
 		return -ODP_RPC_ERR_INTERNAL_ERROR;
@@ -178,16 +186,16 @@ static int pcie_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payloa
 	(void)payload;
 	switch (msg->pkt_subtype){
 	case ODP_RPC_CMD_PCIE_OPEN:
-		ack = pcie_open(remoteClus, msg);
+		pcie_open(remoteClus, msg, &answer);
 		break;
 	case ODP_RPC_CMD_PCIE_CLOS:
-		ack = pcie_close(remoteClus, msg);
+		pcie_close(remoteClus, msg, &answer);
 		break;
 	default:
 		return -ODP_RPC_ERR_BAD_SUBTYPE;
 	}
 
-	odp_rpc_server_ack(msg, ack, NULL, 0);
+	odp_rpc_server_ack(&answer);
 	return -ODP_RPC_ERR_NONE;
 }
 

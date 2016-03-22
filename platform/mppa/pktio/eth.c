@@ -71,6 +71,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 	odp_rpc_t *ack_msg;
 	odp_rpc_ack_t ack;
 	int ret;
+	uint8_t *payload;
 
 	/*
 	 * RPC Msg to IOETH  #N so the LB will dispatch to us
@@ -108,7 +109,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, rules);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		fprintf(stderr, "[ETH] RPC Error\n");
 		return 1;
@@ -120,6 +121,8 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[ETH] Error: Server declined opening of eth interface\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[ETH] Error Log: %s\n", payload);
 		return 1;
 	}
 
@@ -514,6 +517,7 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 		.cos_version = ODP_RPC_ETH_VERSION,
 		.inl_data = close_cmd.inl_data
 	};
+	uint8_t *payload;
 
 	/* Free packets being sent by DMA */
 	tx_uc_flush(eth_get_ctx(eth));
@@ -522,7 +526,7 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 5 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		fprintf(stderr, "[ETH] RPC Error\n");
 		return 1;
@@ -531,6 +535,11 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 		return 1;
 	}
 	ack.inl_data = ack_msg->inl_data;
+	if (ack.status) {
+		fprintf(stderr, "[ETH] Error: Server declined closure of eth interface\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[ETH] Error Log: %s\n", payload);
+	}
 
 	/* Push Context to handling threads */
 	rx_thread_link_close(eth->rx_config.pktio_id);
@@ -562,12 +571,13 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 		.cos_version = ODP_RPC_ETH_VERSION,
 		.inl_data = state_cmd.inl_data
 	};
+	uint8_t *payload;
 
 	odp_rpc_do_query(odp_rpc_get_io_dma_id(slot_id, cluster_id),
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 5 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		fprintf(stderr, "[ETH] RPC Error\n");
 		return 1;
@@ -576,6 +586,13 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 		return 1;
 	}
 	ack.inl_data = ack_msg->inl_data;
+	if (ack.status) {
+		fprintf(stderr, "[ETH] Error: Server declined change of eth state\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[ETH] Error Log: %s\n", payload);
+		return 1;
+	}
+
 	return ack.status;
 }
 
@@ -681,7 +698,7 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 	odp_rpc_t *ack_msg;
 	odp_rpc_ack_t ack;
 	int ret;
-	void *payload;
+	uint8_t *payload;
 	odp_rpc_payload_eth_get_stat_t *rpc_stats;
 
 	/*
@@ -707,7 +724,7 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, &payload, 2 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 2 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		return -1;
 	} else if (ret == 0){
@@ -716,6 +733,9 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
+		fprintf(stderr, "[ETH] Error: Server declined retrieval of eth stats\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[ETH] Error Log: %s\n", payload);
 		return -1;
 	}
 

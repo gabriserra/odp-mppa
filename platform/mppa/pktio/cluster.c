@@ -134,12 +134,13 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 		.flags = 0,
 	};
 	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
+	uint8_t *payload;
 
 	odp_rpc_do_query(rpc_server_id,
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		fprintf(stderr, "[C2C] RPC Error\n");
 		return 1;
@@ -151,6 +152,8 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[C2C] Error: Server declined opening of cluster interface\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[C2C] Error Log: %s\n", payload);
 		return 1;
 	}
 
@@ -178,12 +181,13 @@ static int cluster_rpc_send_c2c_query(pkt_cluster_t *cluster)
 		.flags = 0,
 	};
 	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
+	uint8_t *payload;
 
 	odp_rpc_do_query(rpc_server_id,
-					 odp_rpc_get_io_tag_id(cluster_id),
-					 &cmd, NULL);
+			 odp_rpc_get_io_tag_id(cluster_id),
+			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		fprintf(stderr, "[C2C] RPC Error\n");
 		__odp_errno = EPIPE;
@@ -200,6 +204,9 @@ static int cluster_rpc_send_c2c_query(pkt_cluster_t *cluster)
 			__odp_errno = EAGAIN;
 		} else if (ack.cmd.c2c_query.eacces) {
 			__odp_errno = EACCES;
+		} else if(ack_msg->err_str && ack_msg->data_len > 0) {
+			fprintf(stderr, "[C2C] Error: Server declined query of cluster2cluster status\n");
+			fprintf(stderr, "[C2C] Error Log: %s\n", payload);
 		}
 		return 1;
 	}
@@ -363,6 +370,7 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 {
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
 	odp_rpc_t *ack_msg;
+	odp_rpc_ack_t ack;
 	int ret;
 	odp_rpc_cmd_c2c_clos_t close_cmd = {
 		{
@@ -380,6 +388,7 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 		.inl_data = close_cmd.inl_data
 	};
 	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
+	uint8_t *payload;
 
 	/* Free packets being sent by DMA */
 	tx_uc_flush(c2c_get_ctx(clus));
@@ -400,19 +409,25 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 5 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
-		fprintf(stderr, "[CLUS] RPC Error\n");
+		fprintf(stderr, "[C2C] RPC Error\n");
 		return 1;
 	} else if (ret == 0){
-		fprintf(stderr, "[CLUS] Query timed out\n");
+		fprintf(stderr, "[C2C] Query timed out\n");
 		return 1;
+	}
+	ack.inl_data = ack_msg->inl_data;
+	if (ack.status) {
+		fprintf(stderr, "[C2C] Error: Server declined closure of cluster2cluster interface\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[C2C] Error Log: %s\n", payload);
 	}
 
 	/* Push Context to handling threads */
 	rx_thread_link_close(clus->rx_config.pktio_id);
 
-	return 0;
+	return ack.status;
 }
 
 

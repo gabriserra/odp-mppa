@@ -4,7 +4,7 @@
 #include <odp/rpc/defines.h>
 
 /** Version of the ETH CoS */
-#define ODP_RPC_ETH_VERSION 0x2
+#define ODP_RPC_ETH_VERSION 0x3
 
 /** Length of a mac address */
 #define ETH_ALEN 6

@@ -75,6 +75,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	odp_rpc_t *ack_msg;
 	odp_rpc_ack_t ack;
 	int ret;
+	uint8_t *payload;
 	/*
 	 * RPC Msg to IOPCIE  #N so the LB will dispatch to us
 	 */
@@ -99,9 +100,9 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
-		fprintf(stderr, "[PCIE] RPC Error\n");
+		fprintf(stderr, "[PCIE] RPC Error:\n");
 		return 1;
 	} else if (ret == 0){
 		fprintf(stderr, "[PCIE] Query timed out\n");
@@ -110,6 +111,8 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[PCIE] Error: Server declined opening of pcie interface\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[PCIE] Error Log: %s\n", payload);
 		return 1;
 	}
 
@@ -280,6 +283,7 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 		.flags = 0,
 		.inl_data = close_cmd.inl_data
 	};
+	uint8_t *payload;
 
 	/* Free packets being sent by DMA */
 	tx_uc_flush(pcie_get_ctx(pcie));
@@ -288,7 +292,7 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, NULL, 5 * ODP_RPC_TIMEOUT_1S);
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
 	if (ret < 0) {
 		fprintf(stderr, "[PCIE] RPC Error\n");
 		return 1;
@@ -297,6 +301,11 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 		return 1;
 	}
 	ack.inl_data = ack_msg->inl_data;
+	if (ack.status) {
+		fprintf(stderr, "[PCIE] Error: Server declined closure of pcie interface\n");
+		if (ack_msg->err_str && ack_msg->data_len > 0)
+			fprintf(stderr, "[PCIE] Error Log: %s\n", payload);
+	}
 
 	/* Push Context to handling threads */
 	rx_thread_link_close(pcie->rx_config.pktio_id);

@@ -6,8 +6,26 @@
 
 typedef int (*odp_rpc_handler_t)(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload);
 
-int odp_rpc_server_ack(odp_rpc_t * msg, odp_rpc_ack_t ack,
-		       const uint8_t *payload, uint16_t payload_len);
+typedef struct {
+	odp_rpc_t *msg;
+	odp_rpc_ack_t ack;
+	uint8_t  payload[RPC_MAX_PAYLOAD] __attribute__((aligned(8)));
+	uint16_t payload_len;
+} odp_rpc_answer_t;
+
+#define ODP_RPC_ANSWER_INITIALIZER(m)  { .msg = m, .ack = ODP_RPC_CMD_ACK_INITIALIZER, .payload_len = 0 }
+
+#define RPC_ERROR(answer, mod, x...)										\
+	do {													\
+		if (answer) {											\
+			(answer)->ack.status = 1;								\
+			(answer)->msg->err_str = 1;								\
+			(answer)->payload_len = snprintf((char*)(answer)->payload,				\
+							 RPC_MAX_PAYLOAD, mod " Error:" x);			\
+		}												\
+	} while(0)
+
+int odp_rpc_server_ack(odp_rpc_answer_t *answer);
 
 /** Global structure for modules to register their handlers */
 extern odp_rpc_handler_t __rpc_handlers[ODP_RPC_N_CLASS];

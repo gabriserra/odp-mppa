@@ -155,7 +155,8 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 }
 
 
-int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if)
+int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
+		  odp_rpc_answer_t *answer)
 {
 	int rx_thread_num = if_id / RX_THREAD_COUNT;
 	int th_iface_id = if_id % IF_PER_THREAD;
@@ -166,8 +167,8 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if)
 	iface = &g_rx_threads[rx_thread_num].iface[th_iface_id];
 
 	if (pcie_configure_rx(iface, if_id, rx_id)) {
-		dbg_printf("failed to configure noc rx\n");
-		return 1;
+		PCIE_RPC_ERR_MSG(answer, "Failed to configure noc rx\n");
+		return -1;
 	}
 
 	iface->ev_mask[rx_mask_off] |= (1 << rx_id);

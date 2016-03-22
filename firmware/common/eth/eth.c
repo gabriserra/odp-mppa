@@ -23,20 +23,20 @@ static inline int get_eth_dma_id(unsigned cluster_id){
 	return offset + ETH_BASE_TX;
 }
 
-odp_rpc_ack_t  eth_open(unsigned remoteClus, odp_rpc_t *msg,
-			    uint8_t *payload, unsigned fallthrough)
+void eth_open(unsigned remoteClus, odp_rpc_t *msg,
+	      uint8_t *payload, unsigned fallthrough,
+	      odp_rpc_answer_t *answer)
 {
-	odp_rpc_ack_t ack = { .status = 0};
 	odp_rpc_cmd_eth_open_t data = { .inl_data = msg->inl_data };
 	const int nocIf = get_eth_dma_id(data.dma_if);
 	const unsigned int eth_if = data.ifId % 4; /* 4 is actually 0 in 40G mode */
 
 	if(nocIf < 0) {
-		fprintf(stderr, "[ETH] Error: Invalid NoC interface (%d %d)\n", nocIf, remoteClus);
+		ETH_RPC_ERR_MSG(answer, "Invalid NoC interface (%d %d)\n", nocIf, remoteClus);
 		goto err;
 	}
-	if(data.ifId > 4 || eth_if >= N_ETH_LANE) {
-		fprintf(stderr, "[ETH] Error: Invalid Eth lane\n");
+	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
+		ETH_RPC_ERR_MSG(answer, "Bad lane id %d\n", data.ifId);
 		goto err;
 	}
 
@@ -44,14 +44,14 @@ odp_rpc_ack_t  eth_open(unsigned remoteClus, odp_rpc_t *msg,
 		/* 40G port. We need to check all lanes */
 		for (int i = 0; i < N_ETH_LANE; ++i) {
 			if(status[i].cluster[remoteClus].opened != ETH_CLUS_STATUS_OFF) {
-				fprintf(stderr, "[ETH] Error: Lane %d is already opened for cluster %d\n",
+				ETH_RPC_ERR_MSG(answer, "Lane %d is already opened for cluster %d\n",
 						i, remoteClus);
 				goto err;
 			}
 		}
 	} else {
 		if (status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_OFF) {
-			fprintf(stderr, "[ETH] Error: Lane %d is already opened for cluster %d\n",
+			ETH_RPC_ERR_MSG(answer, "Lane %d is already opened for cluster %d\n",
 					eth_if, remoteClus);
 			goto err;
 		}
@@ -65,7 +65,7 @@ odp_rpc_ack_t  eth_open(unsigned remoteClus, odp_rpc_t *msg,
 	}
 
 	if (fallthrough && !lb_status.dual_mac) {
-		fprintf(stderr, "[ETH] Error: Trying to open in fallthrough with Dual-MAC mode disabled\n");
+		ETH_RPC_ERR_MSG(answer, "Trying to open in fallthrough with Dual-MAC mode disabled\n");
 		goto err;
 	}
 
@@ -75,97 +75,108 @@ odp_rpc_ack_t  eth_open(unsigned remoteClus, odp_rpc_t *msg,
 	status[eth_if].cluster[remoteClus].tx_enabled = data.tx_enabled;
 	status[eth_if].cluster[remoteClus].jumbo = data.jumbo;
 
-	if (ethtool_open_cluster(remoteClus, data.ifId))
+	if (ethtool_open_cluster(remoteClus, data.ifId, answer))
 		goto err;
 	if (ethtool_setup_eth2clus(remoteClus, data.ifId, nocIf, externalAddress,
-				   data.min_rx, data.max_rx))
+				   data.min_rx, data.max_rx, answer))
 		goto err;
-	if (ethtool_setup_clus2eth(remoteClus, data.ifId, nocIf))
+	if (ethtool_setup_clus2eth(remoteClus, data.ifId, nocIf, answer))
 		goto err;
 	if (fallthrough) {
 		status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_FALLTHROUGH;
 	} else {
 		if ( ethtool_apply_rules(remoteClus, data.ifId,
-					 data.nb_rules, (pkt_rule_t*)payload))
+					 data.nb_rules,
+					 (pkt_rule_t*)payload, answer))
 			goto err;
 	}
-	if (ethtool_start_lane(data.ifId, data.loopback, data.verbose))
+	if (ethtool_start_lane(data.ifId, data.loopback, data.verbose, answer))
 		goto err;
 
-	ack.cmd.eth_open.tx_if = externalAddress;
-	ack.cmd.eth_open.tx_tag = status[eth_if].cluster[remoteClus].rx_tag;
+	answer->ack.cmd.eth_open.tx_if = externalAddress;
+	answer->ack.cmd.eth_open.tx_tag = status[eth_if].cluster[remoteClus].rx_tag;
 	if (data.jumbo) {
-		ack.cmd.eth_open.mtu = 9000;
+		answer->ack.cmd.eth_open.mtu = 9000;
 	} else {
-		ack.cmd.eth_open.mtu = 1600;
+		answer->ack.cmd.eth_open.mtu = 1600;
 	}
 
 	if (!lb_status.dual_mac || fallthrough) {
-		memcpy(ack.cmd.eth_open.mac, status[eth_if].mac_address[0], ETH_ALEN);
+		memcpy(answer->ack.cmd.eth_open.mac, status[eth_if].mac_address[0], ETH_ALEN);
 	} else {
-		memcpy(ack.cmd.eth_open.mac, status[eth_if].mac_address[1], ETH_ALEN);
+		memcpy(answer->ack.cmd.eth_open.mac, status[eth_if].mac_address[1], ETH_ALEN);
 	}
 
-	return ack;
+	return;
  err:
-	ethtool_close_cluster(remoteClus, data.ifId);
-	ack.status = 1;
-	return ack;
+	ethtool_close_cluster(remoteClus, data.ifId, NULL);
+	return;
 }
 
-odp_rpc_ack_t  eth_set_state(unsigned remoteClus, odp_rpc_t *msg)
+void eth_set_state(unsigned remoteClus, odp_rpc_t *msg,
+		   odp_rpc_answer_t *answer)
 {
-	odp_rpc_ack_t ack = { .status = 0 };
 	odp_rpc_cmd_eth_state_t data = { .inl_data = msg->inl_data };
 	const unsigned int eth_if = data.ifId % 4; /* 4 is actually 0 in 40G mode */
 
+	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
+		ETH_RPC_ERR_MSG(answer, "Bad lane id %d\n", data.ifId);
+		return;
+	}
+
 	if (data.ifId == 4) {
 		if(status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_40G) {
-			ack.status = -1;
-			return ack;
+			ETH_RPC_ERR_MSG(answer, "Tring to set state for 40G lane while lane is closed or in a different mode\n");
+			return;
 		}
 	} else {
 		if(status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_ON) {
-			ack.status = -1;
-			return ack;
+			ETH_RPC_ERR_MSG(answer, "Tring to set state for 1/10G lane while lane is closed or in 40G\n");
+			return;
 		}
 	}
 
 	if (data.enabled) {
-		if (ethtool_enable_cluster(remoteClus, data.ifId)) {
-			ack.status = -1;
-			return ack;
+		if (ethtool_enable_cluster(remoteClus, data.ifId, answer)) {
+			return;
 		}
 	} else {
-		if (ethtool_disable_cluster(remoteClus, data.ifId)) {
-			ack.status = -1;
-			return ack;
+		if (ethtool_disable_cluster(remoteClus, data.ifId, answer)) {
+			return;
 		}
 	}
 
-	return ack;
+	return;
 }
 
-odp_rpc_ack_t  eth_close(unsigned remoteClus, odp_rpc_t *msg)
+void eth_close(unsigned remoteClus, odp_rpc_t *msg,
+	       odp_rpc_answer_t *answer)
 {
-	odp_rpc_ack_t ack = { .status = 0 };
 	odp_rpc_cmd_eth_clos_t data = { .inl_data = msg->inl_data };
 	const unsigned int eth_if = data.ifId % 4; /* 4 is actually 0 in 40G mode */
 
+	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
+		ETH_RPC_ERR_MSG(answer, "Bad lane id %d\n", data.ifId);
+		return;
+	}
+
 	if (data.ifId == 4) {
 		if(status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_40G) {
-			ack.status = -1;
-			return ack;
+			ETH_RPC_ERR_MSG(answer, "Tring to close 40G lane while lane is closed or in a different mode\n");
+			return;
 		}
 	} else {
 		if(status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_ON) {
-			ack.status = -1;
-			return ack;
+			ETH_RPC_ERR_MSG(answer, "Tring to set state for 1/10G lane while lane is closed or in 40G\n");
+			return;
 		}
 	}
 
-	ethtool_disable_cluster(remoteClus, data.ifId);
-	ethtool_close_cluster(remoteClus, data.ifId);
+	if (status[eth_if].cluster[remoteClus].enabled)
+		if (ethtool_disable_cluster(remoteClus, data.ifId, answer))
+			return;
+	if (ethtool_close_cluster(remoteClus, data.ifId, answer))
+		return;
 
 	if (data.ifId == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i) {
@@ -175,47 +186,42 @@ odp_rpc_ack_t  eth_close(unsigned remoteClus, odp_rpc_t *msg)
 		_eth_cluster_status_init(&status[eth_if].cluster[remoteClus]);
 	}
 
-	return ack;
+	return;
 }
 
-odp_rpc_ack_t  eth_dual_mac(unsigned remoteClus __attribute__((unused)),
-				odp_rpc_t *msg)
+void eth_dual_mac(unsigned remoteClus __attribute__((unused)),
+		  odp_rpc_t *msg,
+		  odp_rpc_answer_t *answer)
 {
-	odp_rpc_ack_t ack = { .status = 0 };
 	odp_rpc_cmd_eth_dual_mac_t data = { .inl_data = msg->inl_data };
-	if (ethtool_set_dual_mac(data.enabled))
-		ack.status = -1;
-	return ack;
+	ethtool_set_dual_mac(data.enabled, answer);
+	return;
 }
 
-odp_rpc_ack_t eth_get_stat(unsigned remoteClus __attribute__((unused)),
-			   odp_rpc_t *msg, uint8_t *ack_payload,
-			   uint16_t *ack_payload_len)
+void eth_get_stat(unsigned remoteClus __attribute__((unused)),
+			   odp_rpc_t *msg,
+			   odp_rpc_answer_t *answer)
 {
-	odp_rpc_ack_t ack = { .status = 0 };
 	odp_rpc_cmd_eth_get_stat_t data = { .inl_data = msg->inl_data };
 
-	*ack_payload_len = 0;
 	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
-		ack.status = -1;
-		return ack;
+		ETH_RPC_ERR_MSG(answer, "Bad lane id %d\n", data.ifId);
+		return;
 	}
 	if (data.ifId == 4 && status[0].initialized != ETH_LANE_ON_40G) {
-		ack.status = -1;
-		return ack;
+		ETH_RPC_ERR_MSG(answer, "Tring to get stats on 40G lane while lane is closed or in a different mode\n");
+		return;
 	} else if (data.ifId < N_ETH_LANE &&
 		   status[data.ifId].initialized !=! ETH_LANE_ON) {
-		ack.status = -1;
-		return ack;
+		   ETH_RPC_ERR_MSG(answer, "Tring to set state for 1/10G lane while lane is closed or in 40G\n");
+		   return;
 	}
-	ack.cmd.eth_get_stat.link_status = ethtool_poll_lane(data.ifId);
+	answer->ack.cmd.eth_get_stat.link_status = ethtool_poll_lane(data.ifId);
 
 	if (data.link_stats) {
-		*ack_payload_len = sizeof(odp_rpc_payload_eth_get_stat_t);
-		ethtool_lane_stats(data.ifId,
-				   (odp_rpc_payload_eth_get_stat_t *)ack_payload);
+		ethtool_lane_stats(data.ifId, answer);
 	}
-	return ack;
+	return;
 }
 static void eth_init(void)
 {
@@ -236,9 +242,7 @@ static void eth_init(void)
 
 static int eth_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
 {
-	odp_rpc_ack_t ack = ODP_RPC_CMD_ACK_INITIALIZER;
-	uint16_t ack_payload_len = 0;
-	uint8_t ack_payload[RPC_MAX_PAYLOAD] __attribute__((aligned(8)));
+	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
 
 	if (msg->pkt_class != ODP_RPC_CLASS_ETH)
 		return -ODP_RPC_ERR_INTERNAL_ERROR;
@@ -247,29 +251,29 @@ static int eth_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload
 
 	switch (msg->pkt_subtype){
 	case ODP_RPC_CMD_ETH_OPEN:
-		ack = eth_open(remoteClus, msg, payload, 0);
+		eth_open(remoteClus, msg, payload, 0, &answer);
 		break;
 	case ODP_RPC_CMD_ETH_STATE:
-		ack = eth_set_state(remoteClus, msg);
+		eth_set_state(remoteClus, msg, &answer);
 		break;
 	case ODP_RPC_CMD_ETH_CLOS:
 	case ODP_RPC_CMD_ETH_CLOS_DEF:
-		ack = eth_close(remoteClus, msg);
+		eth_close(remoteClus, msg, &answer);
 		break;
 	case ODP_RPC_CMD_ETH_OPEN_DEF:
-		ack = eth_open(remoteClus, msg, payload, 1);
+		eth_open(remoteClus, msg, payload, 1, &answer);
 		break;
 	case ODP_RPC_CMD_ETH_DUAL_MAC:
-		ack = eth_dual_mac(remoteClus, msg);
+		eth_dual_mac(remoteClus, msg, &answer);
 		break;
 	case ODP_RPC_CMD_ETH_GET_STAT:
-		ack = eth_get_stat(remoteClus, msg, ack_payload, &ack_payload_len);
+		eth_get_stat(remoteClus, msg, &answer);
 		break;
 	default:
 		return -ODP_RPC_ERR_BAD_SUBTYPE;
 	}
 
-	odp_rpc_server_ack(msg, ack, ack_payload, ack_payload_len);
+	odp_rpc_server_ack(&answer);
 	return -ODP_RPC_ERR_NONE;
 }
 

@@ -388,7 +388,8 @@ odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t t
 
 	if (payload && msg->data_len) {
 		if ( msg->data_len > RPC_MAX_PAYLOAD ) {
-			fprintf(stderr, "Error, msg payload %d > max payload %d\n", msg->data_len, RPC_MAX_PAYLOAD);
+			fprintf(stderr, "Error, msg payload %d > max payload %d\n",
+				msg->data_len, RPC_MAX_PAYLOAD);
 			return 1;
 		}
 		INVALIDATE_AREA(&odp_rpc_ack_buf.payload, msg->data_len);
