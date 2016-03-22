@@ -191,23 +191,33 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 		fprintf(stderr, "[ETH] Error: Failed to find an available Rx on DMA %d\n", nocIf);
 		return -1;
 	}
+	status[eth_if].cluster[remoteClus].nocIf = nocIf;
+	status[eth_if].cluster[remoteClus].rx_tag = rx_port;
 
 	mppa_dnoc_queue_event_it_target_t it_targets = {
 		.reg = 0
 	};
-	int fifo_id;
+	int fifo_id = -1;
 	uint16_t fifo_mask;
+	uint16_t avail_mask = lb_status.tx_fifo[nocIf - 4];
 
-	if (lb_status.tx_fifo[nocIf - 4] == 0) {
+	while(avail_mask && fifo_id == -1){
+		fifo_id = __builtin_k1_ctz(avail_mask);
+		fifo_mask = if_id == 4 ? (0xf << fifo_id) : (1 << fifo_id);
+		if ((fifo_mask & avail_mask) != fifo_mask) {
+			/* Not enough contiguous bits */
+			avail_mask &= ~(1 << fifo_id);
+			fifo_id = -1;
+			continue;
+		}
+	}
+
+	if (fifo_id == -1) {
 		fprintf(stderr, "[ETH] Error: No more Ethernet Tx fifo available on NoC interface %d\n", nocIf);
 		return  -1;
 	}
-	fifo_id = __builtin_k1_ctz(lb_status.tx_fifo[nocIf - 4]);
-	fifo_mask = if_id == 4 ? (0xf << fifo_id) : (1 << fifo_id);
-	if ((fifo_mask & lb_status.tx_fifo[nocIf - 4]) != fifo_mask) {
-		/* This should never happen */
-		return -1;
-	}
+
+	status[eth_if].cluster[remoteClus].eth_tx_fifo = fifo_id;
 	lb_status.tx_fifo[nocIf - 4] &= ~fifo_mask;
 
 
@@ -216,7 +226,6 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 		mppa_ethernet[0]->tx.fifo_if[nocIf - ETH_BASE_TX].lane[eth_if].
 			eth_fifo[fifo_id].eth_fifo_ctrl._.jumbo_mode = 1;
 	}
-	status[eth_if].cluster[remoteClus].eth_tx_fifo = fifo_id;
 
 	mppa_ethernet[0]->tx.fifo_if[nocIf - ETH_BASE_TX].lane[eth_if].
 		eth_fifo[fifo_id].eth_fifo_ctrl._.drop_en = 1;
@@ -242,8 +251,6 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 		return -1;
 	}
 
-	status[eth_if].cluster[remoteClus].nocIf = nocIf;
-	status[eth_if].cluster[remoteClus].rx_tag = rx_port;
 	return 0;
 }
 
