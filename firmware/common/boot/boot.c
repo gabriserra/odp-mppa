@@ -8,6 +8,8 @@
 #include <mppa_bsp.h>
 #include <mppa/osconfig.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "boot.h"
 
@@ -95,7 +97,7 @@ int join_clusters(int *status_mask)
 		ret = join_cluster(i, &status);
 		if (ret < 0)
 			return ret;
-		*status_mask |= status;
+		*status_mask |= WEXITSTATUS(status);
 	}
 	return 0;
 }
