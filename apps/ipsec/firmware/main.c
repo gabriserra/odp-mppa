@@ -61,7 +61,7 @@ int main()
 		printf("Cluster booted\n");
 	}
 
-	join_clusters();
+	join_clusters(NULL);
 
 	return 0;
 }

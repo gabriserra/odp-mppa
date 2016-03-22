@@ -79,12 +79,14 @@ int join_cluster(int clus_id, int *status)
 	return pid;
 }
 
-int join_clusters(void)
+int join_clusters(int *status_mask)
 {
 	int i, ret, status;
+
 	if (!has_booted)
 		while(1);
 
+	*status_mask = 0;
 	for (i = 0; i < BSP_NB_CLUSTER_MAX; ++i) {
 		if (clus_bin_boots[i].status != STATE_ON)
 			continue;
@@ -92,6 +94,7 @@ int join_clusters(void)
 		ret = join_cluster(i, &status);
 		if (ret < 0)
 			return ret;
+		*status_mask |= status;
 	}
 	return 0;
 }
