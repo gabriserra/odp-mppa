@@ -408,7 +408,7 @@ static int check_rules_identical(const pkt_rule_t *rules, int nb_rules)
 static void update_lut(unsigned if_id)
 {
 
-	if (lb_status.enabled)
+	if (!lb_status.enabled)
 		return;
 
 	const int eth_if = if_id % 4;
@@ -462,7 +462,7 @@ static void update_lut(unsigned if_id)
 	}
 	for (int i = 0; i < lb_status.nb_rules; ++i){
 		mppabeth_lb_cfg_extract_table_dispatch_mode((void *) &(mppa_ethernet[0]->lb),
-													i, MPPA_ETHERNET_DISPATCH_POLICY_HASH);
+							    i, MPPA_ETHERNET_DISPATCH_POLICY_HASH);
 	}
 }
 
