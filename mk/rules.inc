@@ -185,20 +185,20 @@ define LONG_RULE
 
 long-$(1)-$(2)-configure: long/$(2)/Makefile
 long-$(1)-$(2)-install: long-$(1)-$(2)-build
-	cd $(ARCH_DIR)/long/$(1)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
+	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
 
 long-$(1)-$(2)-valid: long-$(1)-$(2)-build extra-install
-	cd $(ARCH_DIR)/long/$(1)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile valid \
+	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile valid \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
 
 long-$(1)-$(2)-build: long-$(1)-$(2)-configure
-	mkdir -p $(ARCH_DIR)/long/$(1)/$(2)
-	cd $(ARCH_DIR)/long/$(1)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile \
+	mkdir -p $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
+	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1) all
 
 long-$(1)-$(2)-clean:
-	rm -Rf $(ARCH_DIR)/long/$(1)/$(2)
+	rm -Rf $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
 endef
 
 #
