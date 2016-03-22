@@ -45,9 +45,9 @@ uint32_t valid_ip_src   = 0xaabbccdd;
 uint32_t invalid_ip_src   = 0xaa0bccdd;
 uint32_t valid_ip_dst   = 0xa1b1c1d1;
 
-char pktio_valid_name[] = { "e0:loop:hashpolicy=[P0{@6/0xcc=0xc0d000000800}{@26/0xf=0xaabbccdd}]"
-                                               "[P1{@6#0x3f/0x3f=0xa0b0c0d0e0f0}{@12/0x3=0x0800}]"
-                                               "[P1{@6#0x3f/0x3f=0xa0b0c0d0e0f1}{@12/0x3=0xbeef}]" };
+char pktio_valid_name[] = { "e0:loop:nofree:hashpolicy=[P0{@6/0xcc=0xc0d000000800}{@26/0xf=0xaabbccdd}]"
+			    "[P1{@6#0x3f/0x3f=0xa0b0c0d0e0f0}{@12/0x3=0x0800}]"
+			    "[P1{@6#0x3f/0x3f=0xa0b0c0d0e0f1}{@12/0x3=0xbeef}]" };
 
 char pool_name[] = "pkt_pool_dispatch";
 
@@ -83,6 +83,13 @@ static int setup_test()
 	test_assert_ret(odp_pktio_start(pktio) == 0);
 
 	printf("Setup ok\n");
+	return 0;
+}
+
+static int term_test()
+{
+	test_assert_ret(odp_pktio_close(pktio) == 0);
+	test_assert_ret(odp_pool_destroy(pool) == 0);
 	return 0;
 }
 
@@ -167,9 +174,13 @@ static int send_recv(odp_packet_t packet, int send_nb, int expt_nb)
 
 	int start = __k1_read_dsu_timestamp();
 	while ( ret >= 0 && ret < expt_nb && ( __k1_read_dsu_timestamp() - start ) < 10 * __bsp_frequency ) {
-		ret += odp_pktio_recv(pktio, pkt_tbl, MAX_PKT_BURST);
+		int n_pkt = odp_pktio_recv(pktio, pkt_tbl, MAX_PKT_BURST);
+		ret += n_pkt;
+		if (n_pkt > 0)
+			odp_packet_free_multi(pkt_tbl, n_pkt);
 	}
 	test_assert_ret(ret == expt_nb);
+	odp_packet_free(packet);
 	printf("send_recv %d OK\n", test_id);
 
 	return 0;
@@ -200,6 +211,8 @@ int run_test()
 	send_recv(pkt_invalid_eth_no_ip, 10, 0);
 	send_recv(pkt_invalid_eth_valid_ip, 10, 10);
 	send_recv(pkt_invalid_eth_invalid_ip, 10, 0);
+
+	test_assert_ret(term_test() == 0);
 
 	return 0;
 }
