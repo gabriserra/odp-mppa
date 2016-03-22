@@ -71,7 +71,8 @@ int join_cluster(int clus_id, int *status)
 		return -1;
 	}
 #ifdef VERBOSE
-	printf("[BOOT] Joined cluster %d. Status=%d\n", clus_id, *status);
+	if (status)
+		printf("[BOOT] Joined cluster %d. Status=%d\n", clus_id, *status);
 #endif
 	clus->status = STATE_OFF;
 	free(clus->bin);
