@@ -68,7 +68,7 @@ int netdev_c2h_enqueue_data(struct mppa_pcie_eth_if_config *cfg,
 
 	STORE_U32(c2h->tail, next_tail);
 
-#ifdef VERBOSE
+#ifdef NETDEV_VERBOSE
 	printf("C2H data 0x%llx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
 #endif
 	if (LOAD_U32(cfg->interrupt_status))
@@ -107,7 +107,7 @@ int netdev_h2c_enqueue_buffer(struct mppa_pcie_eth_if_config *cfg,
 		next_head = 0;
 
 	STORE_U32(h2c->head, next_head);
-#ifdef VERBOSE
+#ifdef NETDEV_VERBOSE
 	printf("H2C buffer 0x%llx pushed in if:%p | at offset:%lu\n", buffer->pkt_addr, cfg, head);
 #endif
 
@@ -138,7 +138,7 @@ netdev_h2c_peek_data(const struct mppa_pcie_eth_if_config *cfg)
 	struct mppa_pcie_eth_h2c_ring_buff_entry *entry = entry_base + head;
 	INVALIDATE(entry);
 
-#ifdef VERBOSE
+#ifdef NETDEV_VERBOSE
 	printf("H2C data found in if:%p | at offset:%lu\n", cfg, head);
 #endif
 
@@ -170,7 +170,7 @@ static int netdev_setup_c2h(struct mppa_pcie_eth_if_config *if_cfg,
 		for(i = 0; i < cfg->n_c2h_entries; i++) {
 			entries[i].pkt_addr = g_current_pkt_addr;
 			g_current_pkt_addr += if_cfg->mtu;
-#ifdef VERBOSE
+#ifdef NETDEV_VERBOSE
 			printf("C2H Packet (%lu/%lu) entry at 0x%"PRIx64"\n", i,
 			       cfg->n_c2h_entries, entries[i].pkt_addr);
 #endif
@@ -209,7 +209,7 @@ static int netdev_setup_h2c(struct mppa_pcie_eth_if_config *if_cfg,
 		for(i = 0; i < cfg->n_h2c_entries; i++) {
 			entries[i].pkt_addr = g_current_pkt_addr;
 			g_current_pkt_addr += if_cfg->mtu;
-#ifdef VERBOSE
+#ifdef NETDEV_VERBOSE
 			printf("H2C Packet (%lu/%lu) entry at 0x%"PRIx64"\n", i,
 			       cfg->n_h2c_entries, entries[i].pkt_addr);
 #endif

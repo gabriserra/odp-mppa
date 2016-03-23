@@ -33,6 +33,9 @@ endif
 ifdef VERBOSE
 _CFLAGS += -DVERBOSE
 endif
+ifdef NETDEV_VERBOSE
+_CFLAGS += -DNETDEV_VERBOSE
+endif
 
 ifndef INCLUDING_FIRMWARE
 
