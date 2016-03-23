@@ -4,6 +4,7 @@ _CONFIGS :=
 $(foreach FIRM, $(FIRMWARES), $(eval $(FIRM)_CONFIGS := ))
 $(foreach FIRM, $(FIRMWARES), $(eval _$(FIRM)_CONFIGS := ))
 
+CCACHE := $(shell which ccache 2>/dev/null)
 #
 #
 #
@@ -11,7 +12,7 @@ $(foreach FIRM, $(FIRMWARES), $(eval _$(FIRM)_CONFIGS := ))
 #
 #
 #
-k1b-kalray-nodeos_developer_CONF_ENV    := CC=k1-nodeos-gcc  CXX=k1-nodeos-g++ STRIP=k1-strip
+k1b-kalray-nodeos_developer_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_developer_CONF_OPTS   :=
 k1b-kalray-nodeos_developer_CFLAGS      := -march=k1b -DK1_NODEOS
 k1b-kalray-nodeos_developer_LDFLAGS     :=
@@ -21,7 +22,7 @@ k1b-kalray-nodeos_developer_MAKE_VALID  := -j1
 k1b-kalray-nodeos_developer_INSTALL     := true
 CONFIGS += k1b-kalray-nodeos_developer
 
-k1b-kalray-nodeos_explorer_CONF_ENV    := CC=k1-nodeos-gcc  CXX=k1-nodeos-g++ STRIP=k1-strip
+k1b-kalray-nodeos_explorer_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_explorer_CONF_OPTS   :=
 k1b-kalray-nodeos_explorer_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=explorer -DK1B_EXPLORER
 k1b-kalray-nodeos_explorer_LDFLAGS     :=
@@ -31,7 +32,7 @@ k1b-kalray-nodeos_explorer_MAKE_VALID  := -j1
 k1b-kalray-nodeos_explorer_INSTALL     := true
 _CONFIGS += k1b-kalray-nodeos_explorer
 
-k1b-kalray-nodeos_simu_CONF_ENV    := CC=k1-nodeos-gcc  CXX=k1-nodeos-g++ STRIP=k1-strip
+k1b-kalray-nodeos_simu_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_simu_CONF_OPTS   :=
 k1b-kalray-nodeos_simu_CFLAGS      := -march=k1b -DK1_NODEOS -DMAGIC_SCALL
 k1b-kalray-nodeos_simu_LDFLAGS     :=
@@ -41,7 +42,7 @@ k1b-kalray-nodeos_simu_MAKE_VALID  :=
 k1b-kalray-nodeos_simu_INSTALL     := true
 CONFIGS += k1b-kalray-nodeos_simu
 
-k1b-kalray-nodeos_konic80_CONF_ENV    := CC=k1-nodeos-gcc  CXX=k1-nodeos-g++ STRIP=k1-strip
+k1b-kalray-nodeos_konic80_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_konic80_CONF_OPTS   :=
 k1b-kalray-nodeos_konic80_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=konic80
 k1b-kalray-nodeos_konic80_LDFLAGS     :=
@@ -51,7 +52,7 @@ k1b-kalray-nodeos_konic80_MAKE_VALID  := -j1
 k1b-kalray-nodeos_konic80_INSTALL     := true
 CONFIGS += k1b-kalray-nodeos_konic80
 
-k1b-kalray-mos_developer_CONF_ENV    := CC=k1-gcc  CXX=k1-g++ STRIP=k1-strip
+k1b-kalray-mos_developer_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_developer_CONF_OPTS   :=
 k1b-kalray-mos_developer_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS
 k1b-kalray-mos_developer_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
@@ -63,7 +64,7 @@ k1b-kalray-mos_developer_INSTALL     := true
 k1b-kalray-mos_developer_INSTALL_DOC := true
 CONFIGS += k1b-kalray-mos_developer
 
-k1b-kalray-mos_explorer_CONF_ENV    := CC=k1-gcc  CXX=k1-g++ STRIP=k1-strip
+k1b-kalray-mos_explorer_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_explorer_CONF_OPTS   :=
 k1b-kalray-mos_explorer_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -mboard=explorer -DK1B_EXPLORER
 k1b-kalray-mos_explorer_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
@@ -74,7 +75,7 @@ k1b-kalray-mos_explorer_MAKE_VALID  := -j1
 k1b-kalray-mos_explorer_INSTALL     := true
 _CONFIGS += k1b-kalray-mos_explorer
 
-k1b-kalray-mos_konic80_CONF_ENV    := CC=k1-gcc  CXX=k1-g++ STRIP=k1-strip
+k1b-kalray-mos_konic80_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_konic80_CONF_OPTS   :=
 k1b-kalray-mos_konic80_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -mboard=konic80
 k1b-kalray-mos_konic80_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
@@ -85,7 +86,7 @@ k1b-kalray-mos_konic80_MAKE_VALID  := -j1
 k1b-kalray-mos_konic80_INSTALL     := true
 CONFIGS += k1b-kalray-mos_konic80
 
-k1b-kalray-mos_simu_CONF_ENV    := CC=k1-gcc  CXX=k1-g++ STRIP=k1-strip
+k1b-kalray-mos_simu_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_simu_CONF_OPTS   :=
 k1b-kalray-mos_simu_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -DMAGIC_SCALL
 k1b-kalray-mos_simu_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
@@ -123,24 +124,24 @@ CONFIGS += x86_64-unknown-linux-gnu
 #
 #
 #
-firmware_k1b-kalray_developer_CC          := k1-gcc
+firmware_k1b-kalray_developer_CC          := $(CCACHE) k1-gcc
 firmware_k1b-kalray_developer_CFLAGS      := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single
 firmware_k1b-kalray_developer_LDFLAGS     :=
 firmware_k1b-kalray_developer_INSTDIR      = $(K1ST_DIR)/share/odp/firmware/developer/k1b
 
-firmware_k1b-kalray_konic80_CC            := k1-gcc
+firmware_k1b-kalray_konic80_CC            := $(CCACHE) k1-gcc
 firmware_k1b-kalray_konic80_CFLAGS        := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -mboard=konic80
 firmware_k1b-kalray_konic80_LDFLAGS       :=
 firmware_k1b-kalray_konic80_INSTDIR        = $(K1ST_DIR)/share/odp/firmware/konic80/k1b
 
-firmware_k1b-kalray_simu_CC               := k1-gcc
+firmware_k1b-kalray_simu_CC               := $(CCACHE) k1-gcc
 firmware_k1b-kalray_simu_CFLAGS           := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -DMAGIC_SCALL
 firmware_k1b-kalray_simu_LDFLAGS          :=
 firmware_k1b-kalray_simu_INSTDIR           = $(K1ST_DIR)/share/odp/firmware/simu/k1b
 
-firmware_k1b-kalray_explorer_CC           := k1-gcc
+firmware_k1b-kalray_explorer_CC           := $(CCACHE) k1-gcc
 firmware_k1b-kalray_explorer_CFLAGS       := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr \
-									  	     -mprocessing=single -mboard=explorer -DK1B_EXPLORER
+					     -mprocessing=single -mboard=explorer -DK1B_EXPLORER
 firmware_k1b-kalray_explorer_LDFLAGS      :=
 firmware_k1b-kalray_explorer_INSTDIR       = $(K1ST_DIR)/share/odp/firmware/explorer/k1b
 

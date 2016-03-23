@@ -4,7 +4,7 @@
 #include <odp/rpc/defines.h>
 
 /** Version of the C2C CoS */
-#define ODP_RPC_C2C_VERSION 0x1
+#define ODP_RPC_C2C_VERSION 0x2
 
 typedef enum {
 	ODP_RPC_CMD_C2C_OPEN    /**< Cluster2Cluster: Declare as ready to receive message */,

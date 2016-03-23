@@ -45,7 +45,8 @@ pcie_start_rx_rm();
 void
 pcie_start_tx_rm();
 
-int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if);
+int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
+		  odp_rpc_answer_t *answer);
 
 static inline
 int no_printf(__attribute__((unused)) const char *fmt , ...)
@@ -65,4 +66,8 @@ int no_printf(__attribute__((unused)) const char *fmt , ...)
 #    define dbg_printf(fmt, args...)	no_printf(fmt, ## args)
 #endif
 
+#define PCIE_RPC_ERR_MSG(answer, x...)			\
+	do {						\
+		RPC_ERROR(answer, "[PCIE]", ##x);	\
+	} while(0)
 #endif

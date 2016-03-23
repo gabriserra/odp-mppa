@@ -11,7 +11,7 @@
 int main (int argc, char *argv[])
 {
 
-	int ret;
+	int ret, status;
 
 	ret = odp_rpc_server_start();
 	if (ret) {
@@ -24,12 +24,16 @@ int main (int argc, char *argv[])
 		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
 		exit(1);
 	}
-
 	boot_clusters(argc, argv);
 
-	if ((ret = join_clusters()) != 0) {
-		fprintf(stderr, "Cluster returned with status %d\n", ret);
+	if ((ret = join_clusters(&status)) != 0) {
+		fprintf(stderr, "Failed to joined clusters\n");
 		return ret;
+	}
+	if (status){
+		fprintf(stderr, "Clusters returned with errors: %d\n", status);
+		fflush(stderr);
+		return status;
 	}
 
 	return 0;

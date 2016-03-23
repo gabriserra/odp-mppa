@@ -11,8 +11,10 @@
 int main(int argc __attribute__((unused)),
 	 char *const argv[] __attribute__((unused)))
 {
+	int status;
+	int ret;
 
-	int ret = odp_rpc_server_start();
+	ret = odp_rpc_server_start();
 	if (ret) {
 		fprintf(stderr, "[RPC] Error: Failed to start server\n");
 		exit(EXIT_FAILURE);
@@ -33,7 +35,15 @@ int main(int argc __attribute__((unused)),
 		printf("Cluster booted\n");
 	}
 
-	join_clusters();
+	if ((ret = join_clusters(&status)) != 0) {
+		fprintf(stderr, "Failed to joined clusters\n");
+		return ret;
+	}
+	if (status){
+		fprintf(stderr, "Clusters returned with errors: %d\n", status);
+		fflush(stderr);
+		return status;
+	}
 
 	return 0;
 }

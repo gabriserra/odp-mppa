@@ -16,7 +16,7 @@
 
 int main (int argc, char *argv[])
 {
-	int ret;
+	int ret, status;
 
 	if (argc < 2) {
 		printf("Missing arguments\n");
@@ -36,9 +36,14 @@ int main (int argc, char *argv[])
 
 	boot_clusters(argc, argv);
 
-	if ((ret = join_clusters()) != 0) {
-		fprintf(stderr, "Cluster returned with status %d\n", ret);
+	if ((ret = join_clusters(&status)) != 0) {
+		fprintf(stderr, "Failed to joined clusters\n");
 		return ret;
+	}
+	if (status){
+		fprintf(stderr, "Clusters returned with errors: %d\n", status);
+		fflush(stderr);
+		return status;
 	}
 
 	return 0;
