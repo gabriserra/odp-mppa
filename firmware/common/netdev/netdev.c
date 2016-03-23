@@ -18,7 +18,7 @@
 
 static uintptr_t g_current_pkt_addr = DDR_BUFFER_BASE_ADDR;
 
-struct mppa_pcie_eth_control eth_control = {
+__attribute__((section(".lowmem_data") )) struct mppa_pcie_eth_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
 
