@@ -23,7 +23,7 @@ int odp_rpc_client_get_default_server(void);
 /**
  * Print the content of a RPC command
  */
-void odp_rpc_print_msg(const struct odp_rpc * cmd);
+void odp_rpc_print_msg(const struct odp_rpc * cmd, const uint8_t *payload);
 
 /**
  * Send a RPC command

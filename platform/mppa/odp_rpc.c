@@ -114,7 +114,7 @@ static const int rpc_n_cmds[ODP_RPC_N_CLASS] = {
 	[ODP_RPC_CLASS_RND] = ODP_RPC_CMD_RND_N_CMD,
 };
 
-void odp_rpc_print_msg(const odp_rpc_t * cmd)
+void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 {
 	if (cmd->pkt_class >=  ODP_RPC_N_CLASS) {
 		printf("Invalid packet class ! Class = %d\n", cmd->pkt_class);
@@ -133,12 +133,13 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd)
 	       "\tTag  : %u\n"
 	       "\tFlag :\n"
 	       "\t\tAck : %u\n"
+	       "\t\tErrStr : %u\n"
 	       "\t\tRPC Err: : %x\n"
 	       "\tInl Data:\n",
 	       cmd->pkt_class, cmd->pkt_subtype,
 	       rpc_cmd_names[cmd->pkt_class][cmd->pkt_subtype],
 	       cmd->data_len, cmd->dma_id,
-	       cmd->dnoc_tag, cmd->ack, cmd->rpc_err);
+	       cmd->dnoc_tag, cmd->ack, cmd->err_str, cmd->rpc_err);
 
 	if (cmd->ack) {
 		odp_rpc_ack_t ack = { .inl_data = cmd->inl_data };
@@ -265,6 +266,9 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd)
 	default:
 		break;
 	}
+	if (cmd->err_str && cmd->data_len > 0 && payload) {
+		printf("\tError string:\n\t\t%s", payload);
+	}
 }
 
 int odp_rpc_send_msg(uint16_t local_interface, uint16_t dest_id,
@@ -316,7 +320,7 @@ int odp_rpc_send_msg(uint16_t local_interface, uint16_t dest_id,
 #ifdef VERBOSE
 	printf("[RPC] Sending message from %d (%d) to %d/%d\n",
 	       local_interface, externalAddress, dest_id, dest_tag);
-	odp_rpc_print_msg(cmd);
+	odp_rpc_print_msg(cmd, payload);
 #endif
 	rret = mppa_routing_get_dnoc_unicast_route(externalAddress,
 						   dest_id, &config, &header);
