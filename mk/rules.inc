@@ -9,13 +9,16 @@ $(eval ODP_$(1)_DOC_INST := $(K1ST_DIR)/doc/ODP/$($(1)_PLATFORM))
 $(eval ODP_$(1)_OS_NAME := $(firstword $(subst _, ,$(1))))
 $(eval ODP_$(1)_BOARD_NAME := $(lastword $(subst _, ,$(1))))
 $(eval ODP_$(1)_ARCH_BUILDDIR := $(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME))
+$(eval ODP_$(1)_CONFCACHEDIR := $(CONFCACHE_DIR)/$(ODP_$(1)_ARCH_BUILDDIR))
 $(eval ODP_$(1)_BUILDDIR := $(ARCH_DIR)/odp/$(ODP_$(1)_ARCH_BUILDDIR))
 $(eval ODP_$(1)_DEBUG_BUILDDIR := $(ARCH_DIR)/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR))
 $(ARCH_DIR)/cunit/$(1)/Makefile: $(TOP_DIR)/cunit/configure
+	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --srcdir=$(TOP_DIR)/cunit --prefix=$(CUNIT_INST_DIR)/$(1) \
-	--enable-debug --enable-automated --enable-basic --host=$(1)
+	--enable-debug --enable-automated --enable-basic --host=$(1) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/cunit-config.cache
 
 cunit-$(1)-build: $(ARCH_DIR)/cunit/$(1)/CUnit/Sources/.libs/libcunit.a
 $(ARCH_DIR)/cunit/$(1)/CUnit/Sources/.libs/libcunit.a: $(ARCH_DIR)/cunit/$(1)/Makefile
@@ -31,6 +34,7 @@ cunit-$(1)-clean:
 
 odp-debug-$(1)-configure: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
 $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/libcunit.a $(MAKE_DEPS)
+	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --host=$(1) --with-platform=$($(1)_PLATFORM) \
@@ -39,7 +43,8 @@ $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)
 	--datarootdir=$(K1ST_DIR)share/odp-debug/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
-	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS)
+	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-debug-config.cache
 
 odp-debug-$(1)-build: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
 	$$(MAKE) -C$$$$(basename $$@)V=1 all
@@ -48,6 +53,7 @@ odp-debug-$(1)-clean:
 
 odp-$(1)-configure: $(ODP_$(1)_BUILDDIR)/Makefile
 $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/libcunit.a $(MAKE_DEPS)
+	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --host=$(1) --with-platform=$($(1)_PLATFORM) \
@@ -56,7 +62,8 @@ $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/l
 	--datarootdir=$(K1ST_DIR)share/odp/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
-	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS)
+	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-config.cache
 
 odp-$(1)-build: $(ODP_$(1)_BUILDDIR)/Makefile
 	$$(MAKE) -C$$$$(dirname $$<) V=1 all
