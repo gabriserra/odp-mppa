@@ -5,6 +5,7 @@
 #include "internal/pcie.h"
 #include "internal/netdev.h"
 #include "noc2pci.h"
+#include "pcie.h"
 
 void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
 {
@@ -21,6 +22,7 @@ void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
 }
 
 
+static uint64_t pkt_count[MPPA_PCIE_ETH_IF_MAX] = {0};
 static void poll_noc_rx_buffer(int pcie_eth_if)
 {
 	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_COUNT], *buf;
@@ -80,7 +82,8 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 				break;
 		}
 
-		dbg_printf("%d packets handled\n", buf->pkt_count);
+		pkt_count[pcie_eth_if]++;
+		dbg_printf("%d packets handled, total %llu\n", buf->pkt_count, pkt_count[pcie_eth_if]);
 	}
 }
 
