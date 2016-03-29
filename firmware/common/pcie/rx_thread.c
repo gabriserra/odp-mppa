@@ -23,8 +23,8 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 	}
 
 	events = mppa_noc_dnoc_rx_lac_event_counter(iface->iface_id, rx_id);
-	if (!events) {
-		err_printf("Invalid count of events on rx %d\n", rx_id);
+	if (events != 1) {
+		err_printf("Invalid count of events on rx %d: %d\n", rx_id, events);
 		return -1;
 	}
 
