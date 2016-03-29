@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 #include <mppa_noc.h>
 
 #include "internal/pcie.h"
@@ -42,6 +43,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 								MPPA_PCIE_MULTIBUF_COUNT, &left);
 	if (ret == 0)
 		return;
+	assert(ret <= MPPA_PCIE_MULTIBUF_COUNT);
 
 	dbg_printf("%d buffer ready to be sent\n", ret);
 	for(buf_idx = 0; buf_idx < ret; buf_idx++) {
