@@ -13,13 +13,31 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 	mppa_pcie_noc_rx_buf_t *new_buf;
 	mppa_pcie_noc_rx_buf_t *old_buf;
 	uint32_t left;
+	int ret;
 	uint16_t events;
 	uint16_t pcie_eth_if = iface->rx_cfgs[rx_id].pcie_eth_if;
+	typeof(mppa_dnoc[iface->iface_id]->rx_queues[0]) * const rx_queue =
+		&mppa_dnoc[iface->iface_id]->rx_queues[rx_id];
 
-	int ret = buffer_ring_get_multi(&g_free_buf_pool, &new_buf, 1, &left);
-	if (ret != 1) {
-		err_printf("No more free buffer available\n");
-		return -1;
+	if ( iface->rx_cfgs[rx_id].broken == 0 ) {
+		ret = buffer_ring_get_multi(&g_free_buf_pool, &new_buf, 1, &left);
+		if (ret != 1) {
+			err_printf("No more free buffer available\n");
+			return -1;
+		}
+		rx_queue->buffer_base.dword = (uintptr_t) new_buf->buf_addr;
+
+		old_buf = iface->rx_cfgs[rx_id].mapped_buf;
+		iface->rx_cfgs[rx_id].mapped_buf = new_buf;
+		dbg_printf("Adding buf to eth if %d\n", pcie_eth_if);
+		/* Add previous buffer to full list */
+		buffer_ring_push_multi(&g_full_buf_pool[pcie_eth_if], &old_buf, 1, &left);
+
+		dbg_printf("Reloading rx %d of if %d with buffer %p\n",
+				rx_id, iface->iface_id, new_buf);
+	}
+	else {
+		iface->rx_cfgs[rx_id].broken = 0;
 	}
 
 	events = mppa_noc_dnoc_rx_lac_event_counter(iface->iface_id, rx_id);
@@ -27,11 +45,6 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		err_printf("Invalid count of events on rx %d\n", rx_id);
 		return -1;
 	}
-
-	typeof(mppa_dnoc[iface->iface_id]->rx_queues[0]) * const rx_queue =
-		&mppa_dnoc[iface->iface_id]->rx_queues[rx_id];
-
-	rx_queue->buffer_base.dword = (uintptr_t) new_buf->buf_addr;
 
 	/* Rearm the DMA Rx and check for dropped packets */
 	rx_queue->current_offset.reg = 0ULL;
@@ -49,16 +62,8 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 			rx_queue->item_counter.reg = 2;
 		for (j = 0; j < 16; ++j)
 			rx_queue->activation.reg = 0x1;
+		iface->rx_cfgs[rx_id].broken = 1;
 	}
-
-	old_buf = iface->rx_cfgs[rx_id].mapped_buf;
-	iface->rx_cfgs[rx_id].mapped_buf = new_buf;
-	dbg_printf("Adding buf to eth if %d\n", pcie_eth_if);
-	/* Add previous buffer to full list */
-	buffer_ring_push_multi(&g_full_buf_pool[pcie_eth_if], &old_buf, 1, &left);
-
-	dbg_printf("Reloading rx %d of if %d with buffer %p\n",
-		   rx_id, iface->iface_id, new_buf);
 
 	return 0;
 }

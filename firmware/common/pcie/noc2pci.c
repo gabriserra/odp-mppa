@@ -178,6 +178,8 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 
 	iface->ev_mask[rx_mask_off] |= (1 << rx_id);
 	iface->rx_cfgs[rx_id].pcie_eth_if = pcie_eth_if;
+	iface->rx_cfgs[rx_id].broken = 0;
+
 	__k1_mb();
 
 	return 0;
