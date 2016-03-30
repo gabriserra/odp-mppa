@@ -33,20 +33,21 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 	union mpodp_pkt_hdr_info info;
 	struct mpodp_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
 	struct mpodp_c2h_ring_buff_entry pkt, free_pkt;
+	int nb_bufs;
 
 	if (netdev_c2h_is_full(cfg)) {
 		dbg_printf("PCIe eth tx is full !!!\n");
 		return;
 	}
 
-	ret = buffer_ring_get_multi(&g_full_buf_pool[pcie_eth_if], bufs,
+	nb_bufs = buffer_ring_get_multi(&g_full_buf_pool[pcie_eth_if], bufs,
 								MPPA_PCIE_MULTIBUF_COUNT, &left);
-	if (ret == 0)
+	if (nb_bufs == 0)
 		return;
 	assert(ret <= MPPA_PCIE_MULTIBUF_COUNT);
 
 	dbg_printf("%d buffer ready to be sent\n", ret);
-	for(buf_idx = 0; buf_idx < ret; buf_idx++) {
+	for(buf_idx = 0; buf_idx < nb_bufs; buf_idx++) {
 		buf = bufs[buf_idx];
 		buf->pkt_count = 0;
 
