@@ -142,7 +142,7 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 	conf.event_counter = 0;
 	conf.item_counter = 1;
 	conf.item_reload = 1;
-	conf.reload_mode = MPPA_NOC_RX_RELOAD_MODE_INCR_DATA_NOTIF;
+	conf.reload_mode = MPPA_NOC_RX_RELOAD_MODE_DECR_NOTIF_NO_RELOAD_IDLE;
 	conf.activation = 0x3;
 	conf.counter_id = 0;
 
