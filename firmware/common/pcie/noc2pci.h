@@ -29,6 +29,7 @@ typedef union {
 typedef struct rx_cfg {
 	mppa_pcie_noc_rx_buf_t *mapped_buf;
 	uint8_t pcie_eth_if; /* PCIe ethernet interface */
+	uint8_t broken;
 } rx_cfg_t;
 
 typedef struct rx_iface {
