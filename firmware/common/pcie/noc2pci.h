@@ -42,7 +42,6 @@ typedef struct rx_iface {
 typedef struct rx_thread {
 	rx_iface_t iface[IF_PER_THREAD];
 	int th_id;
-	volatile int ready;
 } rx_thread_t;
 
 extern rx_thread_t g_rx_threads[RX_THREAD_COUNT];
