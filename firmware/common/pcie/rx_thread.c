@@ -100,7 +100,7 @@ mppa_pcie_rx_rm_func()
 	rx_thread_t *thread = &g_rx_threads[rm_id - RX_RM_START];
 	int iface;
 
-	dbg_printf("RM %d with thread id %d started\n", rm_id, thread->th_id);
+	dbg_printf("RM %d with thread id %d started\n", rm_id, rm_id - RX_RM_START);
 
 	rx_rm_ready[rm_id - RX_RM_START] = 1;
 	__k1_wmb();
@@ -123,14 +123,14 @@ pcie_start_rx_rm()
 	for (rm_num = RX_RM_START; rm_num < RX_RM_START + RX_RM_COUNT; rm_num++ ){
 		thread = &g_rx_threads[rm_num - RX_RM_START];
 
-		thread->th_id = rm_num - RX_RM_START;
+		int thread_id = rm_num - RX_RM_START;
 
 		for( i = 0; i < IF_PER_THREAD; i++) {
 			thread->iface[i].iface_id = if_start++;
 		}
 
 		/* Init with scratchpad size */
-		_K1_PE_STACK_ADDRESS[rm_num] = &g_stacks[thread->th_id][RX_RM_STACK_SIZE - 16];
+		_K1_PE_STACK_ADDRESS[rm_num] = &g_stacks[thread_id][RX_RM_STACK_SIZE - 16];
 		_K1_PE_START_ADDRESS[rm_num] = &mppa_pcie_rx_rm_func;
 		_K1_PE_ARGS_ADDRESS[rm_num] = 0;
 
