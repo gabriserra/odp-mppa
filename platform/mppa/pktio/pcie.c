@@ -31,11 +31,13 @@ _ODP_STATIC_ASSERT(MAX_PCIE_INTERFACES * MAX_PCIE_SLOTS <= MAX_RX_PCIE_IF,
 
 #define N_RX_P_PCIE 12
 
+#define NOC_CLUS_IFACE_ID       0
 #define NOC_PCIE_UC_COUNT	2
 #define DNOC_CLUS_IFACE_ID	0
 
 #define PKTIO_PKT_MTU	1500
 
+#include <mppa_bsp.h>
 #include <mppa_noc.h>
 #include <mppa_routing.h>
 
@@ -52,6 +54,30 @@ static inline tx_uc_ctx_t *pcie_get_ctx(const pkt_pcie_t *pcie)
 	const unsigned int tx_index =
 		pcie->tx_config.config._.first_dir % NOC_PCIE_UC_COUNT;
 	return &g_pcie_tx_uc_ctx[tx_index];
+}
+
+static int pcie_init_cnoc_rx(void)
+{
+	mppa_cnoc_mailbox_notif_t notif = {0};
+	mppa_noc_ret_t ret;
+	mppa_noc_cnoc_rx_configuration_t conf = {0};
+	unsigned rx_id;
+
+	conf.mode = MPPA_NOC_CNOC_RX_MAILBOX;
+	conf.init_value = 0;
+
+	/* CNoC */
+	ret = mppa_noc_cnoc_rx_alloc_auto(NOC_CLUS_IFACE_ID, &rx_id,
+					  MPPA_NOC_BLOCKING);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return -1;
+
+	ret = mppa_noc_cnoc_rx_configure(NOC_CLUS_IFACE_ID, rx_id,
+					 conf, &notif);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return -1;
+
+	return rx_id;
 }
 
 static int pcie_init(void)
@@ -85,6 +111,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 			.pkt_size = PKTIO_PKT_MTU,
 			.min_rx = pcie->rx_config.min_port,
 			.max_rx = pcie->rx_config.max_port,
+			.cnoc_rx = pcie->cnoc_rx,
 		}
 	};
 	odp_rpc_t cmd = {
@@ -222,6 +249,10 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
 	}
+
+	pcie->cnoc_rx = pcie_init_cnoc_rx();
+	assert(pcie->cnoc_rx >= 0);
+	pcie->local_credit = 0;
 
 	ret = pcie_rpc_send_pcie_open(pcie);
 
@@ -370,6 +401,9 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	pcie->tx_config.header._.tag += 1;
 	if ( pcie->tx_config.header._.tag > pcie->max_tx_tag )
 		pcie->tx_config.header._.tag = pcie->min_tx_tag;
+
+	uint64_t local_credit = __builtin_k1_afdau((int64_t*)&pcie->local_credit, 1);
+	while (local_credit >= mppa_noc_cnoc_rx_get_value(0, pcie->cnoc_rx) );
 
 	return tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
 					  pkt_table, len, PKTIO_PKT_MTU);
