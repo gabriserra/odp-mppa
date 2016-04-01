@@ -6,6 +6,10 @@
 #include "internal/netdev.h"
 #include "noc2pci.h"
 
+#include "internal/debug.h"
+
+_ODP_STATIC_ASSERT( (MPPA_PCIE_NOC_RX_NB % CREDIT_CHUNK) == 0, "CREDIT_CHUNK__ERROR" );
+
 rx_thread_t g_rx_threads[RX_THREAD_COUNT];
 
 static int reload_rx(rx_iface_t *iface, int rx_id)
@@ -18,11 +22,15 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 	uint16_t pcie_eth_if = iface->rx_cfgs[rx_id].pcie_eth_if;
 	typeof(mppa_dnoc[iface->iface_id]->rx_queues[0]) * const rx_queue =
 		&mppa_dnoc[iface->iface_id]->rx_queues[rx_id];
+	tx_credit_t *tx_credit = iface->rx_cfgs[rx_id].tx_credit;
+
+	if ( rx_id != tx_credit->next_tag )
+		return -1;
 
 	if ( iface->rx_cfgs[rx_id].broken == 0 ) {
 		ret = buffer_ring_get_multi(&g_free_buf_pool, &new_buf, 1, &left);
 		if (ret != 1) {
-			err_printf("No more free buffer available\n");
+			dbg_printf("No more free buffer available\n");
 			return -1;
 		}
 		rx_queue->buffer_base.dword = (uintptr_t) new_buf->buf_addr;
@@ -63,7 +71,23 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		for (j = 0; j < 16; ++j)
 			rx_queue->activation.reg = 0x1;
 		iface->rx_cfgs[rx_id].broken = 1;
+		err_printf("Broken Rx tag should not happen!!!\n");
 	}
+
+	if ( ( ( rx_id - tx_credit->min_tx_tag ) % CREDIT_CHUNK ) == (CREDIT_CHUNK - 1 ) ) {
+		tx_credit->credit += CREDIT_CHUNK;
+		ret = mppa_noc_cnoc_tx_configure(iface->iface_id,
+				tx_credit->cnoc_tx,
+				tx_credit->config,
+				tx_credit->header);
+		assert(ret == MPPA_NOC_RET_SUCCESS);
+		mppa_noc_cnoc_tx_push(iface->iface_id, tx_credit->cnoc_tx, tx_credit->credit);
+		dbg_printf("Send %llu credits to %d\n", tx_credit->credit, tx_credit->cluster);
+	}
+
+
+	tx_credit->next_tag = ( ( tx_credit->next_tag + 1 ) > tx_credit->max_tx_tag ) ?
+		tx_credit->min_tx_tag : tx_credit->next_tag + 1;
 
 	return 0;
 }

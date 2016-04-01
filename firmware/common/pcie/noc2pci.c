@@ -162,7 +162,7 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
-		  odp_rpc_answer_t *answer)
+		  tx_credit_t *tx_credit, odp_rpc_answer_t *answer)
 {
 	int rx_thread_num = if_id / RX_THREAD_COUNT;
 	int th_iface_id = if_id % IF_PER_THREAD;
@@ -180,6 +180,7 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 	iface->ev_mask[rx_mask_off] |= (1 << rx_id);
 	iface->rx_cfgs[rx_id].pcie_eth_if = pcie_eth_if;
 	iface->rx_cfgs[rx_id].broken = 0;
+	iface->rx_cfgs[rx_id].tx_credit = tx_credit;
 
 	__k1_mb();
 
