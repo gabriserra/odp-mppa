@@ -1,5 +1,6 @@
 #ifndef NOC2PCI__H
-#define RX_NOC2PCI__H
+#define NOC2PCI__H
+
 
 #define MAX_RX 					(30 * 4)
 #define RX_THREAD_COUNT			2
