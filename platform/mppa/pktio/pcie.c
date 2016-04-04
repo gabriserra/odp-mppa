@@ -250,8 +250,8 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
 	}
 
-	pcie->cnoc_rx = pcie_init_cnoc_rx();
-	assert(pcie->cnoc_rx >= 0);
+	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
+	assert(ret >= 0);
 	pcie->local_credit = 0;
 
 	ret = pcie_rpc_send_pcie_open(pcie);
