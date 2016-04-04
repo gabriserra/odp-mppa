@@ -322,15 +322,22 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 				printf("[ETH] Initializing MAC for lane %d\n", eth_if);
 
 			ret = mppa_eth_utils_init_mac(eth_if, link_speed);
-			if (ret == BAD_VENDOR) {
+			switch(ret){
+			case BAD_VENDOR:
 				fprintf(stderr,
 					"[ETH] Warning: QSFP coonector is not supported\n");
-			} else if (ret == -EBUSY) {
+				break;
+			case -EBUSY:
 				/* lane is already configured. Ignore */
-				mppa_ethernet[0]->mac.port_ctl._.rx_enable |= ~(1 << eth_if);
-			} else if(ret < 0) {
+				/* FIXME: Reenable lane */
+				break;
+			case -ENETDOWN:
+				/* No link yet but it's sort of expected */
+			case 0:
+				break;
+			default:
 				ETH_RPC_ERR_MSG(answer,
-					"Failed to initialize lane %d (%d)\n",
+					"Internal error during initialization of lane %d (err code %d)\n",
 						eth_if, ret);
 				return -1;
 			}
@@ -345,10 +352,6 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 				&(mppa_ethernet[0]->mac));
 			mppabeth_mac_enable_rx_check_preambule((void*)
 				&(mppa_ethernet[0]->mac));
-
-			if (verbose)
-				printf("[ETH] Starting MAC for lane %d\n", eth_if);
-			mppa_eth_utils_start_lane(eth_if, link_speed);
 
 		}
 		if (if_id == 4) {
@@ -388,7 +391,8 @@ int ethtool_stop_lane(unsigned if_id,
 	const int eth_if = if_id % 4;
 
 	/* Close the lane ! */
-	mppa_ethernet[0]->mac.port_ctl._.rx_enable &= ~(1 << eth_if);
+	/* FIXME: Close the lane */
+	/* mppa_ethernet[0]->mac.port_ctl._.rx_enable &= ~(1 << eth_if); */
 
 	if (if_id == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i)
