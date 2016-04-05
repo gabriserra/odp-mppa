@@ -253,6 +253,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
 	assert(ret >= 0);
 	pcie->local_credit = 0;
+	__k1_wmb();
 
 	ret = pcie_rpc_send_pcie_open(pcie);
 
@@ -279,7 +280,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pcie->tx_config.config._.bw_slow_delay     = 0x00;
 
 		pcie->tx_config.header._.multicast = 0;
-		pcie->tx_config.header._.tag = pcie->min_tx_tag;
+		pcie->tx_config.header._.tag = pcie->max_tx_tag;
 		pcie->tx_config.header._.valid = 1;
 	}
 
