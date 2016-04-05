@@ -15,13 +15,20 @@ typedef struct {
 
 #define ODP_RPC_ANSWER_INITIALIZER(m)  { .msg = m, .ack = ODP_RPC_CMD_ACK_INITIALIZER, .payload_len = 0 }
 
+#ifdef VERBOSE
+#define RPC_VERBOSE_PRINT(x...) do { printf(x);}while(0)
+#else
+#define RPC_VERBOSE_PRINT(x...) do { if(0) printf(x);}while(0)
+#endif
+
 #define RPC_ERROR(answer, mod, x...)										\
 	do {													\
-		if (answer) {											\
+		if ((uintptr_t) NULL != (uintptr_t)answer) {							\
 			(answer)->ack.status = 1;								\
 			(answer)->msg->err_str = 1;								\
 			(answer)->payload_len = snprintf((char*)(answer)->payload,				\
 							 RPC_MAX_PAYLOAD, mod " Error:" x);			\
+			RPC_VERBOSE_PRINT(mod " Error:" x);							\
 		}												\
 	} while(0)
 
