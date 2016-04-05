@@ -140,14 +140,9 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[C2C] RPC Error\n");
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[C2C]");
+	if (ret <= 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[C2C] Query timed out\n");
-		return 1;
-	}
 
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
@@ -187,16 +182,9 @@ static int cluster_rpc_send_c2c_query(pkt_cluster_t *cluster)
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[C2C] RPC Error\n");
-		__odp_errno = EPIPE;
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[C2C]");
+	if (ret < 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[C2C] Query timed out\n");
-		__odp_errno = ETIMEDOUT;
-		return 1;
-	}
 
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
@@ -409,14 +397,10 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[C2C] RPC Error\n");
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[C2C]");
+	if (ret < 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[C2C] Query timed out\n");
-		return 1;
-	}
+
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[C2C] Error: Server declined closure of cluster2cluster interface\n");

@@ -8,6 +8,8 @@
 #include <inttypes.h>
 #include <HAL/hal/hal.h>
 #include <odp/rpc/api.h>
+#include <odp/errno.h>
+#include <errno.h>
 
 #include <mppa_bsp.h>
 #include <mppa_routing.h>
@@ -366,7 +368,8 @@ int odp_rpc_do_query(uint16_t dest_id,
 	return odp_rpc_send_msg(0, dest_id, dest_tag, cmd, payload);
 }
 
-odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t timeout)
+odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t timeout,
+				   const char* mod)
 {
 	int ret;
 
@@ -380,25 +383,35 @@ odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t t
 		timeout -= 110;
 
 	}
-	if (!ret)
+	if (!ret) {
+		fprintf(stderr, "%s Query timed out\n", mod);
 		return ODP_RPC_ERR_TIMEOUT;
+	}
 
 	odp_rpc_t * msg = &odp_rpc_ack_buf.rpc_cmd;
 	INVALIDATE(msg);
 	*cmd = msg;
 
-	if (msg->rpc_err)
-		return -msg->rpc_err;
 
 	if (payload && msg->data_len) {
 		if ( msg->data_len > RPC_MAX_PAYLOAD ) {
 			fprintf(stderr, "Error, msg payload %d > max payload %d\n",
 				msg->data_len, RPC_MAX_PAYLOAD);
-			return 1;
+			return -1;
 		}
 		INVALIDATE_AREA(&odp_rpc_ack_buf.payload, msg->data_len);
 		*payload = odp_rpc_ack_buf.payload;
 	}
+
+	/* Handle protocol error */
+	if (msg->rpc_err) {
+		fprintf(stderr, "%s RPC Error\n", mod);
+		if (msg->err_str && msg->data_len > 0)
+			fprintf(stderr, "\tError Log: %s\n", (char*)(*payload));
+
+		return -msg->rpc_err;
+	}
+
 
 	return 1;
 

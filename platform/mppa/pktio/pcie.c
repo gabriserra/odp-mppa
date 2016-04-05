@@ -100,14 +100,10 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[PCIE] RPC Error:\n");
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[PCIE]");
+	if (ret <= 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[PCIE] Query timed out\n");
-		return 1;
-	}
+
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[PCIE] Error: Server declined opening of pcie interface\n");
@@ -292,15 +288,12 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[PCIE] RPC Error\n");
-		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[PCIE] Query timed out\n");
-		return 1;
-	}
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[PCIE]");
 	ack.inl_data = ack_msg->inl_data;
+
+	if (ret <= 0)
+		return 1;
+
 	if (ack.status) {
 		fprintf(stderr, "[PCIE] Error: Server declined closure of pcie interface\n");
 		if (ack_msg->err_str && ack_msg->data_len > 0)
