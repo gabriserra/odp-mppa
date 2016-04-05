@@ -8,8 +8,6 @@
 #include <inttypes.h>
 #include <HAL/hal/hal.h>
 #include <odp/rpc/api.h>
-#include <odp/errno.h>
-#include <errno.h>
 
 #include <mppa_bsp.h>
 #include <mppa_routing.h>
