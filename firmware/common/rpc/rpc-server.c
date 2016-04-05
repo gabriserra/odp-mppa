@@ -49,7 +49,7 @@ static inline int rxToMsg(unsigned ifId, unsigned tag,
 		INVALIDATE_AREA(*payload, cmd->data_len);
 	}
 #ifdef VERBOSE
-	odp_rpc_print_msg(cmd);
+	odp_rpc_print_msg(cmd, *payload);
 #endif
 
 	return remoteClus;
