@@ -142,6 +142,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	pcie->tx_if = ack.cmd.pcie_open.tx_if;
 	pcie->min_tx_tag = ack.cmd.pcie_open.min_tx_tag;
 	pcie->max_tx_tag = ack.cmd.pcie_open.max_tx_tag;
+	pcie->nb_tx_tags = ack.cmd.pcie_open.max_tx_tag - ack.cmd.pcie_open.min_tx_tag + 1;
 	memcpy(pcie->mac_addr, ack.cmd.pcie_open.mac, ETH_ALEN);
 	pcie->mtu = ack.cmd.pcie_open.mtu;
 
@@ -399,11 +400,10 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 	tx_uc_ctx_t *ctx = pcie_get_ctx(pcie);
 
-	pcie->tx_config.header._.tag += 1;
-	if ( pcie->tx_config.header._.tag > pcie->max_tx_tag )
-		pcie->tx_config.header._.tag = pcie->min_tx_tag;
-
 	uint64_t local_credit = __builtin_k1_afdau((int64_t*)&pcie->local_credit, 1);
+
+	pcie->tx_config.header._.tag = pcie->min_tx_tag + ( local_credit % pcie->nb_tx_tags );
+
 	while (local_credit >= mppa_noc_cnoc_rx_get_value(0, pcie->cnoc_rx) );
 
 	return tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
