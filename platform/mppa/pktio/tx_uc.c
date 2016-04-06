@@ -17,7 +17,7 @@ extern char _heap_end;
 #define COLOR_ID 1
 static inline uint64_t get_mOS_uc_event(int uc_id)
 {
-	mOS_uc_counter_t *trs_ctr = &_scoreboard_start.SCB_UC.event_counter[uc_id][COLOR_ID];
+	mOS_uc_counter_t *trs_ctr = &_scoreboard_start.SCB_UC.event_counter[uc_id];
 	return __builtin_k1_ldu((void*)&trs_ctr->_dword);
 }
 
