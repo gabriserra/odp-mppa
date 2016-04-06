@@ -36,21 +36,11 @@ int main()
 				"-c", "14", "-m", "ASYNC_IN_PLACE", NULL
 			};
 
-			/*for (int i = 0; i < 16; i++) {
+			for (int i = 0; i < 16; i++) {
 				if ( i % 4 == 0 ) continue;
 				if ( i % 4 == 3 ) continue;
 				boot_cluster(i, _argv[0], _argv);
-			}*/
-			boot_cluster(1, _argv[0], _argv);
-			boot_cluster(2, _argv[0], _argv);
-			boot_cluster(5, _argv[0], _argv);
-      boot_cluster(6, _argv[0], _argv);
-			boot_cluster(9, _argv[0], _argv);
-			boot_cluster(10, _argv[0], _argv);
-			boot_cluster(13, _argv[0], _argv);
-			/*
-			boot_cluster(14, _argv[0], _argv);
-      */
+			}
 		}
 		{
 			static char const * _argv[] = {
@@ -64,18 +54,12 @@ int main()
 				"-i", "0", "-w", "2", "-p", "256", NULL
 			};
 
-			/*for (int i = 0; i < 16; i += 4) {
+			for (int i = 0; i < 16; i += 4) {
         if ( i % 4 == 1 ) continue;
 				if ( i % 4 == 2 ) continue;
 				if ( i % 4 == 3 ) continue;
 				boot_cluster(i, _argv[0], _argv);
-			}*/
-			boot_cluster(0, _argv[0], _argv);
-			boot_cluster(4, _argv[0], _argv);
-		  boot_cluster(8, _argv[0], _argv);
-			boot_cluster(12, _argv[0], _argv);
-      /*
-      */
+			}
 		}
 		printf("Cluster booted\n");
 	}

@@ -177,12 +177,9 @@ static args_t *args;
  * Buffer pool for packet IO
  */
 #ifdef __k1__
+// buffer sized for 1500B packets
 #define SHM_PKT_POOL_BUF_COUNT 460
 #define SHM_PKT_POOL_BUF_SIZE  1600
-//#define SHM_PKT_POOL_BUF_COUNT 600
-//#define SHM_PKT_POOL_BUF_SIZE  1100
-//#define SHM_PKT_POOL_BUF_COUNT 1500
-//#define SHM_PKT_POOL_BUF_SIZE  500
 #else
 #define SHM_PKT_POOL_BUF_COUNT 1024
 #define SHM_PKT_POOL_BUF_SIZE  4096
@@ -782,6 +779,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
 	odp_barrier_wait(&sync_barrier);
 
 	for(;;) {
+    // FIXME: thr <= 6 modified to allow 3 filtering threads
 		if(thr % 2 == 0 && thr  <= 6){
 			int n_pkt;
 			odp_packet_t pkts[PKT_BURST_SIZE];
