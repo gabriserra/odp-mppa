@@ -331,7 +331,6 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	uint32_t auth_len = params->auth_range.length;
 	void *iv_ptr;
 	uint8_t *tag = data + params->hash_result_offset;
-	//return ODP_CRYPTO_ALG_ERR_NONE;
 
 	if (params->override_iv_ptr)
 		iv_ptr = params->override_iv_ptr;
@@ -351,17 +350,18 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
 	 * and if we are processing packets on parallel threads
 	 * we could get corruption.
 	 */
+  // NOTE: iv copy is not necessary for gcm as primitives leave
+  // iv unmodified
+  //
 	//unsigned char iv_enc[AES_BLOCK_SIZE];
 	//memcpy(iv_enc, iv_ptr, AES_BLOCK_SIZE);
 
 	/* Adjust pointer for beginning of area to cipher/auth */
 	uint8_t *plaindata = data + params->cipher_range.offset;
 
-	//return ODP_CRYPTO_ALG_ERR_NONE;
 
 	/* Encrypt it */
 	EVP_CIPHER_CTX *ctx = session->cipher.data.aes_gcm.ctx;
-#if 1
 	unsigned int cipher_len = 0;
 
   cipher_len = plain_len;
@@ -371,31 +371,6 @@ odp_crypto_alg_err_t aes_gcm_encrypt(odp_crypto_op_params_t *params,
     return ODP_CRYPTO_ALG_ERR_DATA_SIZE;
   }
 
-#else
-	int cipher_len = 0;
-
-  cipher_len = plain_len;
-	EVP_EncryptInit_ex(ctx, NULL, NULL, NULL, iv_enc);
-
-	/* Authenticate header data (if any) without encrypting them */
-	if (aad_head < plaindata) {
-		EVP_EncryptUpdate(ctx, NULL, &cipher_len,
-				  aad_head, plaindata - aad_head);
-	}
-
-	EVP_EncryptUpdate(ctx, plaindata, &cipher_len,
-			  plaindata, plain_len);
-	cipher_len = plain_len;
-
-	/* Authenticate footer data (if any) without encrypting them */
-	if (aad_head + auth_len > plaindata + plain_len) {
-		EVP_EncryptUpdate(ctx, NULL, NULL, aad_tail,
-				  auth_len - (aad_tail - aad_head));
-	}
-
-	EVP_EncryptFinal_ex(ctx, plaindata + cipher_len, &cipher_len);
-	EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag);
-#endif
 
 
 	return ODP_CRYPTO_ALG_ERR_NONE;
