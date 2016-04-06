@@ -14,9 +14,10 @@
 
 extern char _heap_end;
 
+#define COLOR_ID 1
 static inline uint64_t get_mOS_uc_event(int uc_id)
 {
-	mOS_uc_counter_t *trs_ctr = &_scoreboard_start.SCB_UC.event_counter[uc_id];
+	mOS_uc_counter_t *trs_ctr = &_scoreboard_start.SCB_UC.event_counter[uc_id][COLOR_ID];
 	return __builtin_k1_ldu((void*)&trs_ctr->_dword);
 }
 
@@ -110,9 +111,10 @@ int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
 			mOS_uc_transaction_t  * trs =
 				& _scoreboard_start.SCB_UC.trs[uc_ctx_table[i].dnoc_uc_id][j];
 			trs->notify._word = 0;
-			trs->desc.tx_set = 1 << uc_ctx_table[i].dnoc_tx_id;
 			trs->desc.param_set = 0xff;
 			trs->desc.pointer_set = 0xf;
+			trs->desc.path_updt = 1;
+			trs->desc.vid = COLOR_ID;
 		}
 		uc_ctx_table[i].add_header = add_header;
 		uc_ctx_table[i].init = 1;
@@ -170,8 +172,8 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 		trs->parameter.array[2 * i + 1] = 0;
 	}
 
-	trs->path.array[ctx->dnoc_tx_id].header = tx_config->header;
-	trs->path.array[ctx->dnoc_tx_id].config = tx_config->config;
+	trs->path.legacy.header = tx_config->header;
+	trs->path.legacy.config = tx_config->config;
 
 	job->pkt_count = pkt_count;
 
@@ -258,8 +260,8 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 		trs->parameter.array[i] = 0;
 	}
 
-	trs->path.array[ctx->dnoc_tx_id].header = tx_config->header;
-	trs->path.array[ctx->dnoc_tx_id].config = tx_config->config;
+	trs->path.legacy.header = tx_config->header;
+	trs->path.legacy.config = tx_config->config;
 
 	job->pkt_count = pkt_count;
 

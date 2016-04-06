@@ -9,6 +9,7 @@ DEBUG_CONF_FLAGS := $(_DEBUG_CONF_FLAGS)
 endif
 
 TOP_DIR := $(shell readlink -f $$(pwd))
+CONFCACHE_DIR := $(TOP_DIR)/.confcache
 ARCH_DIR:= $(TOP_DIR)/build/
 INST_DIR:= $(TOP_DIR)/install
 K1ST_DIR:= $(INST_DIR)/local/k1tools/
@@ -171,3 +172,6 @@ junits:
 list-configs:
 	@echo $(CONFIGS)
 
+
+distclean: clean
+	rm -Rf $(CONFCACHE_DIR)

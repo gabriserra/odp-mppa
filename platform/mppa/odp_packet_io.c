@@ -788,6 +788,36 @@ int _odp_pktio_stats(odp_pktio_t pktio,
 	return ret;
 }
 
+void _odp_pktio_stats_print(odp_pktio_t pktio,
+			    const _odp_pktio_stats_t *stats)
+{
+	pktio_entry_t *entry;
+
+	entry = get_pktio_entry(pktio);
+	printf("PKTIO stats: '%s'\n"
+	       "\tInOctets    : %6llu\n"
+	       "\tInUcastPkts : %6llu\n"
+	       "\tInDiscards  : %6llu\n"
+	       "\tInDropped   : %6llu\n"
+	       "\tInErrors    : %6llu\n"
+	       "\tInUnknwnProt: %6llu\n"
+	       "\tOutOctets   : %6llu\n"
+	       "\tOutUcastPkts: %6llu\n"
+	       "\tOutDiscards : %6llu\n"
+	       "\tOutErrors   : %6llu\n",
+	       entry->s.name,
+	       stats->in_octets,
+	       stats->in_ucast_pkts,
+	       stats->in_discards,
+	       stats->in_dropped,
+	       stats->in_errors,
+	       stats->in_unknown_protos,
+	       stats->out_octets,
+	       stats->out_ucast_pkts,
+	       stats->out_discards,
+	       stats->out_errors);
+}
+
 void odp_pktio_print(odp_pktio_t id)
 {
 	pktio_entry_t *entry;

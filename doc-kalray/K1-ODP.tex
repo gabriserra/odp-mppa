@@ -81,6 +81,9 @@ The K1-ODP files will be installed under the
 ethernet counters}
 \item[-]{Ethernet lane is now UP when calling
   \texttt{odp\_pktio\_start} instead of open}
+\item[-]{Loopback between MPPA interfaces using a cable is now
+  supported. Both pktio must be created before starting them to allow
+  the link to get UP.}
 \end{itemize}
 
 \subsubsection{Firmwares}
@@ -90,9 +93,12 @@ Although the main thread still runs on IODDR, the main does not need
 to poll for message anymore.
 The call to \texttt{odp\_rpc\_server\_start} starts a background
 thread on IOETH that handles all the clusters request directly.
-The main thread should not exit before the spawned clusters ave been
+The main thread should not exit before the spawned clusters have been
 joined by calling \texttt{join\_clusters}.
 If no clusters were spawned, the firmare should never exit.
+If the firmware is spawned uotside a MPK (no additional ELF files),
+\texttt{boot\_cluster} and \texttt{boot\_clusters} do not spawn nor
+parse arguments.
 
 Firmware build system has been changed to inherit compilation flags
 from the \texttt{platforms.inc} file already used for building ODP
@@ -423,15 +429,8 @@ k1-cluster   --functional  --mboard=developer --march=bostan --user-syscall=/usr
   (default), packets may not be returned in order to the ODP
   application. If order is required, the number of Rx thread must be
   set to one.}
-\item[-]{It is currently not possible to do loopback between multiple
-  Ethernet lane of a single MPPA board. Because odp\_pktio\_open waits
-  for the link to be up before returning (with a timeout), it needs
-  the opposite side of the link to be up.}
 \item[-]{Only promiscuous mode is currently available.}
 \item[-]{Multi-Lane (4x10G) it not supported yet.}
-\item[-]{It is currently not possible to reopen an Ethernet interface
-  with a different hash policy even if all the clusters have closed
-  it.}
 \item[-]{When clusters transmits to an ethernet port more than the port
   bandwidth can handle, packets may be dropped.}
 \end{itemize}

@@ -20,6 +20,7 @@ int main(int argc, char* argv[])
 			/* Last arg, or just one for this run */
 			printf("Running with one pktio: '%s'\n", argv[idx]);
 			setenv("ODP_PKTIO_IF0", argv[idx], 1);
+			unsetenv("ODP_PKTIO_IF1");
 			idx += 2;
 			ret |= pktio_main();
 		} else if (argc - idx == 2 || !strcmp(argv[idx + 2], "--")) {

@@ -119,14 +119,14 @@ int odp_term_global(void)
 	}
 #endif
 
-	if (odp_rpc_client_term()) {
-		ODP_ERR("ODP RPC tem failed.\n");
-		return -1;
-	}
-
 	if (odp_pktio_term_global()) {
 		ODP_ERR("ODP pktio term failed.\n");
 		rc = -1;
+	}
+
+	if (odp_rpc_client_term()) {
+		ODP_ERR("ODP RPC tem failed.\n");
+		return -1;
 	}
 
 	if (odp_schedule_term_global()) {

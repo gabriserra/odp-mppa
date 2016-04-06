@@ -21,29 +21,44 @@
 #define N_ETH_LANE 4
 #endif
 
+#define ETH_RPC_ERR_MSG(answer, x...)			\
+	do {						\
+		RPC_ERROR(answer, "[ETH]", ##x);	\
+	} while(0)
+
 int ethtool_init_lane(int eth_if);
 
-int ethtool_open_cluster(unsigned remoteClus, unsigned if_id);
-int ethtool_close_cluster(unsigned remoteClus, unsigned if_id);
+int ethtool_open_cluster(unsigned remoteClus, unsigned if_id,
+			 odp_rpc_answer_t *answer);
+int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
+			  odp_rpc_answer_t *answer);
 
 int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   int nocIf, int externalAddress,
-			   int min_rx, int max_rx);
-int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf);
+			   int min_rx, int max_rx,
+			   odp_rpc_answer_t *answer);
+int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
+			   odp_rpc_answer_t *answer);
 int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
-			int nb_rules, const pkt_rule_t rules[nb_rules]);
+			int nb_rules, const pkt_rule_t rules[nb_rules],
+			odp_rpc_answer_t *answer);
 
-int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id);
-int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id);
+int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
+			   odp_rpc_answer_t *answer);
+int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
+			    odp_rpc_answer_t *answer);
 
-int ethtool_start_lane(unsigned if_id, int loopback, int verbose);
-int ethtool_stop_lane(unsigned if_id);
+int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
+		       odp_rpc_answer_t *answer);
+int ethtool_stop_lane(unsigned if_id,
+		      odp_rpc_answer_t *answer);
 
 int ethtool_poll_lane(unsigned if_id);
 int ethtool_lane_stats(unsigned if_id,
-		       odp_rpc_payload_eth_get_stat_t *stats);
+		       odp_rpc_answer_t *answer);
 
-int ethtool_set_dual_mac(int enabled);
+int ethtool_set_dual_mac(int enabled,
+			 odp_rpc_answer_t *answer);
 
 typedef enum {
 	ETH_CLUS_STATUS_OFF,

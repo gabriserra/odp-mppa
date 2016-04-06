@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "pktio.h"
 
-#define PKT_BUF_NUM            200
+#define PKT_BUF_NUM            150
 #define PKT_BUF_SIZE           (2 * 1024)
 #define PKT_LEN_NORMAL         64
 #define PKT_LEN_JUMBO          (PKT_BUF_SIZE - ODPH_ETHHDR_LEN - \
@@ -513,6 +513,9 @@ static void test_txrx(odp_pktio_input_mode_t in_mode, int num_pkts)
 			io->inq = ODP_QUEUE_INVALID;
 		}
 
+	}
+	for (i = 0; i < num_ifaces; ++i) {
+		io = &pktios[i];
 		ret = odp_pktio_start(io->id);
 		CU_ASSERT(ret == 0);
 
@@ -767,7 +770,7 @@ void pktio_test_start_stop(void)
 
 	/* Test Rx on a stopped interface. Only works if there are 2 */
 	if (num_ifaces > 1) {
-		for (alloc = 0; alloc < 1000; alloc++) {
+		for (alloc = 0; alloc < 100; alloc++) {
 			pkt = odp_packet_alloc(default_pkt_pool, packet_len);
 			if (pkt == ODP_PACKET_INVALID)
 				break;

@@ -13,7 +13,7 @@ options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path t
                         "valid-configs" => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
                         "output-dir"    => [nil, "Output directory for RPMs."],
                         "k1version"     => ["unknown", "K1 Tools version required for building ODP applications"],
-                        "toolchainversion"     => ["", "K1 Toolchain version required for building ODP applications"],
+                        "librariesversion" => ["", "k1-libraries version required for building ODP applications"],
                      })
 
 if options["list-configs"] == true then
@@ -38,7 +38,7 @@ repo = Git.new(odp_clone,workspace)
 local_valid = options["local-valid"]
 
 clean = Target.new("clean", repo, [])
-build = ParallelTarget.new("build", repo, [])
+build = Target.new("build", repo, [])
 install = Target.new("install", repo, [build])
 valid = ParallelTarget.new("valid", repo, [install])
 valid_packages = ParallelTarget.new("valid-packages", repo, [])
@@ -206,9 +206,11 @@ b.target("package") do
     tar_package = File.expand_path("odp.tar")
     depends = []
     depends.push b.depends_info_struct.new("k1-tools","=", options["k1version"], "")
-    if options["toolchainversion"].to_s != "" then
-        depends.push b.depends_info_struct.new("k1-toolchain","=", options["toolchainversion"], "")
+
+    if not options["librariesversion"].to_s.empty? then
+      depends.push b.depends_info_struct.new("k1-libraries","=", options["librariesversion"], "")
     end
+
     package_description = "K1 ODP package (k1-odp-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp", release_info,
                            package_description,
@@ -249,13 +251,13 @@ b.target("package") do
     # Generates k1r_parameters.sh
     output_parameters = File.join(artifacts,"k1odp_parameters.sh")
     b.run("rm -f #{output_parameters}")
-    b.run("echo 'K1ODP_VERSION=#{$version}-#{$buildID}' >> #{output_parameters}")
-    b.run("echo 'K1ODP_RELEASE=#{$version}' >> #{output_parameters}")
+    b.run("echo 'K1ODP_VERSION=#{version}-#{releaseID}' >> #{output_parameters}")
+    b.run("echo 'K1ODP_RELEASE=#{version}' >> #{output_parameters}")
+    b.run("echo 'K1ODP_REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
     b.run("echo 'COMMITER_EMAIL=#{options["email"]}' >> #{output_parameters}")
     b.run("echo 'INTEGRATION_BRANCH=#{ENV.fetch("INTEGRATION_BRANCH",options["branch"])}' >> #{output_parameters}")
     b.run("echo 'REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
     b.run("#{workspace}/metabuild/bin/packages.rb --tar=#{File.join(artifacts,"package.tar")} tar")
-
 end
 
 b.target("clean") do

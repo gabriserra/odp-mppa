@@ -9,13 +9,16 @@ $(eval ODP_$(1)_DOC_INST := $(K1ST_DIR)/doc/ODP/$($(1)_PLATFORM))
 $(eval ODP_$(1)_OS_NAME := $(firstword $(subst _, ,$(1))))
 $(eval ODP_$(1)_BOARD_NAME := $(lastword $(subst _, ,$(1))))
 $(eval ODP_$(1)_ARCH_BUILDDIR := $(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME))
+$(eval ODP_$(1)_CONFCACHEDIR := $(CONFCACHE_DIR)/$(ODP_$(1)_ARCH_BUILDDIR))
 $(eval ODP_$(1)_BUILDDIR := $(ARCH_DIR)/odp/$(ODP_$(1)_ARCH_BUILDDIR))
 $(eval ODP_$(1)_DEBUG_BUILDDIR := $(ARCH_DIR)/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR))
 $(ARCH_DIR)/cunit/$(1)/Makefile: $(TOP_DIR)/cunit/configure
+	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --srcdir=$(TOP_DIR)/cunit --prefix=$(CUNIT_INST_DIR)/$(1) \
-	--enable-debug --enable-automated --enable-basic --host=$(1)
+	--enable-debug --enable-automated --enable-basic --host=$(1) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/cunit-config.cache
 
 cunit-$(1)-build: $(ARCH_DIR)/cunit/$(1)/CUnit/Sources/.libs/libcunit.a
 $(ARCH_DIR)/cunit/$(1)/CUnit/Sources/.libs/libcunit.a: $(ARCH_DIR)/cunit/$(1)/Makefile
@@ -31,6 +34,7 @@ cunit-$(1)-clean:
 
 odp-debug-$(1)-configure: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
 $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/libcunit.a $(MAKE_DEPS)
+	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --host=$(1) --with-platform=$($(1)_PLATFORM) \
@@ -39,7 +43,8 @@ $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)
 	--datarootdir=$(K1ST_DIR)share/odp-debug/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
-	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS)
+	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-debug-config.cache
 
 odp-debug-$(1)-build: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
 	$$(MAKE) -C$$$$(basename $$@)V=1 all
@@ -48,6 +53,7 @@ odp-debug-$(1)-clean:
 
 odp-$(1)-configure: $(ODP_$(1)_BUILDDIR)/Makefile
 $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/libcunit.a $(MAKE_DEPS)
+	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --host=$(1) --with-platform=$($(1)_PLATFORM) \
@@ -56,7 +62,8 @@ $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/l
 	--datarootdir=$(K1ST_DIR)share/odp/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
-	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS)
+	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-config.cache
 
 odp-$(1)-build: $(ODP_$(1)_BUILDDIR)/Makefile
 	$$(MAKE) -C$$$$(dirname $$<) V=1 all
@@ -97,7 +104,7 @@ odp-$(1)-valid: odp-$(1)-build extra-install firmware-install
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/test/performance $($(1)_MAKE_VALID) check
 
 odp-$(1)-clean:
-	rm -Rf $(ARCH_DIR)/odp/$(1)
+	rm -Rf $(ODP_$(1)_BUILDDIR)
 
 endef
 
@@ -110,17 +117,17 @@ define FIRMWARE_RULE
 $(eval $(1)-$(2)-ENV := ODP_FIRMWARE_CONFIG="$(1)" INSTDIR="$(firmware_$(1)_INSTDIR)" ODP_TOOLCHAIN_DIR="$(K1ST_DIR)")
 firmware-$(2)-$(1)-configure: firmware/$(2)/Makefile
 firmware-$(2)-$(1)-build: firmware/$(2)/Makefile extra-install odp-k1b-kalray-mos_developer-install-headers
-	mkdir -p $(ARCH_DIR)/firmware/$(2)/$(1)
-	cd $(ARCH_DIR)/firmware/$(2)/$(1) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile all $($(1)-$(2)-ENV)
+	mkdir -p $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile all $($(1)-$(2)-ENV)
 
 firmware-$(2)-$(1)-install: firmware-$(2)-$(1)-build
-	cd $(ARCH_DIR)/firmware/$(2)/$(1) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile install $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile install $($(1)-$(2)-ENV)
 firmware-$(2)-$(1)-valid: firmware-$(2)-$(1)-build
-	cd $(ARCH_DIR)/firmware/$(2)/$(1) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile valid $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile valid $($(1)-$(2)-ENV)
 firmware-$(2)-$(1)-long: firmware-$(2)-$(1)-build
-	cd $(ARCH_DIR)/firmware/$(2)/$(1) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile long $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile long $($(1)-$(2)-ENV)
 firmware-$(2)-$(1)-clean:
-	rm -Rf $(ARCH_DIR)/firmware/$(2)/$(1)
+	rm -Rf $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2)
 endef
 
 
@@ -185,20 +192,20 @@ define LONG_RULE
 
 long-$(1)-$(2)-configure: long/$(2)/Makefile
 long-$(1)-$(2)-install: long-$(1)-$(2)-build
-	cd $(ARCH_DIR)/long/$(1)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
+	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
 
 long-$(1)-$(2)-valid: long-$(1)-$(2)-build extra-install
-	cd $(ARCH_DIR)/long/$(1)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile valid \
+	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile valid \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
 
 long-$(1)-$(2)-build: long-$(1)-$(2)-configure
-	mkdir -p $(ARCH_DIR)/long/$(1)/$(2)
-	cd $(ARCH_DIR)/long/$(1)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile \
+	mkdir -p $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
+	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1) all
 
 long-$(1)-$(2)-clean:
-	rm -Rf $(ARCH_DIR)/long/$(1)/$(2)
+	rm -Rf $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
 endef
 
 #

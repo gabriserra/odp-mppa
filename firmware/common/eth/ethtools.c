@@ -48,14 +48,22 @@ enum mppa_eth_mac_ethernet_mode_e mac_get_default_mode(unsigned lane_id)
 	return -1;
 }
 
-enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id)
+enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
+							odp_rpc_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	enum mppa_eth_mac_ethernet_mode_e link_speed =
 		mac_get_default_mode(eth_if);
+
+	if ((int)link_speed == -1) {
+		ETH_RPC_ERR_MSG(answer,
+				"Unsupported lane or board\n");
+		return -1;
+	}
+
 	if (!link_speed == MPPA_ETH_MAC_ETHMODE_40G && if_id == 4) {
-		fprintf(stderr,
-				"[ETH] Error: Cannot open 40G link\n");
+		ETH_RPC_ERR_MSG(answer,
+				"Cannot open 40G link on this board\n");
 		return -1;
 	} else if (link_speed == MPPA_ETH_MAC_ETHMODE_40G && if_id < 4) {
 		/* Link could do 40G but we use only one lane */
@@ -78,18 +86,27 @@ int ethtool_init_lane(int eth_if)
 	return 0;
 }
 
-int ethtool_open_cluster(unsigned remoteClus, unsigned if_id)
+int ethtool_open_cluster(unsigned remoteClus, unsigned if_id,
+			 odp_rpc_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 	if (if_id == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i)
-			if (status[i].cluster[remoteClus].opened != ETH_CLUS_STATUS_OFF)
+			if (status[i].cluster[remoteClus].opened != ETH_CLUS_STATUS_OFF){
+				ETH_RPC_ERR_MSG(answer,
+						"Trying to open 40G lane but lane %d is already opened by this cluster\n",
+						i);
 				return -1;
+			}
 		for (int i = 0; i < N_ETH_LANE; ++i)
 			status[i].cluster[remoteClus].opened = ETH_CLUS_STATUS_40G;
 	} else {
-		if (status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_OFF)
+		if (status[eth_if].cluster[remoteClus].opened != ETH_CLUS_STATUS_OFF){
+			ETH_RPC_ERR_MSG(answer,
+					"Trying to open 1/10G %d lane but it is already opened by this cluster\n",
+					eth_if);
 			return -1;
+		}
 		status[eth_if].cluster[remoteClus].opened = ETH_CLUS_STATUS_ON;
 	}
 	status[eth_if].refcounts.opened++;
@@ -99,7 +116,8 @@ int ethtool_open_cluster(unsigned remoteClus, unsigned if_id)
 
 int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   int nocIf, int externalAddress,
-			   int min_rx, int max_rx)
+			   int min_rx, int max_rx,
+			   odp_rpc_answer_t *answer)
 {
 	int ret;
 
@@ -112,15 +130,19 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 		return 0;
 
 	ret = mppa_routing_get_dnoc_unicast_route(externalAddress,
-						  odp_rpc_undensify_cluster_id(remoteClus), &config, &header);
+						  odp_rpc_undensify_cluster_id(remoteClus),
+						  &config, &header);
 	if (ret != MPPA_ROUTING_RET_SUCCESS) {
-		fprintf(stderr, "[ETH] Error: Failed to route to cluster %d\n", remoteClus);
+		ETH_RPC_ERR_MSG(answer,
+				"Failed to route to cluster %d\n", remoteClus);
 		return -1;
 	}
 
 	ret = mppa_noc_dnoc_tx_alloc_auto(nocIf, &nocTx, MPPA_NOC_BLOCKING);
 	if (ret != MPPA_NOC_RET_SUCCESS) {
-		fprintf(stderr, "[ETH] Error: Failed to find an available Tx on DMA %d\n", nocIf);
+		ETH_RPC_ERR_MSG(answer,
+				"Failed to find an available Tx on DMA %d\n",
+				nocIf);
 		return -1;
 	}
 
@@ -144,7 +166,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 
 	ret = mppa_noc_dnoc_tx_configure(nocIf, nocTx, header, config);
 	if (ret != MPPA_NOC_RET_SUCCESS) {
-		fprintf(stderr, "[ETH] Error: Failed to configure Tx\n");
+		ETH_RPC_ERR_MSG(answer, "Failed to configure Tx\n");
 		mppa_noc_dnoc_tx_free(nocIf, nocTx);
 		return -1;
 	}
@@ -176,7 +198,8 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 }
 
 
-int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
+int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
+			   odp_rpc_answer_t *answer)
 {
 	int ret;
 	unsigned rx_port;
@@ -189,26 +212,37 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 	mppa_dnoc[nocIf]->rx_global.rx_ctrl._.payload_slice = 2;
 	ret = mppa_noc_dnoc_rx_alloc_auto(nocIf, &rx_port, MPPA_NOC_NON_BLOCKING);
 	if(ret) {
-		fprintf(stderr, "[ETH] Error: Failed to find an available Rx on DMA %d\n", nocIf);
+		ETH_RPC_ERR_MSG(answer, "Failed to find an available Rx on DMA %d\n", nocIf);
 		return -1;
 	}
+	status[eth_if].cluster[remoteClus].nocIf = nocIf;
+	status[eth_if].cluster[remoteClus].rx_tag = rx_port;
 
 	mppa_dnoc_queue_event_it_target_t it_targets = {
 		.reg = 0
 	};
-	int fifo_id;
+	int fifo_id = -1;
 	uint16_t fifo_mask;
+	uint16_t avail_mask = lb_status.tx_fifo[nocIf - 4];
 
-	if (lb_status.tx_fifo[nocIf - 4] == 0) {
-		fprintf(stderr, "[ETH] Error: No more Ethernet Tx fifo available on NoC interface %d\n", nocIf);
+	while(avail_mask && fifo_id == -1){
+		fifo_id = __builtin_k1_ctz(avail_mask);
+		fifo_mask = if_id == 4 ? (0xf << fifo_id) : (1 << fifo_id);
+		if ((fifo_mask & avail_mask) != fifo_mask) {
+			/* Not enough contiguous bits */
+			avail_mask &= ~(1 << fifo_id);
+			fifo_id = -1;
+			continue;
+		}
+	}
+
+	if (fifo_id == -1) {
+		ETH_RPC_ERR_MSG(answer, "No more Ethernet Tx fifo available on NoC interface %d\n",
+				nocIf);
 		return  -1;
 	}
-	fifo_id = __builtin_k1_ctz(lb_status.tx_fifo[nocIf - 4]);
-	fifo_mask = if_id == 4 ? (0xf << fifo_id) : (1 << fifo_id);
-	if ((fifo_mask & lb_status.tx_fifo[nocIf - 4]) != fifo_mask) {
-		/* This should never happen */
-		return -1;
-	}
+
+	status[eth_if].cluster[remoteClus].eth_tx_fifo = fifo_id;
 	lb_status.tx_fifo[nocIf - 4] &= ~fifo_mask;
 
 
@@ -217,7 +251,6 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 		mppa_ethernet[0]->tx.fifo_if[nocIf - ETH_BASE_TX].lane[eth_if].
 			eth_fifo[fifo_id].eth_fifo_ctrl._.jumbo_mode = 1;
 	}
-	status[eth_if].cluster[remoteClus].eth_tx_fifo = fifo_id;
 
 	mppa_ethernet[0]->tx.fifo_if[nocIf - ETH_BASE_TX].lane[eth_if].
 		eth_fifo[fifo_id].eth_fifo_ctrl._.drop_en = 1;
@@ -238,29 +271,28 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf)
 
 	ret = mppa_noc_dnoc_rx_configure(nocIf, rx_port, conf);
 	if(ret) {
-		fprintf(stderr, "[ETH] Error: Failed to configure Rx\n");
+		ETH_RPC_ERR_MSG(answer, "Failed to configure Rx\n");
 		mppa_noc_dnoc_rx_free(nocIf, rx_port);
 		return -1;
 	}
 
-	status[eth_if].cluster[remoteClus].nocIf = nocIf;
-	status[eth_if].cluster[remoteClus].rx_tag = rx_port;
 	return 0;
 }
 
-int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
+int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
+		       odp_rpc_answer_t *answer)
 {
 	int ret;
 	int eth_if = if_id % 4;
 	if (lb_status.opened_refcount) {
 		if (loopback && !lb_status.loopback) {
-			fprintf(stderr,
-					"[ETH] Error: One lane was enabled. Cannot set lane %d in loopback\n",
+			ETH_RPC_ERR_MSG(answer,
+					"One lane was enabled. Cannot set lane %d in loopback\n",
 					eth_if);
 			return -1;
 		} else if (!loopback && lb_status.loopback) {
-			fprintf(stderr,
-					"[ETH] Error: Eth is in MAC loopback. Cannot enable lane %d\n",
+			ETH_RPC_ERR_MSG(answer,
+					"Eth is in MAC loopback. Cannot enable lane %d\n",
 					eth_if);
 			return -1;
 		}
@@ -275,7 +307,8 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
 			mppabeth_mac_enable_loopback_bypass((void *)&(mppa_ethernet[0]->mac));
 			lb_status.loopback = 1;
 		} else {
-			enum mppa_eth_mac_ethernet_mode_e link_speed = ethtool_get_mac_speed(if_id);
+			enum mppa_eth_mac_ethernet_mode_e link_speed =
+				ethtool_get_mac_speed(if_id, answer);
 			if ((int)link_speed < 0)
 				return link_speed;
 
@@ -289,15 +322,22 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
 				printf("[ETH] Initializing MAC for lane %d\n", eth_if);
 
 			ret = mppa_eth_utils_init_mac(eth_if, link_speed);
-			if (ret == BAD_VENDOR) {
+			switch(ret){
+			case BAD_VENDOR:
 				fprintf(stderr,
 					"[ETH] Warning: QSFP coonector is not supported\n");
-			} else if (ret == -EBUSY) {
+				break;
+			case -EBUSY:
 				/* lane is already configured. Ignore */
-				mppa_ethernet[0]->mac.port_ctl._.rx_enable |= ~(1 << eth_if);
-			} else if(ret < 0) {
-				fprintf(stderr,
-					"[ETH] Error: Failed to initialize lane %d (%d)\n",
+				/* FIXME: Reenable lane */
+				break;
+			case -ENETDOWN:
+				/* No link yet but it's sort of expected */
+			case 0:
+				break;
+			default:
+				ETH_RPC_ERR_MSG(answer,
+					"Internal error during initialization of lane %d (err code %d)\n",
 						eth_if, ret);
 				return -1;
 			}
@@ -313,10 +353,6 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
 			mppabeth_mac_enable_rx_check_preambule((void*)
 				&(mppa_ethernet[0]->mac));
 
-			if (verbose)
-				printf("[ETH] Starting MAC for lane %d\n", eth_if);
-			mppa_eth_utils_start_lane(eth_if, link_speed);
-
 		}
 		if (if_id == 4) {
 			for (int i = 0; i < N_ETH_LANE; ++i)
@@ -326,21 +362,22 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
 		break;
 	case ETH_LANE_ON:
 		if (if_id == 4) {
-			fprintf(stderr,
-				"[ETH] Error: One lane was enabled in 1 or 10G. Cannot set lane %d in 40G\n",
-				eth_if);
+			ETH_RPC_ERR_MSG(answer,
+					"One lane was enabled in 1 or 10G. Cannot set lane %d in 40G\n",
+					eth_if);
 			return -1;
 		}
 		break;
 	case ETH_LANE_ON_40G:
 		if (if_id < 4) {
-			fprintf(stderr,
-				"[ETH] Error: Interface was enabled in 40G. Cannot set lane %d in 1 or 10G mode\n",
-				eth_if);
+			ETH_RPC_ERR_MSG(answer,
+					"Interface was enabled in 40G. Cannot set lane %d in 1 or 10G mode\n",
+					eth_if);
 			return -1;
 		}
 		break;
 	default:
+		ETH_RPC_ERR_MSG(answer, "Internal error\n");
 		return -1;
 	}
 
@@ -348,12 +385,14 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose)
 	return 0;
 }
 
-int ethtool_stop_lane(unsigned if_id)
+int ethtool_stop_lane(unsigned if_id,
+		      odp_rpc_answer_t *answer __attribute__((unused)))
 {
 	const int eth_if = if_id % 4;
 
 	/* Close the lane ! */
-	mppa_ethernet[0]->mac.port_ctl._.rx_enable &= ~(1 << eth_if);
+	/* FIXME: Close the lane */
+	/* mppa_ethernet[0]->mac.port_ctl._.rx_enable &= ~(1 << eth_if); */
 
 	if (if_id == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i)
@@ -391,13 +430,19 @@ static int compare_rule_entries(const pkt_rule_entry_t entry1,
 		entry1.hash_mask != entry2.hash_mask;
 }
 
-static int check_rules_identical(const pkt_rule_t *rules, int nb_rules)
+static int check_rules_identical(const pkt_rule_t *rules, int nb_rules,
+				 odp_rpc_answer_t *answer)
 {
 	for ( int rule_id = 0; rule_id < nb_rules; ++rule_id ) {
 		for ( int entry_id = 0; entry_id < rules[rule_id].nb_entries; ++entry_id ) {
-			pkt_rule_entry_t entry = mppabeth_lb_get_rule((void *) &(mppa_ethernet[0]->lb), rule_id, entry_id);
+			pkt_rule_entry_t entry =
+				mppabeth_lb_get_rule((void *) &(mppa_ethernet[0]->lb),
+						     rule_id, entry_id);
+
 			if ( compare_rule_entries(rules[rule_id].entries[entry_id], entry ) ) {
-				fprintf(stderr, "Rule[%d] entry[%d] differs from already set rule\n", rule_id, entry_id);
+				ETH_RPC_ERR_MSG(answer,
+						"Rule[%d] entry[%d] differs from already set rule\n",
+						rule_id, entry_id);
 				return 1;
 			}
 		}
@@ -409,7 +454,7 @@ static int check_rules_identical(const pkt_rule_t *rules, int nb_rules)
 static void update_lut(unsigned if_id)
 {
 
-	if (lb_status.enabled)
+	if (!lb_status.enabled)
 		return;
 
 	const int eth_if = if_id % 4;
@@ -463,7 +508,7 @@ static void update_lut(unsigned if_id)
 	}
 	for (int i = 0; i < lb_status.nb_rules; ++i){
 		mppabeth_lb_cfg_extract_table_dispatch_mode((void *) &(mppa_ethernet[0]->lb),
-													i, MPPA_ETHERNET_DISPATCH_POLICY_HASH);
+							    i, MPPA_ETHERNET_DISPATCH_POLICY_HASH);
 	}
 }
 
@@ -481,8 +526,10 @@ static uint64_t h2n_order(uint64_t host_value, uint8_t cmp_mask)
 	}
 	return reordered_value.d;
 }
+
 int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
-			int nb_rules, const pkt_rule_t rules[nb_rules] )
+			int nb_rules, const pkt_rule_t rules[nb_rules],
+			odp_rpc_answer_t *answer )
 {
 	const int eth_if = if_id % 4;
 
@@ -502,7 +549,7 @@ int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
 		/* No Hash rules yet. Make sure no one opened anything yet */
 		for (int i =0; i < N_ETH_LANE; ++i){
 			if (status[i].initialized != ETH_LANE_OFF) {
-				fprintf(stderr, "[ETH] Error: Lane %d already opened without hashpolicy\n", i);
+				ETH_RPC_ERR_MSG(answer, "Lane %d already opened without hashpolicy\n", i);
 				return -1;
 			}
 		}
@@ -549,15 +596,15 @@ int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
 		}
 		lb_status.enabled = 1;
 		lb_status.nb_rules = ((lb_status.dual_mac && if_id < 4) ? 4 : 1) * nb_rules;
-	} else if ( check_rules_identical(rules, nb_rules) ) {
-		fprintf(stderr, "[ETH] Error: Non matching hash policy already registered\n");
+	} else if ( check_rules_identical(rules, nb_rules, answer) ) {
 		return -1;
 	}
 	status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_HASH;
 	return 0;
 }
 
-int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id)
+int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
+			   odp_rpc_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 	const int noc_if = status[eth_if].cluster[remoteClus].nocIf;
@@ -566,19 +613,32 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id)
 
 	if(noc_if < 0 ||
 	   status[eth_if].cluster[remoteClus].enabled) {
+		ETH_RPC_ERR_MSG(answer, "Trying to enable lane %d which is closed or already enabled\n",
+				eth_if);
 		return -1;
 	}
+
 	/* Enable on single lane while 40G mode is one */
-	if (if_id < 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_40G)
+	if (if_id < 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_40G){
+		ETH_RPC_ERR_MSG(answer, "Trying to enable lane %d in 1/10G mode while lanes are open in 40G mode\n",
+				eth_if);
 		return -1;
+	}
 	/* Enable on all lanes while 1 or 10G mode is one */
-	if (if_id == 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_ON)
+	if (if_id == 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_ON){
+		ETH_RPC_ERR_MSG(answer, "Trying to enable lane %d in 40G while lane is open in 1/10G mode\n",
+				eth_if);
 		return -1;
+	}
 
 	/* Make sure link is up */
 	if (!lb_status.loopback){
 		enum mppa_eth_mac_ethernet_mode_e link_speed =
-			ethtool_get_mac_speed(if_id);
+			ethtool_get_mac_speed(if_id, answer);
+
+		if ((int)link_speed == -1)
+			return -1;
+
 		unsigned long long start = __k1_read_dsu_timestamp();
 		int up = 0;
 		while (__k1_read_dsu_timestamp() - start < 3ULL * __bsp_frequency) {
@@ -588,7 +648,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id)
 			}
 		}
 		if (!up) {
-			fprintf(stderr, "[ETH] Error:No carrier on lane %d\n", eth_if);
+			ETH_RPC_ERR_MSG(answer, "No carrier on lane %d\n", eth_if);
 			return -1;
 		}
 	}
@@ -641,6 +701,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id)
 							  (1 << ETH_DEFAULT_CTX));
 		break;
 	default:
+		ETH_RPC_ERR_MSG(answer, "Internal error\n");
 		return -1;
 	}
 
@@ -649,7 +710,8 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id)
 	return 0;
 }
 
-int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id)
+int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
+			    odp_rpc_answer_t *answer)
 {
 
 	const int eth_if = if_id % 4;
@@ -658,14 +720,22 @@ int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id)
 	const eth_cluster_policy_t policy = status[eth_if].cluster[remoteClus].policy;
 
 	/* Disable on single lane while 40G mode is one */
-	if (if_id < 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_40G)
+	if (if_id < 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_40G){
+		ETH_RPC_ERR_MSG(answer, "Trying to disable lane %d in 1/10G mode while lanes are open in 40G mode\n",
+				eth_if);
 		return -1;
+	}
 	/* Disable on all lanes while 1 or 10G mode is one */
-	if (if_id == 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_ON)
+	if (if_id == 4 && status[eth_if].cluster[remoteClus].opened == ETH_CLUS_STATUS_ON){
+		ETH_RPC_ERR_MSG(answer, "Trying to disable lane %d in 40G while lane is open in 1/10G mode\n",
+				eth_if);
 		return -1;
+	}
 
 	if(status[eth_if].cluster[remoteClus].nocIf < 0 ||
 	   status[eth_if].cluster[remoteClus].enabled == 0) {
+		ETH_RPC_ERR_MSG(answer, "Trying to disable lane %d which is closed or already disabled\n",
+				eth_if);
 		return -1;
 	}
 	status[eth_if].cluster[remoteClus].enabled = 0;
@@ -703,6 +773,7 @@ int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id)
 							  noc_if - ETH_BASE_TX, tx_id, 0);
 		break;
 	default:
+		ETH_RPC_ERR_MSG(answer, "Internal error\n");
 		return -1;
 	}
 	status[eth_if].rx_refcounts.enabled--;
@@ -710,7 +781,8 @@ int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id)
 	return 0;
 }
 
-int ethtool_close_cluster(unsigned remoteClus, unsigned if_id)
+int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
+			  odp_rpc_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	int noc_if = status[eth_if].cluster[remoteClus].nocIf;
@@ -720,11 +792,17 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id)
 
 	if (if_id == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i)
-			if (status[i].cluster[remoteClus].enabled)
+			if (status[i].cluster[remoteClus].enabled) {
+				ETH_RPC_ERR_MSG(answer, "Trying to close 40G lane while lane %d is enabled\n",
+						i);
 				return -1;
+			}
 	} else {
-		if (status[eth_if].cluster[remoteClus].enabled)
+		if (status[eth_if].cluster[remoteClus].enabled) {
+			ETH_RPC_ERR_MSG(answer, "Trying to close lane %d while it is enabled\n",
+					eth_if);
 			return -1;
+		}
 	}
 
 	if (rx_tag >= 0)
@@ -747,7 +825,8 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id)
 	status[eth_if].refcounts.opened--;
 
 	if (!status[eth_if].refcounts.opened)
-		ethtool_stop_lane(if_id);
+		if(ethtool_stop_lane(if_id, answer))
+			return -1;
 
 	if (status[eth_if].cluster[remoteClus].policy == ETH_CLUS_POLICY_HASH) {
 		/* If we were the last hash policy. Clear up the tables
@@ -775,14 +854,15 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id)
 	return 0;
 }
 
-int ethtool_set_dual_mac(int enable)
+int ethtool_set_dual_mac(int enable,
+			 odp_rpc_answer_t *answer)
 {
 	if (lb_status.dual_mac == enable)
 		return 0;
 
 	for (int i = 0; i < N_ETH_LANE; ++i) {
 		if (status[i].refcounts.opened) {
-			fprintf(stderr, "[ETH] Cannot change dual mac mode when lane are active\n");
+			ETH_RPC_ERR_MSG(answer, "Cannot change dual mac mode when lane are active\n");
 			return -1;
 		}
 	}
@@ -794,7 +874,11 @@ int ethtool_poll_lane(unsigned if_id)
 {
 	const int eth_if = if_id % 4;
 	enum mppa_eth_mac_ethernet_mode_e link_speed =
-		ethtool_get_mac_speed(if_id);
+		ethtool_get_mac_speed(if_id, NULL);
+
+	if ((int)link_speed == -1)
+		return 0;
+
 	if (!mppa_eth_utils_mac_poll_state(eth_if, link_speed)) {
 		/* Link is up */
 		return 1;
@@ -803,12 +887,19 @@ int ethtool_poll_lane(unsigned if_id)
 	return 0;
 }
 int ethtool_lane_stats(unsigned if_id,
-		       odp_rpc_payload_eth_get_stat_t *stats)
+		       odp_rpc_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 
-	if(status[eth_if].initialized == ETH_LANE_OFF)
+	if(status[eth_if].initialized == ETH_LANE_OFF){
+		ETH_RPC_ERR_MSG(answer, "Trying to get stats on lane %d which is closed\n",
+				eth_if);
 		return -1;
+	}
+
+	odp_rpc_payload_eth_get_stat_t *stats =
+		(odp_rpc_payload_eth_get_stat_t *)answer->payload;
+	answer->payload_len = sizeof(*stats);
 
 	if (lb_status.loopback){
 		memset(stats, 0, sizeof(*stats));
@@ -855,7 +946,8 @@ int ethtool_lane_stats(unsigned if_id,
 	}
 	stats->out_errors =
 		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_fcs.reg +
-		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_size.reg;
+		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_size._.tx_small +
+		mppa_ethernet[0]->mac.lane_stat[0].tx_bad_size._.tx_large;
 
 	return 0;
 }

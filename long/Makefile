@@ -47,7 +47,7 @@ IOPCIE_ELF := $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/$(OS_BOARD_NAME)/$(CORE_AR
 cluster-cflags := -I$(ODP_TOOLCHAIN_DIR)/$(INCLUDE_DIR)/include -I$(CUNIT_INSTALL_DIR)/include
 cluster-lflags := -L$(ODP_TOOLCHAIN_DIR)/lib/odp/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/ -L$(CUNIT_INSTALL_DIR)/lib/
 
-cluster-cflags += -I$(ODP_SRC_DIR)/test/validation/common/ -I$(LONG_DIR)/include $($(ODP_ARCH)_CFLAGS) -g3
+cluster-cflags += -I$(ODP_SRC_DIR)/test/validation/common/ -I$(LONG_DIR)/include $($(ODP_ARCH)_CFLAGS) -g3 -O2
 cluster-lflags += -lodphelper -lodp -lcunit -lcrypto  $(LIB_NOC_LFLAGS) $($(ODP_ARCH)_LDFLAGS) -Wl,--gc-sections
 
 $(IOPCIE_ELF)-nameinmpk = iopcie

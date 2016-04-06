@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
+#include <mppa_boot_args.h>
 #include <mppa_power.h>
 #include <mppa_routing.h>
 #include <mppa_noc.h>
 #include <mppa_bsp.h>
 #include <mppa/osconfig.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "boot.h"
 
@@ -32,6 +35,22 @@ struct clus_bin_boot {
 static unsigned has_booted;
 static struct clus_bin_boot clus_bin_boots[BSP_NB_CLUSTER_MAX];
 
+extern void* MPPA_SPAWN_DIRECTORY_ADDRESS __attribute__((weak));
+
+static int has_bootable_elfs(void)
+{
+	mppa_boot_entry_t *table =
+		(mppa_boot_entry_t*) &MPPA_SPAWN_DIRECTORY_ADDRESS;
+	if (table == NULL) {
+		return 0;
+	}
+
+	if (table[0].image_addr)
+		return 1;
+
+	return 0;
+}
+
 int join_cluster(int clus_id, int *status)
 {
 	mppa_power_pid_t pid;
@@ -54,7 +73,8 @@ int join_cluster(int clus_id, int *status)
 		return -1;
 	}
 #ifdef VERBOSE
-	printf("[BOOT] Joined cluster %d. Status=%d\n", clus_id, *status);
+	if (status)
+		printf("[BOOT] Joined cluster %d. Status=%d\n", clus_id, *status);
 #endif
 	clus->status = STATE_OFF;
 	free(clus->bin);
@@ -62,12 +82,14 @@ int join_cluster(int clus_id, int *status)
 	return pid;
 }
 
-int join_clusters(void)
+int join_clusters(int *status_mask)
 {
 	int i, ret, status;
+
 	if (!has_booted)
 		while(1);
 
+	*status_mask = 0;
 	for (i = 0; i < BSP_NB_CLUSTER_MAX; ++i) {
 		if (clus_bin_boots[i].status != STATE_ON)
 			continue;
@@ -75,12 +97,15 @@ int join_clusters(void)
 		ret = join_cluster(i, &status);
 		if (ret < 0)
 			return ret;
+		*status_mask |= WEXITSTATUS(status);
 	}
 	return 0;
 }
 
 int boot_cluster(int clus_id, const char bin_file[], const char * argv[] ) {
 	if (__k1_get_cluster_id() != 128)
+		return -1;
+	if (!has_bootable_elfs())
 		return -1;
 
 	struct clus_bin_boot *clus = &clus_bin_boots[clus_id];
@@ -117,6 +142,9 @@ int boot_clusters(int argc, char * const argv[])
 	unsigned int i;
 	int opt;
 	if (__k1_get_cluster_id() != 128)
+		return -1;
+
+	if (!has_bootable_elfs())
 		return -1;
 
 	unsigned clus_count = 0;
