@@ -19,12 +19,41 @@
 #include "internal/eth.h"
 #include <odp/rpc/helpers.h>
 
+enum mppa_eth_mac_ethernet_mode_e mac_get_default_mode(unsigned lane_id)
+{
+	(void)lane_id;
+	switch (__bsp_flavour) {
+	case BSP_ETH_530:
+	case BSP_EXPLORER:
+		return MPPA_ETH_MAC_ETHMODE_1G;
+		break;
+	case BSP_KONIC80:
+		return MPPA_ETH_MAC_ETHMODE_40G;
+		break;
+	case BSP_DEVELOPER:
+		if (__k1_get_cluster_id() >= 192) {
+			/* IO(DDR|ETH)1 */
+			if(lane_id == 0 || lane_id == 1)
+				return MPPA_ETH_MAC_ETHMODE_10G_BASE_R;
+			if(lane_id == 2 || lane_id == 3)
+				return MPPA_ETH_MAC_ETHMODE_1G;
+		} else {
+			/* IO(DDR|ETH)0 => EXB03 */
+			return MPPA_ETH_MAC_ETHMODE_40G;
+		}
+		break;
+	default:
+		return -1;
+	}
+	return -1;
+}
+
 enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
 							odp_rpc_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	enum mppa_eth_mac_ethernet_mode_e link_speed =
-		mppa_eth_utils_mac_get_default_mode(eth_if);
+		mac_get_default_mode(eth_if);
 
 	if ((int)link_speed == -1) {
 		ETH_RPC_ERR_MSG(answer,
