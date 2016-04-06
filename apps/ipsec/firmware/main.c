@@ -38,19 +38,17 @@ int main()
 
 			/*for (int i = 0; i < 16; i++) {
 				if ( i % 4 == 0 ) continue;
-				//if ( i / 4 == 1 ) continue;
 				if ( i % 4 == 3 ) continue;
-        //if (i != 2 && i != 1 && i!= 5 && i != 6 && i != 9 && i != 10) continue;
 				boot_cluster(i, _argv[0], _argv);
 			}*/
-			//boot_cluster(1, _argv[0], _argv);
+			boot_cluster(1, _argv[0], _argv);
 			boot_cluster(2, _argv[0], _argv);
-			/*
 			boot_cluster(5, _argv[0], _argv);
       boot_cluster(6, _argv[0], _argv);
 			boot_cluster(9, _argv[0], _argv);
 			boot_cluster(10, _argv[0], _argv);
 			boot_cluster(13, _argv[0], _argv);
+			/*
 			boot_cluster(14, _argv[0], _argv);
       */
 		}
@@ -63,24 +61,20 @@ int main()
 				"--srcip",  "192.168.111.2",
 				"--dstip", "192.168.222.2",
 				"-m", "u",
-				"-i", "0", "-w", "2", "-p", "1500", NULL
+				"-i", "0", "-w", "2", "-p", "256", NULL
 			};
 
-			//for (int i = 0; i < 16; i += 4) {
-				/*
+			/*for (int i = 0; i < 16; i += 4) {
         if ( i % 4 == 1 ) continue;
 				if ( i % 4 == 2 ) continue;
 				if ( i % 4 == 3 ) continue;
-        */
-
-        //if (i != 0 && i != 4 && i!= 8 && i != 12) continue;
-				//boot_cluster(i, _argv[0], _argv);
-			//}
+				boot_cluster(i, _argv[0], _argv);
+			}*/
 			boot_cluster(0, _argv[0], _argv);
-      /*
 			boot_cluster(4, _argv[0], _argv);
 		  boot_cluster(8, _argv[0], _argv);
 			boot_cluster(12, _argv[0], _argv);
+      /*
       */
 		}
 		printf("Cluster booted\n");
