@@ -927,9 +927,10 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	appl_args->number = -1;
 	appl_args->payload = 56;
 	appl_args->timeout = -1;
+	int remove_header_size = 0;
 
 	while (1) {
-		opt = getopt_long(argc, argv, "+I:a:b:s:d:p:i:m:n:t:w:c:h",
+		opt = getopt_long(argc, argv, "+I:a:b:s:d:p:P:i:m:n:t:w:c:h",
 				  longopts, &long_index);
 		if (opt == -1)
 			break;	/* No more options */
@@ -1034,7 +1035,11 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 		case 'p':
 			appl_args->payload = atoi(optarg);
-			printf("PAYLOAD = %i\n", appl_args->payload);
+			break;
+
+		case 'P':
+			appl_args->payload = atoi(optarg);
+			remove_header_size = 1;
 			break;
 
 		case 'n':
@@ -1059,6 +1064,22 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		}
 	}
 
+	if ( remove_header_size ) {
+		int header_size = 0;
+		switch (appl_args->mode) {
+			case APPL_MODE_UDP:
+				header_size = ODPH_UDPHDR_LEN + ODPH_IPV4HDR_LEN + ODPH_ETHHDR_LEN;
+				break;
+			case APPL_MODE_PING:
+				header_size = ODPH_ICMPHDR_LEN + ODPH_IPV4HDR_LEN + ODPH_ETHHDR_LEN;
+				break;
+			case APPL_MODE_RCV:
+				break;
+		}
+		appl_args->payload -= header_size;
+	}
+
+	printf("PAYLOAD = %i\n", appl_args->payload);
 	if (appl_args->if_count == 0 || appl_args->mode == -1) {
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
@@ -1138,7 +1159,8 @@ static void usage(char *progname)
 	       "                        ODP_PKTIO_DISABLE_SOCKET_MMAP\n"
 	       "                        ODP_PKTIO_DISABLE_SOCKET_MMSG\n"
 	       " can be used to advanced pkt I/O selection for linux-generic\n"
-	       "  -p, --packetsize payload length of the packets\n"
+	       "  -p, --payloadsize payload length of the packets\n"
+	       "  -P, --packetsize payload + header length of the packets\n"
 	       "  -t, --timeout only for ping mode, wait ICMP reply timeout seconds\n"
 	       "  -i, --interval wait interval ms between sending each packet\n"
 	       "                 default is 1000ms. 0 for flood mode\n"
