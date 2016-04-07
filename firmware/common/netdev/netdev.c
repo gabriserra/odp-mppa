@@ -5,16 +5,20 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include <pcie_queue.h>
+#include <pcie_queue_protocol.h>
 #include <mppa/osconfig.h>
 #include <HAL/hal/hal.h>
 #include "netdev.h"
 #include "internal/cache.h"
 
+#define MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC	0xCAFEBABE
+
 #define DDR_BUFFER_BASE_ADDR	0x80000000
 
 static uintptr_t g_current_pkt_addr = DDR_BUFFER_BASE_ADDR;
 
-__attribute__((section(".eth_control"))) struct mppa_pcie_eth_control eth_control = {
+__attribute__((section(".lowmem_data") )) struct mppa_pcie_eth_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
 
@@ -266,12 +270,20 @@ int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 
 int netdev_start()
 {
+	pcie_open();
+
 	/* Ensure coherency */
 	__k1_mb();
 	/* Cross fingers for everything to be setup correctly ! */
-	__builtin_k1_swu(&eth_control.magic, 0xCAFEBABE);
+	__builtin_k1_swu(&eth_control.magic, MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC);
 	/* Ensure coherency */
 	__k1_mb();
+
+	__mppa_pcie_control.services[PCIE_SERVICE_ETH].addr = (unsigned int)&eth_control;
+	__k1_wmb();
+	__mppa_pcie_control.services[PCIE_SERVICE_ETH].magic = PCIE_SERVICE_MAGIC;
+	__k1_wmb();
+
 
 #ifdef __mos__
 	mOS_pcie_write_usr_it(0);

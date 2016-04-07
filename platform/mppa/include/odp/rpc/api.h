@@ -51,10 +51,12 @@ int odp_rpc_do_query(uint16_t dest_id, uint16_t dest_tag,
  * @param[out] payload Address where to store Ack message payload address.
  * payload is only valid until a new RPC command is sent
  * @param[in] timeout Time out in cycles.
+ * @param[in] mod Name of the module calling wait_ack to add to error messages
  * @retval -1 Error
  * @retval 0 Timeout
  * @retval 1 OK
  */
-odp_rpc_cmd_err_e odp_rpc_wait_ack(struct odp_rpc ** cmd, void ** payload, uint64_t timeout);
+odp_rpc_cmd_err_e odp_rpc_wait_ack(struct odp_rpc ** cmd, void ** payload, uint64_t timeout,
+				   const char* mod);
 
 #endif /* __ODP_RPC_API_H__ */

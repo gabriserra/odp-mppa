@@ -76,14 +76,10 @@ int main(){
 		odp_rpc_do_query(odp_rpc_get_io_dma_id(1, cluster_id),
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
-		ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S);
-		if (ret < 0) {
-			fprintf(stderr, "[ETH] RPC Error\n");
+		ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+		if (ret <= 0)
 			return 1;
-		} else if (ret == 0){
-			fprintf(stderr, "[ETH] Query timed out\n");
-			return 1;
-		}
+
 		ack.inl_data = ack_msg->inl_data;
 		if (ack.status) {
 			fprintf(stderr, "[ETH] Error: Server declined dual mac mode\n");
@@ -127,14 +123,10 @@ int main(){
 							 odp_rpc_get_io_tag_id(cluster_id),
 							 &cmd, NULL);
 
-			ret = odp_rpc_wait_ack(&ack_msg, NULL, -1);
-			if (ret < 0) {
-				fprintf(stderr, "[ETH] RPC Error\n");
+			ret = odp_rpc_wait_ack(&ack_msg, NULL, -1, "[ETH]");
+			if (ret <= 0)
 				return 1;
-			} else if (ret == 0){
-				fprintf(stderr, "[ETH] Query timed out\n");
-				return 1;
-			}
+
 			ack.inl_data = ack_msg->inl_data;
 			if (ack.status) {
 				fprintf(stderr, "[ETH] Error: Server declined opening of eth interface\n");
@@ -164,14 +156,10 @@ int main(){
 							 odp_rpc_get_io_tag_id(cluster_id),
 							 &cmd, NULL);
 
-			ret = odp_rpc_wait_ack(&ack_msg, NULL, -1);
-			if (ret < 0) {
-				fprintf(stderr, "[ETH] RPC Error\n");
+			ret = odp_rpc_wait_ack(&ack_msg, NULL, -1, "[ETH]");
+			if (ret <= 0)
 				return 1;
-			} else if (ret == 0){
-				fprintf(stderr, "[ETH] Query timed out\n");
-				return 1;
-			}
+
 			ack.inl_data = ack_msg->inl_data;
 			if (ack.status) {
 				fprintf(stderr, "[ETH] Error: Server declined closing of eth interface\n");

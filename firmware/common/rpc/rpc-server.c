@@ -49,7 +49,7 @@ static inline int rxToMsg(unsigned ifId, unsigned tag,
 		INVALIDATE_AREA(*payload, cmd->data_len);
 	}
 #ifdef VERBOSE
-	odp_rpc_print_msg(cmd);
+	odp_rpc_print_msg(cmd, *payload);
 #endif
 
 	return remoteClus;
@@ -211,13 +211,29 @@ int odp_rpc_server_thread()
 		int ret;
 		ret = odp_rpc_server_handle(&msg);
 		if (ret < 0) {
-			unsigned interface = get_rpc_local_dma_id(msg->dma_id);
+			odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
 
+			switch(ret){
+			case -ODP_RPC_ERR_BAD_COS:
+				RPC_ERROR(&answer, "[RPC]", "Message has unsupported Class of Service %d\n",
+					  msg->pkt_class);
+				break;
+			case -ODP_RPC_ERR_BAD_SUBTYPE:
+				RPC_ERROR(&answer, "[RPC]", "Message has subtype %d for Class of Service %d\n",
+					  msg->pkt_subtype, msg->pkt_class);
+				break;
+			case -ODP_RPC_ERR_VERSION_MISMATCH:
+				RPC_ERROR(&answer, "[RPC]", "Message has a different CoS Version: %d\n",
+					  msg->cos_version);
+				break;
+			case -ODP_RPC_ERR_INTERNAL_ERROR:
+			default:
+				RPC_ERROR(&answer, "[RPC]", "Internal error while handling RPC message\n");
+				break;
+			}
 			/* Error in handling. Send a RPC command with error flag */
-			msg->ack = 1;
 			msg->rpc_err = -ret;
-			msg->data_len = 0;
-			odp_rpc_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
+			odp_rpc_server_ack(&answer);
 		}
 	}
 	return 0;

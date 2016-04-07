@@ -109,14 +109,9 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, rules);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[ETH] RPC Error\n");
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	if (ret <= 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[ETH] Query timed out\n");
-		return 1;
-	}
 
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
@@ -526,14 +521,10 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[ETH] RPC Error\n");
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	if (ret <= 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[ETH] Query timed out\n");
-		return 1;
-	}
+
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[ETH] Error: Server declined closure of eth interface\n");
@@ -577,14 +568,10 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
-		fprintf(stderr, "[ETH] RPC Error\n");
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	if (ret <= 0)
 		return 1;
-	} else if (ret == 0){
-		fprintf(stderr, "[ETH] Query timed out\n");
-		return 1;
-	}
+
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[ETH] Error: Server declined change of eth state\n");
@@ -724,12 +711,9 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 					 odp_rpc_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 2 * ODP_RPC_TIMEOUT_1S);
-	if (ret < 0) {
+	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 2 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	if (ret <= 0)
 		return -1;
-	} else if (ret == 0){
-		return -1;
-	}
 
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {

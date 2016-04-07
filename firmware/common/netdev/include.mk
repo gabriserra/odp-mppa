@@ -1,6 +1,15 @@
+ifndef __NETDEV_INCLUDED__
+__NETDEV_INCLUDED__ := 1
+
 NETDEVDIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 SRCDIRS   += $(NETDEVDIR)
 
-HDRFILES  += $(TOP_SRCDIR)/mppaeth/mppa_pcie_netdev.h
+ifdef MPPAPCIE_DIR
+_CFLAGS  += -I$(MPPAPCIE_DIR)/mppapcie_netdev/
+else
+_CFLAGS  += -I$(realpath $(K1_TOOLCHAIN_DIR))/../..//src/k1-mppapcie-dkms-2.2.0/mppapcie_netdev/
+endif
 _CFLAGS   += -I$(TOP_SRCDIR)/mppaeth
-_LDFLAGS  += -T$(NETDEVDIR)/linker.ld
+_LDFLAGS  += -lpcie_queue
+
+endif

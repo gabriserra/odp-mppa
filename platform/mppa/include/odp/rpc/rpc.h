@@ -21,8 +21,7 @@ typedef enum {
 	ODP_RPC_ERR_BAD_SUBTYPE = 2,
 	ODP_RPC_ERR_VERSION_MISMATCH = 3,
 	ODP_RPC_ERR_INTERNAL_ERROR = 4,
-	ODP_RPC_ERR_BAD_CMD = 5,
-	ODP_RPC_ERR_TIMEOUT = 6,
+	ODP_RPC_ERR_TIMEOUT = 5,
 } odp_rpc_cmd_err_e;
 
 typedef struct odp_rpc {
