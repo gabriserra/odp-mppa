@@ -150,15 +150,19 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			break;
 		}
 		if (ctx->add_header){
-			tx_uc_header_t info = { .dword = 0ULL };
-			info.pkt_size = len;
+			mppa_ethernet_header_t *hdr;
+
+			base_addr -= sizeof(*hdr);
+			hdr = (mppa_ethernet_header_t*) base_addr;
+
+			hdr->timestamp = 4 * head + i;
+			hdr->info.dword = 0ULL;
+			hdr->info._.pkt_size = len;
 			/* Add the packet end marker */
 			if (tx_config->add_end_marker && i == (pkt_count - 1))
-				info.flags |= END_OF_PACKETS;
+				hdr->info._.hash_key |= END_OF_PACKETS;
 
-			base_addr -= sizeof(info);
-			((tx_uc_header_t*)base_addr)->dword = info.dword;
-			len += sizeof(info);
+			len += sizeof(*hdr);
 		}
 
 		trs->parameter.array[2 * i + 0] = len / sizeof(uint64_t);
@@ -237,16 +241,19 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 			break;
 		}
 		if (ctx->add_header){
-			tx_uc_header_t info = { .dword = 0ULL };
-			info.pkt_size = len;
-			/* Add the packet end marker */
-			if (tx_config->add_end_marker && i == (pkt_count - 1)) {
-				info.flags |= END_OF_PACKETS;
-			}
+			mppa_ethernet_header_t *hdr;
 
-			base_addr -= sizeof(info);
-			((tx_uc_header_t*)base_addr)->dword = info.dword;
-			len += sizeof(info);
+			base_addr -= sizeof(*hdr);
+			hdr = (mppa_ethernet_header_t*) base_addr;
+
+			hdr->timestamp = 8 * head + i;
+			hdr->info.dword = 0ULL;
+			hdr->info._.pkt_size = len;
+			/* Add the packet end marker */
+			if (tx_config->add_end_marker && i == (pkt_count - 1))
+				hdr->info._.hash_key |= END_OF_PACKETS;
+
+			len += sizeof(*hdr);
 		}
 		/* ROund up to superior multiple of 8B */
 		len = ( ( len + sizeof(uint64_t) - 1 ) / sizeof(uint64_t) ) * sizeof(uint64_t);

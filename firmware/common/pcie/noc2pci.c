@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <mppa_noc.h>
 
+#include "mppa_pcie_netdev.h"
 #include "internal/pcie.h"
 #include "internal/netdev.h"
 #include "noc2pci.h"
@@ -27,7 +28,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 	uint32_t left, pkt_size;
 	int ret, buf_idx;
 	void * pkt_addr;
-	tx_uc_header_t hdr;
+	union mppa_pcie_eth_pkt_hdr_info info;
 	struct mppa_pcie_eth_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
 	struct mppa_pcie_eth_c2h_ring_buff_entry pkt, free_pkt;
 
@@ -51,9 +52,10 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 
 		while (1) {
 			/* Read header from packet */
-			hdr.dword = __builtin_k1_ldu(pkt_addr);
-			pkt_size = hdr.pkt_size;
-			pkt_addr += sizeof(tx_uc_header_t);
+
+			info.dword = __builtin_k1_ldu(pkt_addr + offsetof(struct mppa_pcie_eth_pkt_hdr, info));
+			pkt_size = info._.pkt_size;
+			pkt_addr += sizeof(struct mppa_pcie_eth_pkt_hdr);
 			buf->pkt_count++;
 
 			dbg_printf("packet at addr %p, size %ld\n", pkt_addr, pkt_size);
@@ -76,7 +78,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 			pkt_addr += ( ( pkt_size + sizeof(uint64_t) - 1 ) / sizeof(uint64_t) ) *
 				sizeof(uint64_t);
 
-			if (hdr.flags & END_OF_PACKETS)
+			if (info._.hash_key & END_OF_PACKETS)
 				break;
 		}
 

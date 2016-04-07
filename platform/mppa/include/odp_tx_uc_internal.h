@@ -20,14 +20,6 @@ extern "C" {
 
 #define END_OF_PACKETS		(1 << 0)
 
-typedef union {
-	struct {
-		uint16_t pkt_size;
-		uint16_t flags;
-	};
-	uint64_t dword;
-} tx_uc_header_t;
-
 typedef struct eth_uc_job_ctx {
 	odp_packet_t pkt_table[MAX_PKT_PER_UC];
 	unsigned int pkt_count;
