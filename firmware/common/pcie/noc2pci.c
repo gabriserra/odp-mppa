@@ -128,11 +128,8 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 	mppa_pcie_noc_rx_buf_t *buf;
 	uint32_t left;
 	mppa_noc_dnoc_rx_configuration_t conf = MPPA_NOC_DNOC_RX_CONFIGURATION_INIT;
-	int ret = buffer_ring_get_multi(&g_free_buf_pool, &buf, 1, &left);
-	if (ret != 1) {
-		err_printf("No more free buffer available\n");
-		return -1;
-	}
+	int ret;
+	while ( buffer_ring_get_multi(&g_free_buf_pool, &buf, 1, &left) == -1 );
 
 	iface->rx_cfgs[rx_id].mapped_buf = buf;
 	iface->rx_cfgs[rx_id].pcie_eth_if = iface->rx_cfgs[rx_id].pcie_eth_if;
