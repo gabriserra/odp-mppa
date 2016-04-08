@@ -33,15 +33,21 @@ run_test()
 	local ret=0
 	BOARD_TYPE=$(cat /mppa/board0/type)
 
+	IO0_LOOPS=" e0:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e0p0:loop:tags=100"
+	IO1_LOOPS=" e1:loop:tags=100 -- e1:loop:jumbo:tags=100 -- e0p1:loop:tags=100"
+	COMMON="cluster0:tags=100 -- loop "
 	case "$BOARD_TYPE" in
 		"ab01")
-			IFLIST="loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="$IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
 			;;
 		"konic80")
-			IFLIST="e0 e1 -- e1 e0 -- e0:jumbo e1:jumbo -- e1:jumbo e0:jumbo -- loop -- e0:loop:tags=100 -- e1:loop:tags=100 -- e0:loop:jumbo:tags=100 -- e1:loop:jumbo:tags=100 -- e0p0:loop:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="e0 e1 -- e1 e0 -- e0:jumbo e1:jumbo -- e1:jumbo e0:jumbo -- $IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
+			;;
+		"emb01")
+			IFLIST="e0p0 e0p1 -- e0p1 e0p0 -- e0p0:jumbo e0p1:jumbo -- e0p1:jumbo e0p0:jumbo -- $IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
 			;;
 		"explorer")
-			IFLIST="loop -- e1:loop:tags=100 -- e1:jumbo:tags=100 -- e1p1:loop:tags=100 -- cluster0:tags=100"
+			IFLIST="$IO1_LOOPS -- $COMMON"
 			;;
 		"")
 			IFLIST="loop"
