@@ -74,7 +74,10 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		err_printf("Broken Rx tag should not happen!!!\n");
 	}
 
-	if ( ( ( rx_id - tx_credit->min_tx_tag ) % CREDIT_CHUNK ) == (CREDIT_CHUNK - 1 ) ) {
+	tx_credit->next_tag = ( ( tx_credit->next_tag + 1 ) > tx_credit->max_tx_tag ) ?
+		tx_credit->min_tx_tag : tx_credit->next_tag + 1;
+
+	if ( ( ( tx_credit->next_tag - tx_credit->min_tx_tag ) % CREDIT_CHUNK ) == 0 ) {
 		tx_credit->credit += CREDIT_CHUNK;
 		ret = mppa_noc_cnoc_tx_configure(iface->iface_id,
 				tx_credit->cnoc_tx,
@@ -85,9 +88,6 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		dbg_printf("Send %llu credits to %d\n", tx_credit->credit, tx_credit->cluster);
 	}
 
-
-	tx_credit->next_tag = ( ( tx_credit->next_tag + 1 ) > tx_credit->max_tx_tag ) ?
-		tx_credit->min_tx_tag : tx_credit->next_tag + 1;
 
 	return 0;
 }
