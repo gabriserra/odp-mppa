@@ -72,7 +72,9 @@ if ENV["label"].to_s() != "" then
     when /KONIC80Developers*/, /MPPA_KONIC80_Developers*/
         valid_configs = [ "k1b-kalray-nodeos_konic80", "k1b-kalray-mos_konic80" ]
         valid_type = "jtag"
-
+    when /MPPA_EMB01b_centos7-with-eth-loopback/
+        valid_configs = [ "k1b-kalray-nodeos_emb01", "k1b-kalray-mos_emb01" ]
+        valid_type = "jtag"
     when "fedora19-64","debian6-64","debian7-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
         # Validate nothing.
         valid_configs = [ ]
