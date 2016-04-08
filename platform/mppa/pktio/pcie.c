@@ -402,11 +402,12 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 
 	uint64_t local_credit = __builtin_k1_afdau((int64_t*)&pcie->local_credit, 1);
 
-	pcie->tx_config.header._.tag = pcie->min_tx_tag + ( local_credit % pcie->nb_tx_tags );
+	pkt_tx_uc_config tx_config = pcie->tx_config;
+	tx_config.header._.tag = pcie->min_tx_tag + ( local_credit % pcie->nb_tx_tags );
 
 	while (local_credit >= mppa_noc_cnoc_rx_get_value(0, pcie->cnoc_rx) );
 
-	return tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
+	return tx_uc_send_aligned_packets(&tx_config, ctx,
 					  pkt_table, len, PKTIO_PKT_MTU);
 }
 
