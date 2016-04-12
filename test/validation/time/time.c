@@ -332,7 +332,6 @@ static void time_test_wait_until(time_cb time, time_from_ns_cb time_from_ns)
 	for (i = 1; i < 6; i++) {
 		wait = odp_time_sum(wait, second);
 		odp_time_wait_until(wait);
-		printf("%d..", i);
 	}
 	end_time = time();
 
