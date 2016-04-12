@@ -84,6 +84,7 @@ ethernet counters}
 \item[-]{Loopback between MPPA interfaces using a cable is now
   supported. Both pktio must be created before starting them to allow
   the link to get UP.}
+\item[-]{Added support for multiple ethernet lane on one I/O.}
 \end{itemize}
 
 \subsubsection{Firmwares}
@@ -430,7 +431,6 @@ k1-cluster   --functional  --mboard=developer --march=bostan --user-syscall=/usr
   application. If order is required, the number of Rx thread must be
   set to one.}
 \item[-]{Only promiscuous mode is currently available.}
-\item[-]{Multi-Lane (4x10G) it not supported yet.}
 \item[-]{When clusters transmits to an ethernet port more than the port
   bandwidth can handle, packets may be dropped.}
 \end{itemize}
