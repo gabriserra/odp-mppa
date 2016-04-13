@@ -383,7 +383,7 @@ odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t t
 	}
 	if (!ret) {
 		fprintf(stderr, "%s Query timed out\n", mod);
-		return ODP_RPC_ERR_TIMEOUT;
+		return -ODP_RPC_ERR_TIMEOUT;
 	}
 
 	odp_rpc_t * msg = &odp_rpc_ack_buf.rpc_cmd;

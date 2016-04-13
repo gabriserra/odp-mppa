@@ -23,7 +23,7 @@
 #include "odp_tx_uc_internal.h"
 
 #define MAX_ETH_SLOTS 2
-#define MAX_ETH_PORTS 4
+#define MAX_ETH_PORTS 5
 _ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
 		   "MAX_RX_ETH_IF__ERROR");
 
