@@ -904,6 +904,7 @@ int _odp_parse_common(odp_packet_hdr_t *pkt_hdr, const uint8_t *ptr)
 	odp_packet_parsing_ctx_t ctx;
 	memset(&ctx, 0, sizeof(ctx));
 
+	INVALIDATE_AREA(pkt_hdr->buf_hdr.addr, pkt_hdr->frame_len);
 	if (packet_parse_l2_not_done(pkt_hdr))
 		packet_parse_l2(pkt_hdr);
 
