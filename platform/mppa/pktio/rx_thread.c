@@ -366,7 +366,6 @@ static void _poll_masks(int th_id)
 
 static void *_rx_thread_start(void *arg)
 {
-	mOS_disable_streaming_load();
 	int th_id = (unsigned long)(arg);
 	for (int i = 0; i < MAX_RX_IF; ++i) {
 		rx_buffer_list_t * hdr_list =
