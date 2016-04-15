@@ -14,7 +14,7 @@ extern "C" {
 #include <odp_buffer_ring_internal.h>
 
 #define N_EV_MASKS 4
-#define MAX_RX_ETH_IF 8
+#define MAX_RX_ETH_IF 10
 #define MAX_RX_PCIE_IF 8
 #define MAX_RX_C2C_IF 16
 #define MAX_RX_IF (MAX_RX_ETH_IF + MAX_RX_PCIE_IF + MAX_RX_C2C_IF)

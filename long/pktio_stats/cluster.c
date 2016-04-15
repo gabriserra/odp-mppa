@@ -256,12 +256,15 @@ void pktio_test_stats(void)
 
 	/* send */
 	for (pkts = 0; pkts != alloc; ) {
-		ret = odp_queue_enq_multi(outq, &tx_ev[pkts], alloc - pkts);
+		int npkt = (alloc - pkts) > 8 ? 8 : (alloc - pkts);
+		ret = odp_queue_enq_multi(outq, &tx_ev[pkts], npkt);
 		if (ret < 0) {
 			CU_FAIL("unable to enqueue packet\n");
 			break;
 		}
 		pkts += ret;
+		__k1_cpu_backoff(1000000);
+
 	}
 
 	/* get */
