@@ -168,7 +168,7 @@ odp_crypto_alg_err_t sha256_gen(odp_crypto_op_params_t *params,
 #else
   unsigned int md_len;
 
-  hmac_sha256_opt(
+  mppa_hmac_sha256(
 	     session->auth.data.sha256.key,
 	     32,
 	     data,
