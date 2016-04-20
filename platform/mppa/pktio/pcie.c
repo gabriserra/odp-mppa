@@ -219,7 +219,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pcie->rx_config.pktio_id = slot_id * MAX_PCIE_INTERFACES + port_id +
 			MAX_RX_ETH_IF;
 		/* FIXME */
-		pcie->rx_config.header_sz = sizeof(uint32_t);
+		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
 	}
 
@@ -334,12 +334,16 @@ static int pcie_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		INVALIDATE(pkt_hdr);
 		packet_parse_reset(pkt_hdr);
 
-		uint32_t size;
+		union mppa_ethernet_header_info_t info;
 		uint8_t * const hdr_addr = base_addr -
-			sizeof(uint32_t);
+			sizeof(mppa_ethernet_header_t);
+		mppa_ethernet_header_t * const header =
+			(mppa_ethernet_header_t *)hdr_addr;
 
-		size = __builtin_k1_lwu(hdr_addr);
-		pull_tail(pkt_hdr, pkt_hdr->frame_len - size);
+		info.dword = LOAD_U64(header->info.dword);
+		const unsigned frame_len =
+			info._.pkt_size;
+		pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
 		packet_parse_l2(pkt_hdr);
 	}
 

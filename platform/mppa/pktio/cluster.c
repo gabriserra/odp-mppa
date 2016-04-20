@@ -289,7 +289,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pkt_cluster->rx_config.pool = pool;
 		pkt_cluster->rx_config.pktio_id = MAX_RX_ETH_IF +
 			MAX_RX_PCIE_IF + cluster_id;
-		pkt_cluster->rx_config.header_sz = sizeof(tx_uc_header_t);
+		pkt_cluster->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 
 		if (cluster_init_cnoc_tx()) {
 			ODP_ERR("Failed to initialize CNoC Rx\n");
@@ -478,14 +478,15 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 		INVALIDATE(pkt_hdr);
 		packet_parse_reset(pkt_hdr);
 
-		tx_uc_header_t info;
+		union mppa_ethernet_header_info_t info;
 		uint8_t * const hdr_addr = base_addr -
-			sizeof(tx_uc_header_t);
-		tx_uc_header_t * const header =
-			(tx_uc_header_t *)hdr_addr;
+			sizeof(mppa_ethernet_header_t);
+		mppa_ethernet_header_t * const header =
+			(mppa_ethernet_header_t *)hdr_addr;
 
-		info.dword = LOAD_U64(header->dword);
-		const unsigned frame_len = info.pkt_size;
+		info.dword = LOAD_U64(header->info.dword);
+		const unsigned frame_len =
+			info._.pkt_size;
 		pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
 		packet_parse_l2(pkt_hdr);
 	}

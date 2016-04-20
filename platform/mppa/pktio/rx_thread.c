@@ -30,7 +30,6 @@ typedef struct {
 	odp_packet_t pkt;
 	uint8_t broken;
 	uint8_t pktio_id;
-	uint64_t reconf_id;
 } rx_tag_t;
 
 /** Per If data */
@@ -127,7 +126,6 @@ static int _configure_rx(rx_config_t *rx_config, int rx_id)
 
 	odp_packet_hdr_t *pkt_hdr = odp_packet_hdr(pkt);
 	rx_hdl.tag[rx_id].pkt = pkt;
-	pkt_hdr->buf_hdr.order = rx_hdl.tag[rx_id].reconf_id = rx_id;
 
 	int ret;
 	uint32_t len;
@@ -198,7 +196,6 @@ static int _reload_rx(int th_id, int rx_id)
 
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
-	rx_hdl.tag[rx_id].reconf_id += 256ULL;
 
 	if (odp_unlikely(pkt == ODP_PACKET_INVALID)){
 		if (rx_hdl.tag[rx_id].broken) {
@@ -207,6 +204,15 @@ static int _reload_rx(int th_id, int rx_id)
 		} else {
 			if_th->oom_pkts++;
 		}
+	} else {
+		/* Move timestamp to order so it can be sorted in the ring buf */
+		odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
+		const mppa_ethernet_header_t *header;
+		header = (const mppa_ethernet_header_t*)
+			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
+			 rx_config->pkt_offset);
+
+		pkt_hdr->buf_hdr.order = LOAD_U64(header->timestamp);
 	}
 
 	typeof(mppa_dnoc[dma_if]->rx_queues[0]) * const rx_queue =
@@ -227,7 +233,6 @@ static int _reload_rx(int th_id, int rx_id)
 
 		newpkt = rx_pool->spares[--rx_pool->n_spares];
 		pkt_hdr = odp_packet_hdr(newpkt);
-		pkt_hdr->buf_hdr.order = rx_hdl.tag[rx_id].reconf_id;
 
 		rx_queue->buffer_base.dword = (unsigned long)
 			((uint8_t *)(pkt_hdr->buf_hdr.addr) +
@@ -270,7 +275,6 @@ static int _reload_rx(int th_id, int rx_id)
 		 * will be counted by the pkt == ODP_PACKET_INVALID */
 		if_th->dropped_pkts += dropped + 1;
 		rx_hdl.tag[rx_id].broken = true;
-		rx_hdl.tag[rx_id].reconf_id += (dropped + 1) << 8;
 
 		/* We didn't actually used the spare one */
 		rx_hdl.tag[rx_id].pkt = ODP_PACKET_INVALID;
@@ -354,7 +358,6 @@ static void _poll_masks(int th_id)
 
 static void *_rx_thread_start(void *arg)
 {
-	mOS_disable_streaming_load();
 	int th_id = (unsigned long)(arg);
 	for (int i = 0; i < MAX_RX_IF; ++i) {
 		rx_buffer_list_t * hdr_list =
