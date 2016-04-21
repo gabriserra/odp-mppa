@@ -259,6 +259,7 @@ b.target("package") do
     b.run("echo 'COMMITER_EMAIL=#{options["email"]}' >> #{output_parameters}")
     b.run("echo 'INTEGRATION_BRANCH=#{ENV.fetch("INTEGRATION_BRANCH",options["branch"])}' >> #{output_parameters}")
     b.run("echo 'REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
+    b.run("echo 'INIC_BUILD_NUMBER=#{ENV["BUILD_NUMBER"]}' >> #{output_parameters}")
     b.run("#{workspace}/metabuild/bin/packages.rb --tar=#{File.join(artifacts,"package.tar")} tar")
 end
 
