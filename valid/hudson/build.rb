@@ -258,6 +258,7 @@ b.target("package") do
     b.run("echo 'K1ODP_REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
     b.run("echo 'COMMITER_EMAIL=#{options["email"]}' >> #{output_parameters}")
     b.run("echo 'INTEGRATION_BRANCH=#{ENV.fetch("INTEGRATION_BRANCH",options["branch"])}' >> #{output_parameters}")
+    b.run("echo 'TMP_BRANCH=#{ENV["TARGET_BRANCH"]}' >> #{output_parameters}")
     b.run("echo 'REVISION=#{repo.long_sha1()}' >> #{output_parameters}")
     b.run("echo 'INIC_BUILD_NUMBER=#{ENV["BUILD_NUMBER"]}' >> #{output_parameters}")
     b.run("#{workspace}/metabuild/bin/packages.rb --tar=#{File.join(artifacts,"package.tar")} tar")
