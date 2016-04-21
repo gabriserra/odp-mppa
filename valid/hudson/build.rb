@@ -251,7 +251,7 @@ b.target("package") do
 
 
     # Generates k1r_parameters.sh
-    output_parameters = File.join(artifacts,"k1odp_parameters.sh")
+    output_parameters = File.join(artifacts,"parameters.sh")
     b.run("rm -f #{output_parameters}")
     b.run("echo 'K1ODP_VERSION=#{version}-#{releaseID}' >> #{output_parameters}")
     b.run("echo 'K1ODP_RELEASE=#{version}' >> #{output_parameters}")
