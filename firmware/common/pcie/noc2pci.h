@@ -1,6 +1,5 @@
 #ifndef NOC2PCI__H
-#define NOC2PCI__H
-
+#define RX_NOC2PCI__H
 
 #define MAX_RX 					(30 * 4)
 #define RX_THREAD_COUNT			2
@@ -12,11 +11,6 @@
 #define RX_RM_START		5
 #define RX_RM_COUNT		2
 #define PCIE_TX_RM		(RX_RM_START + RX_RM_COUNT)
-
-/**
- * Credits are sent back every CREDIT_CHUNK buffers.
- */
-#define CREDIT_CHUNK	(MPPA_PCIE_NOC_RX_NB / 4)
 
 /**
  * WARNING: struct from odp_tx_uc_internal
@@ -32,24 +26,9 @@ typedef union {
 	uint64_t dword;
 } tx_uc_header_t;
 
-
-typedef struct tx_credit {
-	uint8_t min_tx_tag;
-	uint8_t max_tx_tag;
-	mppa_cnoc_config_t config;
-	mppa_cnoc_header_t header;
-	uint8_t cnoc_tx;
-	uint8_t remote_cnoc_rx;
-	uint8_t next_tag;
-	uint8_t cluster;
-	uint64_t credit;
-} tx_credit_t;
-
 typedef struct rx_cfg {
 	mppa_pcie_noc_rx_buf_t *mapped_buf;
 	uint8_t pcie_eth_if; /* PCIe ethernet interface */
-	uint8_t broken;
-	tx_credit_t *tx_credit;
 } rx_cfg_t;
 
 typedef struct rx_iface {
@@ -61,6 +40,8 @@ typedef struct rx_iface {
 
 typedef struct rx_thread {
 	rx_iface_t iface[IF_PER_THREAD];
+	int th_id;
+	volatile int ready;
 } rx_thread_t;
 
 extern rx_thread_t g_rx_threads[RX_THREAD_COUNT];

@@ -131,12 +131,6 @@ typedef struct {
 					 *   Eth Egress */
 	uint16_t max_tx_tag;            /**< Remote DMA last tag to forward to
 					 *   Eth Egress */
-	uint8_t  nb_tx_tags;            /**< Remote DMA number of tag to forward
-					 *   to Eth Egress */
-	uint16_t cnoc_rx;               /**< Cnoc RX port for cluster -> host
-					 *   flow control */
-	uint64_t local_credit;          /**< Flow control credit for cluster
-					 *   -> host */
 
 	pkt_tx_uc_config tx_config;
 } pkt_pcie_t;

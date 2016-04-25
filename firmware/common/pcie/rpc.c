@@ -6,7 +6,6 @@
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"
-#include "noc2pci.h"
 
 struct mppa_pcie_eth_dnoc_tx_cfg g_mppa_pcie_tx_cfg[BSP_NB_IOCLUSTER_MAX][BSP_DNOC_TX_PACKETSHAPER_NB_MAX] = {{{0}}};
 
@@ -86,19 +85,6 @@ static inline int pcie_add_forward(unsigned int pcie_eth_if_id,
 	return 0;
 }
 
-static int8_t cnoc_tx_tags[MPPA_CNOC_COUNT] = { [0 ... MPPA_CNOC_COUNT-1] = -1 };
-static inline int pcie_get_cnoc_tx_tag(int if_id)
-{
-	mppa_noc_ret_t ret;
-	if ( cnoc_tx_tags[if_id] == -1 ) {
-		unsigned tag;
-		ret = mppa_noc_cnoc_tx_alloc_auto(if_id, &tag, MPPA_NOC_BLOCKING);
-		assert(ret == MPPA_NOC_RET_SUCCESS);
-		cnoc_tx_tags[if_id] = tag;
-	}
-	return cnoc_tx_tags[if_id];
-}
-
 static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 		      odp_rpc_answer_t *answer)
 {
@@ -149,32 +135,9 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 	unsigned int min_tx_tag = first_rx;
 	unsigned int max_tx_tag = first_rx + MPPA_PCIE_NOC_RX_NB - 1;
 	unsigned rx_id;
-	mppa_routing_ret_t rret;
-
-	tx_credit_t *tx_credit = calloc(1, sizeof(tx_credit_t));
-	tx_credit->cluster = remoteClus;
-	tx_credit->min_tx_tag = min_tx_tag;
-	tx_credit->max_tx_tag = max_tx_tag;
-	tx_credit->next_tag = min_tx_tag;
-	tx_credit->cnoc_tx = pcie_get_cnoc_tx_tag(if_id);
-
-	tx_credit->credit = MPPA_PCIE_NOC_RX_NB;
-	tx_credit->remote_cnoc_rx = open_cmd.cnoc_rx;
-	rret = mppa_routing_get_cnoc_unicast_route(odp_rpc_get_cluster_id(if_id),
-											   remoteClus, &tx_credit->config,
-											   &tx_credit->header);
-	assert(rret == 0);
-
-	ret = mppa_noc_cnoc_tx_configure(if_id,
-			tx_credit->cnoc_tx,
-			tx_credit->config,
-			tx_credit->header);
-	assert(ret == MPPA_NOC_RET_SUCCESS);
-	mppa_noc_cnoc_tx_push(if_id, tx_credit->cnoc_tx, tx_credit->credit);
-	
 
 	for ( rx_id = min_tx_tag; rx_id <= max_tx_tag; ++rx_id ) {
-		ret = pcie_setup_rx(if_id, rx_id, open_cmd.pcie_eth_if_id, tx_credit, answer);
+		ret = pcie_setup_rx(if_id, rx_id, open_cmd.pcie_eth_if_id, answer);
 		if (ret)
 			return;
 	}

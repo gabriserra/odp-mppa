@@ -27,7 +27,6 @@ typedef union {
 		uint8_t pcie_eth_if_id; /* PCIe eth interface number */
 		uint8_t min_rx;
 		uint8_t max_rx;
-		uint8_t cnoc_rx;
 	};
 	odp_rpc_inl_data_t inl_data;
 } odp_rpc_cmd_pcie_open_t;
