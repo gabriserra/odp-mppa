@@ -22,7 +22,7 @@ ifeq ($(CONFIG_MPPA_TRACE), 1)
 	EXTRA_CFLAGS += -fno-inline
 endif
 
-mppapcie_odp-objs += odp.o
+mppapcie_odp-objs += odp.o odp_rx.o odp_tx.o
 
 all:
 	@if [ "$(MPPAPCIE_INCLUDE_DIR)" == "" ]; then echo "Could not find MPPAPCIE include. Please set MPPAPCIE_INCLUDE_DIR"; exit 1; fi
