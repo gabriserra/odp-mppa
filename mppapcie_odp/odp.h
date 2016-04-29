@@ -1,6 +1,10 @@
 #ifndef ODP_H
 #define ODP_H
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 12, 0))
+#define DMA_SUCCESS DMA_COMPLETE
+#endif
+
 #define MPODP_NAPI_WEIGHT  NAPI_POLL_WEIGHT
 #define MPODP_MAX_TX_RECLAIM 16
 #define MPODP_TX_RECLAIM_PERIOD (HZ / 2)
@@ -123,5 +127,15 @@ struct mpodp_pdata_priv {
 	struct work_struct enable;	/* cannot register in interrupt context */
 	struct notifier_block notifier;
 };
+
+netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
+			     struct net_device *netdev);
+void mpodp_tx_timeout(struct net_device *netdev);
+void mpodp_tx_timer_cb(unsigned long data);
+int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget);
+
+int mpodp_start_rx(struct mpodp_if_priv *priv);
+int mpodp_clean_rx(struct mpodp_if_priv *priv,
+		   int budget, int *work_done);
 
 #endif
