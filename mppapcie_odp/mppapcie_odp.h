@@ -32,9 +32,7 @@
 /**
  * Flags for config flags
  */
-#define ODP_CONFIG_RING_AUTOLOOP	(1 << 0)
-#define ODP_CONFIG_SEND_IT_TO_RM	(1 << 1)
-#define ODP_CONFIG_DISABLED		(1 << 2)
+#define ODP_CONFIG_DISABLED		(1 << 0)
 
 
 /**

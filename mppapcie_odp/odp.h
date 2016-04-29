@@ -64,8 +64,7 @@ struct odp_if_priv {
 
 	/* TX ring */
 	struct dma_chan *tx_chan[ODP_NOC_CHAN_COUNT + 1];
-	struct mppa_pcie_dma_slave_config tx_config[ODP_NOC_CHAN_COUNT +
-						    1];
+	struct mppa_pcie_dma_slave_config tx_config[ODP_NOC_CHAN_COUNT];
 	struct odp_tx *tx_ring;
 
 	/* Position of the latest complete Tx buffer.
