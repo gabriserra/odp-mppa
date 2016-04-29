@@ -1,25 +1,25 @@
 #ifndef ODP_H
 #define ODP_H
 
-#define MPPA_PCIE_NETDEV_NAPI_WEIGHT  NAPI_POLL_WEIGHT
-#define MPPA_PCIE_NETDEV_MAX_TX_RECLAIM 16
-#define MPPA_PCIE_NETDEV_TX_RECLAIM_PERIOD (HZ / 2)
+#define ODP_NAPI_WEIGHT  NAPI_POLL_WEIGHT
+#define ODP_MAX_TX_RECLAIM 16
+#define ODP_TX_RECLAIM_PERIOD (HZ / 2)
 
 /* Sufficient for K1B not for K1A but not expected to be used */
-#define MPPA_PCIE_NETDEV_NOC_CHAN_COUNT 4
-#define MPPA_PCIE_NETDEV_AUTOLOOP_DESC_COUNT 32
+#define ODP_NOC_CHAN_COUNT 4
+#define ODP_AUTOLOOP_DESC_COUNT 32
 
 #define desc_info_addr(_smem_addr, addr, field)				\
-	_smem_addr + addr +  offsetof(struct mppa_pcie_eth_ring_buff_desc, field)
+	_smem_addr + addr +  offsetof(struct odp_ring_buff_desc, field)
 
-enum _mppa_pcie_netdev_state {
-	_MPPA_PCIE_NETDEV_STATE_DISABLED = 0,
-	_MPPA_PCIE_NETDEV_STATE_ENABLING = 1,
-	_MPPA_PCIE_NETDEV_STATE_ENABLED = 2,
-	_MPPA_PCIE_NETDEV_STATE_DISABLING = 3,
+enum _odp_if_state {
+	_ODP_IF_STATE_DISABLED = 0,
+	_ODP_IF_STATE_ENABLING = 1,
+	_ODP_IF_STATE_ENABLED = 2,
+	_ODP_IF_STATE_DISABLING = 3,
 };
 
-struct mppa_pcie_netdev_tx {
+struct odp_tx {
 	struct sk_buff *skb;
 	struct scatterlist sg[MAX_SKB_FRAGS + 1];
 	u32 sg_len;
@@ -31,7 +31,7 @@ struct mppa_pcie_netdev_tx {
 	uint32_t flags;
 };
 
-struct mppa_pcie_netdev_rx {
+struct odp_rx {
 	struct sk_buff *skb;
 	struct scatterlist sg[1];
 	u32 sg_len;
@@ -40,13 +40,13 @@ struct mppa_pcie_netdev_rx {
 	u32 len; /* avoid to re-read the entry in the RX 2nd step */
 };
 
-struct mppa_pcie_tx_cache_entry {
+struct odp_cache_entry {
 	void *entry_addr;
 	u32 addr;
 	u32 flags;
 };
 
-struct mppa_pcie_netdev_priv {
+struct odp_if_priv {
 	struct napi_struct napi;
 
 	struct mppa_pcie_device *pdata;
@@ -54,7 +54,7 @@ struct mppa_pcie_netdev_priv {
 
 	struct dentry *dir;
 
-	struct mppa_pcie_eth_if_config *config;
+	struct odp_if_config *config;
 	struct net_device *netdev;
 
 	atomic_t reset;
@@ -63,9 +63,9 @@ struct mppa_pcie_netdev_priv {
 	u8 __iomem *interrupt_status_addr;
 
 	/* TX ring */
-	struct dma_chan *tx_chan[MPPA_PCIE_NETDEV_NOC_CHAN_COUNT+1];
-	struct mppa_pcie_dma_slave_config tx_config[MPPA_PCIE_NETDEV_NOC_CHAN_COUNT+1];
-	struct mppa_pcie_netdev_tx *tx_ring;
+	struct dma_chan *tx_chan[ODP_NOC_CHAN_COUNT+1];
+	struct mppa_pcie_dma_slave_config tx_config[ODP_NOC_CHAN_COUNT+1];
+	struct odp_tx *tx_ring;
 
 	/* Position of the latest complete Tx buffer.
 	 * same as tail in MPPA Tx ring buffer
@@ -94,12 +94,12 @@ struct mppa_pcie_netdev_priv {
 	/* Amount of Tx cached Host side in autoloop mode. Size = tx_size */
 	int tx_cached_head;
 	/* Cached adresses from the MPPA side. Size = tx_mppa_size */
-	struct mppa_pcie_tx_cache_entry *tx_cache;
+	struct odp_cache_entry *tx_cache;
 
 	/* RX ring */
 	struct dma_chan *rx_chan;
 	struct mppa_pcie_dma_slave_config rx_config;
-	struct mppa_pcie_netdev_rx *rx_ring;
+	struct odp_rx *rx_ring;
 	int rx_used;
 	int rx_avail;
 	int rx_tail;
@@ -107,19 +107,19 @@ struct mppa_pcie_netdev_priv {
 	int rx_head;
 	u8 __iomem *rx_head_addr;
 	int rx_size;
-	struct mppa_pcie_eth_c2h_ring_buff_entry *rx_mppa_entries;
+	struct odp_c2h_ring_buff_entry *rx_mppa_entries;
 	struct timer_list rx_timer; /* checks Tx queues */
 
 };
 
-struct mppa_pcie_pdata_netdev {
+struct odp_pdata_priv {
 	struct list_head link; /* List of all devices */
 	struct mppa_pcie_device *pdata;
 	struct pci_dev *pdev; /* pointer to device structure */
 	atomic_t state;
-	struct net_device *dev[MPPA_PCIE_ETH_MAX_INTERFACE_COUNT];
+	struct net_device *dev[ODP_MAX_IF_COUNT];
 	int if_count;
-	struct mppa_pcie_eth_control control;
+	struct odp_control control;
 	struct work_struct enable; /* cannot register in interrupt context */
 	struct notifier_block notifier;
 };
