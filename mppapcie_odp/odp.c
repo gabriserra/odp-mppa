@@ -119,9 +119,6 @@ static int odp_clean_rx(struct odp_if_priv *priv,
 	/* write new RX head */
 	if (work_done) {
 		writel(priv->rx_used, priv->rx_head_addr);
-		if (priv->config->flags & ODP_CONFIG_SEND_IT_TO_RM) {
-			mppa_pcie_send_it_to_rm(priv->pdata, 0);
-		}
 	}
 
 	/* RX: 1st step: start transfer */
@@ -244,7 +241,7 @@ static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
 	unsigned int worked = 0;
 	union mppa_timestamp ts;
 	uint32_t tx_done, first_tx_done, last_tx_done, tx_submitted,
-	    tx_size;
+		tx_size, tx_head;
 
 	tx_submitted = atomic_read(&priv->tx_submitted);
 	tx_done = atomic_read(&priv->tx_done);
@@ -252,24 +249,20 @@ static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
 	last_tx_done = first_tx_done;
 
 	tx_size = priv->tx_size;
-	if (priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) {
-		int tx_head = atomic_read(&priv->tx_head);
+	tx_head = atomic_read(&priv->tx_head);
 
-		if (!tx_head) {
-			/* No carrier yet. Check if there are any buffers yet */
-			tx_head = readl(priv->tx_head_addr);
-			if (tx_head) {
-				/* We now have buffers */
-				atomic_set(&priv->tx_head, tx_head);
-				netif_carrier_on(netdev);
+	if (!tx_head) {
+		/* No carrier yet. Check if there are any buffers yet */
+		tx_head = readl(priv->tx_head_addr);
+		if (tx_head) {
+			/* We now have buffers */
+			atomic_set(&priv->tx_head, tx_head);
+			netif_carrier_on(netdev);
 
-				netdev_dbg(netdev,
-					   "Link now has Tx (%u). Bring it up\n",
-					   tx_head);
-			}
-			return 0;
-
+			netdev_dbg(netdev,"Link now has Tx (%u). Bring it up\n",
+				   tx_head);
 		}
+		return 0;
 	}
 
 	/* TX: 2nd step: update TX tail (DMA transfer completed) */
@@ -302,9 +295,6 @@ static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
 	}
 	/* write new TX tail */
 	atomic_set(&priv->tx_done, tx_done);
-	if (worked && !(priv->config->flags & ODP_CONFIG_RING_AUTOLOOP)) {
-		writel(tx_done, priv->tx_tail_addr);
-	}
 
 	/* TX: 3rd step: free finished TX slot */
 	while (first_tx_done != last_tx_done) {
@@ -335,10 +325,6 @@ static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
 	netdev->stats.tx_bytes += bytes_completed;
 	netdev->stats.tx_packets += packets_completed;
 
-	if (priv->config->flags & ODP_CONFIG_SEND_IT_TO_RM) {
-		mppa_pcie_send_it_to_rm(priv->pdata, 0);
-	}
-
 	netdev_completed_queue(netdev, packets_completed, bytes_completed);
 	netif_wake_queue(netdev);
       out:
@@ -364,12 +350,6 @@ static void odp_dma_callback_rx(void *param)
 	napi_schedule(&priv->napi);
 }
 
-static void odp_dma_callback_tx(void *param)
-{
-	struct odp_if_priv *priv = param;
-	odp_clean_tx(priv, ODP_MAX_TX_RECLAIM);
-}
-
 static void odp_tx_timer_cb(unsigned long data)
 {
 	struct odp_if_priv *priv = (struct odp_if_priv *) data;
@@ -377,9 +357,8 @@ static void odp_tx_timer_cb(unsigned long data)
 
 	worked = odp_clean_tx(priv, ODP_MAX_TX_RECLAIM);
 
-	/* if netdev is in autoloop, check for new descriptors */
-	if ((priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) &&
-	    atomic_read(&priv->tx_head) != 0 &&
+	/* check for new descriptors */
+	if (atomic_read(&priv->tx_head) != 0 &&
 	    priv->tx_cached_head != priv->tx_size) {
 		uint32_t tx_head;
 		struct odp_cache_entry *entry;
@@ -445,14 +424,10 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 	int dma_len, ret;
 	uint8_t fifo_mode, requested_engine;
 	struct odp_pkt_hdr *hdr;
-
+	uint32_t tx_autoloop_next;
 	uint32_t tx_submitted, tx_next;
 	uint32_t tx_full, tx_head;
 	uint32_t tx_mppa_idx;
-	uint32_t entry_len;
-	int chanidx = 0;
-	const int autoloop =
-	    priv->config->flags & ODP_CONFIG_RING_AUTOLOOP;
 
 	/* make room before adding packets */
 	odp_clean_tx_unlocked(priv, -1);
@@ -467,18 +442,8 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 	 * - In std mode it's the same
 	 * - In autoloop, it's not because the Host desc ring buffer does NOT
 	 *   have the same size as the MPPA Tx RB */
-	if (autoloop) {
-		tx_mppa_idx = atomic_read(&priv->tx_autoloop_cur);
-		tx_full = atomic_read(&priv->tx_done);
-	} else {
-		tx_mppa_idx = tx_submitted;
-		/* Update tx_head to see if there are more free slots */
-		if (tx_next == tx_head) {
-			tx_head = readl(priv->tx_head_addr);
-			atomic_set(&priv->tx_head, tx_head);
-		}
-		tx_full = tx_head;
-	}
+	tx_mppa_idx = atomic_read(&priv->tx_autoloop_cur);
+	tx_full = atomic_read(&priv->tx_done);
 
 	if (tx_next == tx_full) {
 		/* Ring is full */
@@ -501,28 +466,23 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 	mppa_pcie_time_get(priv->tx_time, &tx->time);
 
 	/* configure channel */
-	if (!autoloop) {
-		tx->dst_addr = readq(entry->entry_addr +
-				     offsetof(struct
-					      odp_h2c_ring_buff_entry,
-					      pkt_addr));
-		tx->flags =
-		    readl(entry->entry_addr +
-			  offsetof(struct odp_h2c_ring_buff_entry, flags));
-	} else {
-		tx->dst_addr = entry->addr;
-		tx->flags = entry->flags;
-	}
+	tx->dst_addr = entry->addr;
+	tx->flags = entry->flags;
 
 	/* Check the provided address */
 	ret =
 	    mppa_pcie_dma_check_addr(priv->pdata, tx->dst_addr, &fifo_mode,
 				     &requested_engine);
-	if ((ret)
-	    || (fifo_mode && (requested_engine >= ODP_NOC_CHAN_COUNT))) {
+	if ((ret) ||
+	    !fifo_mode ||
+	    requested_engine >= ODP_NOC_CHAN_COUNT){
 		if (ret) {
 			netdev_err(netdev,
 				   "tx %d: invalid send address %llx\n",
+				   tx_submitted, tx->dst_addr);
+		} else if (!fifo_mode) {
+			netdev_err(netdev,
+				   "tx %d: %llx is not a PCI2Noc addres\n",
 				   tx_submitted, tx->dst_addr);
 		} else {
 			netdev_err(netdev,
@@ -536,12 +496,11 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 		netif_stop_queue(netdev);
 		return NETDEV_TX_BUSY;
 	}
-	if (fifo_mode)
-		chanidx = requested_engine + 1;
-	tx->chanidx = chanidx;
-	priv->tx_config[chanidx].cfg.dst_addr = tx->dst_addr;
-	priv->tx_config[chanidx].fifo_mode = fifo_mode;
-	priv->tx_config[chanidx].requested_engine = requested_engine;
+
+	tx->chanidx = requested_engine;
+	priv->tx_config[requested_engine].cfg.dst_addr = tx->dst_addr;
+	priv->tx_config[requested_engine].fifo_mode = fifo_mode;
+	priv->tx_config[requested_engine].requested_engine = requested_engine;
 
 	netdev_vdbg(netdev,
 		    "tx %d: sending to 0x%llx. Fifo=%d Engine=%d\n",
@@ -584,21 +543,6 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 	tx->skb = skb;
 	tx->len = skb->len;
 
-	/* write TX entry length field */
-	if (!autoloop) {
-		entry_len = readl(entry->entry_addr +
-				  offsetof(struct odp_h2c_ring_buff_entry,
-					   len));
-		if (tx->len > entry_len) {
-			netdev->stats.tx_errors++;
-			kfree_skb(skb);
-			return NETDEV_TX_OK;
-		}
-
-		writel(skb->len, entry->entry_addr +
-		       offsetof(struct odp_h2c_ring_buff_entry, len));
-	}
-
 	/* prepare sg */
 	sg_init_table(tx->sg, MAX_SKB_FRAGS + 1);
 	tx->sg_len = skb_to_sgvec(skb, tx->sg, 0, skb->len);
@@ -612,8 +556,8 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 		goto busy;
 	}
 
-	if (dmaengine_slave_config
-	    (priv->tx_chan[chanidx], &priv->tx_config[chanidx].cfg)) {
+	if (dmaengine_slave_config(priv->tx_chan[requested_engine],
+				   &priv->tx_config[requested_engine].cfg)) {
 		/* board has reset, wait for reset of netdev */
 		netif_stop_queue(netdev);
 		netif_carrier_off(netdev);
@@ -624,7 +568,7 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 
 	/* get transfer descriptor */
 	dma_txd =
-	    dmaengine_prep_slave_sg(priv->tx_chan[chanidx], tx->sg,
+	    dmaengine_prep_slave_sg(priv->tx_chan[requested_engine], tx->sg,
 				    dma_len, DMA_MEM_TO_DEV, 0);
 	if (dma_txd == NULL) {
 		/* dmaengine_prep_slave_sg failed, retry */
@@ -641,19 +585,18 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 
 	/* submit and issue descriptor */
 	tx->cookie = dmaengine_submit(dma_txd);
-	dma_async_issue_pending(priv->tx_chan[chanidx]);
+	dma_async_issue_pending(priv->tx_chan[requested_engine]);
 
 	netdev_sent_queue(netdev, skb->len);
 
 	/* Increment tail pointer locally */
 	atomic_set(&priv->tx_submitted, tx_next);
 
-	if (autoloop) {
-		uint32_t tx_autoloop_next = tx_mppa_idx + 1;
-		if (tx_autoloop_next == priv->tx_cached_head)
-			tx_autoloop_next = 0;
-		atomic_set(&priv->tx_autoloop_cur, tx_autoloop_next);
-	}
+	tx_autoloop_next = tx_mppa_idx + 1;
+	if (tx_autoloop_next == priv->tx_cached_head)
+		tx_autoloop_next = 0;
+	atomic_set(&priv->tx_autoloop_cur, tx_autoloop_next);
+
 	skb_tx_timestamp(skb);
 
 	tx_next = (tx_next + 1);
@@ -700,15 +643,10 @@ static int odp_open(struct net_device *netdev)
 
 	mod_timer(&priv->tx_timer, jiffies + ODP_TX_RECLAIM_PERIOD);
 
-	if (!(priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) ||
-	    atomic_read(&priv->tx_head) != 0) {
-		/* If we are in autoloop mode, we might not have any buffer available et
-		 * so keep the carrier off */
+	if (atomic_read(&priv->tx_head) != 0) {
 		netif_carrier_on(netdev);
 	} else {
 		netif_carrier_off(netdev);
-		netdev_dbg(netdev,
-			   "Autoloop enabled but no Tx. Mark link as down\n");
 	}
 
 	return 0;
@@ -755,7 +693,7 @@ static void odp_remove(struct net_device *netdev)
 	unregister_netdev(netdev);
 
 	/* clean */
-	for (chanidx = 0; chanidx <= ODP_NOC_CHAN_COUNT; chanidx++) {
+	for (chanidx = 0; chanidx < ODP_NOC_CHAN_COUNT; chanidx++) {
 		dma_release_channel(priv->tx_chan[chanidx]);
 	}
 	kfree(priv->tx_cache);
@@ -781,7 +719,6 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 	char name[64];
 	int i, entries_addr;
 	int chanidx;
-	const bool autoloop = config->flags & ODP_CONFIG_RING_AUTOLOOP;
 	struct mppa_pcie_id mppa_id;
 	struct pci_dev *pdev = mppa_pcie_get_pci_dev(pdata);
 	u8 __iomem *smem_vaddr;
@@ -897,11 +834,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 						  config->
 						  h2c_ring_buf_desc_addr,
 						  ring_buffer_entries_count));
-	if (autoloop) {
-		priv->tx_size = ODP_AUTOLOOP_DESC_COUNT;
-	} else {
-		priv->tx_size = priv->tx_mppa_size;
-	}
+	priv->tx_size = ODP_AUTOLOOP_DESC_COUNT;
 
 	priv->tx_head_addr = desc_info_addr(smem_vaddr,
 					    config->h2c_ring_buf_desc_addr,
@@ -941,7 +874,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 	}
 
 	priv->tx_cached_head = 0;
-	for (chanidx = 0; chanidx <= ODP_NOC_CHAN_COUNT; chanidx++) {
+	for (chanidx = 0; chanidx < ODP_NOC_CHAN_COUNT; chanidx++) {
 		priv->tx_config[chanidx].cfg.direction = DMA_MEM_TO_DEV;
 		priv->tx_config[chanidx].fifo_mode =
 		    _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
@@ -962,16 +895,6 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 							       tx_chan
 							       [chanidx],
 							       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
-		if (!autoloop) {
-			mppa_pcie_dmaengine_set_channel_callback(priv->
-								 tx_chan
-								 [chanidx],
-								 odp_dma_callback_tx,
-								 priv);
-			mppa_pcie_dmaengine_set_channel_interrupt_mode
-			    (priv->tx_chan[chanidx],
-			     _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_ENABLED);
-		}
 
 	}
 	priv->packet_id = 0ULL;
@@ -1218,18 +1141,11 @@ static irqreturn_t odp_interrupt(int irq, void *arg)
 		}
 
 		/* Compute the limit where the Tx queue would have been saturated
-		 * - In std mode, submitted is just before head
 		 * - In autoloop, submitted is just before done (we don't care at all about head)
 		 */
-		if (priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) {
-			if (!atomic_read(&priv->tx_head))
-				continue;
-			tx_limit = atomic_read(&priv->tx_done);
-		} else {
-			tx_limit = readl(priv->tx_head_addr);
-			atomic_set(&priv->tx_head, tx_limit);
-		}
-
+		if (!atomic_read(&priv->tx_head))
+			continue;
+		tx_limit = atomic_read(&priv->tx_done);
 	}
 	dev_dbg(&netdev->pdev->dev, "netdev interrupt OUT\n");
 	return IRQ_HANDLED;
