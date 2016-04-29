@@ -37,8 +37,7 @@ static int mpodp_rx_is_done(struct mpodp_if_priv *priv, int index)
 		 NULL) == DMA_SUCCESS);
 }
 
-int mpodp_clean_rx(struct mpodp_if_priv *priv,
-		   int budget, int *work_done)
+int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget)
 {
 	struct net_device *netdev = priv->netdev;
 	struct mpodp_rx *rx;
@@ -79,10 +78,10 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv,
 	      pkt_skip:
 		priv->rx_used = (priv->rx_used + 1) % priv->rx_size;
 
-		(*work_done)++;
+		worked++;
 	}
 	/* write new RX head */
-	if (work_done) {
+	if (worked) {
 		writel(priv->rx_used, priv->rx_head_addr);
 	}
 

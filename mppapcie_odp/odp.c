@@ -69,12 +69,12 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 
 	/* Check for Rx transfer completion and send the SKBs to the
 	 * network stack */
-	work = mpodp_clean_rx(priv, budget, &work_done);
+	work = mpodp_clean_rx(priv, budget);
 
 	/* Start new Rx transfer if any */
 	mpodp_start_rx(priv);
 
-	if (work_done < budget && work < budget) {
+	if (work < budget) {
 		napi_complete(napi);
 	}
 
