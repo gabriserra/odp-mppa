@@ -36,7 +36,7 @@ LIST_HEAD(netdev_device_list);
 DEFINE_MUTEX(netdev_device_list_mutex);
 
 
-static uint32_t odp_get_eth_control_addr(struct mppa_pcie_device *pdata)
+static uint32_t mpodp_get_eth_control_addr(struct mppa_pcie_device *pdata)
 {
 	uint32_t addr;
 	int ret =
@@ -48,19 +48,19 @@ static uint32_t odp_get_eth_control_addr(struct mppa_pcie_device *pdata)
 	return addr;
 }
 
-static void odp_tx_timeout(struct net_device *netdev)
+static void mpodp_tx_timeout(struct net_device *netdev)
 {
 	netdev_err(netdev, "tx timeout\n");
 }
 
-static struct net_device_stats *odp_get_stats(struct net_device *netdev)
+static struct net_device_stats *mpodp_get_stats(struct net_device *netdev)
 {
 	/* TODO: get stats from the MPPA */
 
 	return &netdev->stats;
 }
 
-static int odp_rx_is_done(struct odp_if_priv *priv, int index)
+static int mpodp_rx_is_done(struct mpodp_if_priv *priv, int index)
 {
 	if (priv->rx_ring[index].len == 0) {
 		/* error packet, always done */
@@ -72,17 +72,17 @@ static int odp_rx_is_done(struct odp_if_priv *priv, int index)
 		 NULL) == DMA_SUCCESS);
 }
 
-static int odp_clean_rx(struct odp_if_priv *priv,
-			int budget, int *work_done)
+static int mpodp_clean_rx(struct mpodp_if_priv *priv,
+			  int budget, int *work_done)
 {
 	struct net_device *netdev = priv->netdev;
-	struct odp_rx *rx;
+	struct mpodp_rx *rx;
 	struct dma_async_tx_descriptor *dma_txd;
 	int dma_len, limit, worked = 0;
 
 	/* RX: 2nd step: give packet to kernel and update RX head */
 	while (budget-- && priv->rx_used != priv->rx_avail) {
-		if (!odp_rx_is_done(priv, priv->rx_used)) {
+		if (!mpodp_rx_is_done(priv, priv->rx_used)) {
 			/* DMA transfer not completed */
 			break;
 		}
@@ -103,7 +103,8 @@ static int odp_clean_rx(struct odp_if_priv *priv,
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
 		rx->skb->protocol = eth_type_trans(rx->skb, netdev);
-		/* rx->skb->csum = readl(rx->entry_addr + offsetof(struct odp_c2h_ring_buff_entry, checksum); */
+		/* rx->skb->csum = readl(rx->entry_addr +
+		   offsetof(struct mpodp_c2h_ring_buff_entry, checksum); */
 		/* rx->skb->ip_summed = CHECKSUM_COMPLETE; */
 		napi_gro_receive(&priv->napi, rx->skb);
 
@@ -136,9 +137,8 @@ static int odp_clean_rx(struct odp_if_priv *priv,
 	/* get mppa entries */
 	memcpy_fromio(priv->rx_mppa_entries + priv->rx_avail,
 		      priv->rx_ring[priv->rx_avail].entry_addr,
-		      sizeof(struct odp_c2h_ring_buff_entry) * (limit -
-								priv->
-								rx_avail));
+		      sizeof(struct mpodp_c2h_ring_buff_entry) *
+		      (limit - priv->rx_avail));
 	while (priv->rx_avail != limit) {
 		/* get rx slot */
 		rx = &(priv->rx_ring[priv->rx_avail]);
@@ -225,17 +225,17 @@ static int odp_clean_rx(struct odp_if_priv *priv,
 	return worked;
 }
 
-static int odp_tx_is_done(struct odp_if_priv *priv, int index)
+static int mpodp_tx_is_done(struct mpodp_if_priv *priv, int index)
 {
 	return (dmaengine_tx_status
 		(priv->tx_chan[priv->tx_ring[index].chanidx],
 		 priv->tx_ring[index].cookie, NULL) == DMA_SUCCESS);
 }
 
-static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
+static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
 {
 	struct net_device *netdev = priv->netdev;
-	struct odp_tx *tx;
+	struct mpodp_tx *tx;
 	unsigned int packets_completed = 0;
 	unsigned int bytes_completed = 0;
 	unsigned int worked = 0;
@@ -267,7 +267,7 @@ static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
 
 	/* TX: 2nd step: update TX tail (DMA transfer completed) */
 	while (tx_done != tx_submitted && worked < budget) {
-		if (!odp_tx_is_done(priv, tx_done)) {
+		if (!mpodp_tx_is_done(priv, tx_done)) {
 			/* DMA transfer not completed */
 			break;
 		}
@@ -331,37 +331,37 @@ static int odp_clean_tx_unlocked(struct odp_if_priv *priv, unsigned budget)
 	return worked;
 }
 
-static int odp_clean_tx(struct odp_if_priv *priv, unsigned budget)
+static int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget)
 {
 	struct netdev_queue *txq = netdev_get_tx_queue(priv->netdev, 0);
 	int worked = 0;
 
 	if (__netif_tx_trylock(txq)) {
-		worked = odp_clean_tx_unlocked(priv, ODP_MAX_TX_RECLAIM);
+		worked = mpodp_clean_tx_unlocked(priv, MPODP_MAX_TX_RECLAIM);
 		__netif_tx_unlock(txq);
 	}
 	return worked;
 }
 
-static void odp_dma_callback_rx(void *param)
+static void mpodp_dma_callback_rx(void *param)
 {
-	struct odp_if_priv *priv = param;
+	struct mpodp_if_priv *priv = param;
 
 	napi_schedule(&priv->napi);
 }
 
-static void odp_tx_timer_cb(unsigned long data)
+static void mpodp_tx_timer_cb(unsigned long data)
 {
-	struct odp_if_priv *priv = (struct odp_if_priv *) data;
+	struct mpodp_if_priv *priv = (struct mpodp_if_priv *) data;
 	unsigned long worked = 0;
 
-	worked = odp_clean_tx(priv, ODP_MAX_TX_RECLAIM);
+	worked = mpodp_clean_tx(priv, MPODP_MAX_TX_RECLAIM);
 
 	/* check for new descriptors */
 	if (atomic_read(&priv->tx_head) != 0 &&
 	    priv->tx_cached_head != priv->tx_size) {
 		uint32_t tx_head;
-		struct odp_cache_entry *entry;
+		struct mpodp_cache_entry *entry;
 
 		tx_head = readl(priv->tx_head_addr);
 		/* In autoloop, we need to cache new elements */
@@ -370,31 +370,31 @@ static void odp_tx_timer_cb(unsigned long data)
 
 			entry->addr =
 			    readq(entry->entry_addr +
-				  offsetof(struct odp_h2c_ring_buff_entry,
+				  offsetof(struct mpodp_h2c_ring_buff_entry,
 					   pkt_addr));
 			entry->flags =
 			    readl(entry->entry_addr +
-				  offsetof(struct odp_h2c_ring_buff_entry,
+				  offsetof(struct mpodp_h2c_ring_buff_entry,
 					   flags));
 			priv->tx_cached_head++;
 		}
 	}
 
 	mod_timer(&priv->tx_timer, jiffies +
-		  (worked < ODP_MAX_TX_RECLAIM ?
-		   ODP_TX_RECLAIM_PERIOD : 2));
+		  (worked < MPODP_MAX_TX_RECLAIM ?
+		   MPODP_TX_RECLAIM_PERIOD : 2));
 }
 
-static int odp_poll(struct napi_struct *napi, int budget)
+static int mpodp_poll(struct napi_struct *napi, int budget)
 {
-	struct odp_if_priv *priv;
+	struct mpodp_if_priv *priv;
 	int work_done = 0, work = 0;
 
-	priv = container_of(napi, struct odp_if_priv, napi);
+	priv = container_of(napi, struct mpodp_if_priv, napi);
 
 	netdev_dbg(priv->netdev, "netdev_poll IN\n");
 
-	work = odp_clean_rx(priv, budget, &work_done);
+	work = mpodp_clean_rx(priv, budget, &work_done);
 
 	if (work_done < budget && work < budget) {
 		napi_complete(napi);
@@ -406,31 +406,31 @@ static int odp_poll(struct napi_struct *napi, int budget)
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
-static void odp_poll_controller(struct net_device *netdev)
+static void mpodp_poll_controller(struct net_device *netdev)
 {
-	struct odp_if_priv *priv = netdev_priv(netdev);
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
 
 	napi_schedule(&priv->napi);
 }
 #endif
 
-static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
-				  struct net_device *netdev)
+static netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
+				    struct net_device *netdev)
 {
-	struct odp_if_priv *priv = netdev_priv(netdev);
-	struct odp_tx *tx;
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
+	struct mpodp_tx *tx;
 	struct dma_async_tx_descriptor *dma_txd;
-	struct odp_cache_entry *entry;
+	struct mpodp_cache_entry *entry;
 	int dma_len, ret;
 	uint8_t fifo_mode, requested_engine;
-	struct odp_pkt_hdr *hdr;
+	struct mpodp_pkt_hdr *hdr;
 	uint32_t tx_autoloop_next;
 	uint32_t tx_submitted, tx_next;
 	uint32_t tx_full, tx_head;
 	uint32_t tx_mppa_idx;
 
 	/* make room before adding packets */
-	odp_clean_tx_unlocked(priv, -1);
+	mpodp_clean_tx_unlocked(priv, -1);
 
 	tx_submitted = atomic_read(&priv->tx_submitted);
 	tx_next = (tx_submitted + 1);
@@ -475,7 +475,7 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 				     &requested_engine);
 	if ((ret) ||
 	    !fifo_mode ||
-	    requested_engine >= ODP_NOC_CHAN_COUNT){
+	    requested_engine >= MPODP_NOC_CHAN_COUNT){
 		if (ret) {
 			netdev_err(netdev,
 				   "tx %d: invalid send address %llx\n",
@@ -488,7 +488,7 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 			netdev_err(netdev,
 				   "tx %d: address %llx using NoC engine out of range (%d >= %d)\n",
 				   tx_submitted, tx->dst_addr,
-				   requested_engine, ODP_NOC_CHAN_COUNT);
+				   requested_engine, MPODP_NOC_CHAN_COUNT);
 		}
 		netdev->stats.tx_dropped++;
 		dev_kfree_skb(skb);
@@ -507,36 +507,34 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 		    tx_submitted, (uint64_t) tx->dst_addr, fifo_mode,
 		    requested_engine);
 
-	/* If the packet needs a header to determine size, add it */
-	if (tx->flags & ODP_NEED_PKT_HDR) {
-		netdev_dbg(netdev, "tx %d: Adding header to packet\n",
-			   tx_submitted);
-		if (skb_headroom(skb) < sizeof(struct odp_pkt_hdr)) {
-			struct sk_buff *skb_new;
+	/* The packet needs a header to determine size, add it */
+	netdev_dbg(netdev, "tx %d: Adding header to packet\n",
+		   tx_submitted);
+	if (skb_headroom(skb) < sizeof(struct mpodp_pkt_hdr)) {
+		struct sk_buff *skb_new;
 
-			skb_new =
-			    skb_realloc_headroom(skb,
-						 sizeof(struct
-							odp_pkt_hdr));
-			if (!skb_new) {
-				netdev->stats.tx_errors++;
-				kfree_skb(skb);
-				return NETDEV_TX_OK;
-			}
+		skb_new =
+			skb_realloc_headroom(skb,
+					     sizeof(struct
+						    mpodp_pkt_hdr));
+		if (!skb_new) {
+			netdev->stats.tx_errors++;
 			kfree_skb(skb);
-			skb = skb_new;
+			return NETDEV_TX_OK;
 		}
-
-		hdr =
-		    (struct odp_pkt_hdr *) skb_push(skb,
-						    sizeof(struct
-							   odp_pkt_hdr));
-		hdr->timestamp = priv->packet_id;
-		hdr->info.dword = 0ULL;
-		hdr->info._.pkt_size =
-		    (skb->len - sizeof(struct odp_pkt_hdr));
-		hdr->info._.pkt_id = priv->packet_id;
+		kfree_skb(skb);
+		skb = skb_new;
 	}
+
+	hdr =
+		(struct mpodp_pkt_hdr *) skb_push(skb,
+						  sizeof(struct
+							 mpodp_pkt_hdr));
+	hdr->timestamp = priv->packet_id;
+	hdr->info.dword = 0ULL;
+	hdr->info._.pkt_size =
+		(skb->len - sizeof(struct mpodp_pkt_hdr));
+	hdr->info._.pkt_id = priv->packet_id;
 	priv->packet_id++;
 
 	/* save skb to free it later */
@@ -617,9 +615,9 @@ static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 }
 
 
-static int odp_open(struct net_device *netdev)
+static int mpodp_open(struct net_device *netdev)
 {
-	struct odp_if_priv *priv = netdev_priv(netdev);
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
 	uint32_t tx_tail;
 
 	tx_tail = readl(priv->tx_tail_addr);
@@ -641,7 +639,7 @@ static int odp_open(struct net_device *netdev)
 	priv->interrupt_status = 1;
 	writel(priv->interrupt_status, priv->interrupt_status_addr);
 
-	mod_timer(&priv->tx_timer, jiffies + ODP_TX_RECLAIM_PERIOD);
+	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
 	if (atomic_read(&priv->tx_head) != 0) {
 		netif_carrier_on(netdev);
@@ -652,9 +650,9 @@ static int odp_open(struct net_device *netdev)
 	return 0;
 }
 
-static int odp_close(struct net_device *netdev)
+static int mpodp_close(struct net_device *netdev)
 {
-	struct odp_if_priv *priv = netdev_priv(netdev);
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
 
 	priv->interrupt_status = 0;
 	writel(priv->interrupt_status, priv->interrupt_status_addr);
@@ -667,25 +665,25 @@ static int odp_close(struct net_device *netdev)
 	napi_disable(&priv->napi);
 	netif_stop_queue(netdev);
 
-	odp_clean_tx(priv, -1);
+	mpodp_clean_tx(priv, -1);
 
 	return 0;
 }
 
-static const struct net_device_ops odp_ops = {
-	.ndo_open = odp_open,
-	.ndo_stop = odp_close,
-	.ndo_start_xmit = odp_start_xmit,
-	.ndo_get_stats = odp_get_stats,
-	.ndo_tx_timeout = odp_tx_timeout,
+static const struct net_device_ops mpodp_ops = {
+	.ndo_open = mpodp_open,
+	.ndo_stop = mpodp_close,
+	.ndo_start_xmit = mpodp_start_xmit,
+	.ndo_get_stats = mpodp_get_stats,
+	.ndo_tx_timeout = mpodp_tx_timeout,
 #ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller = odp_poll_controller,
+	.ndo_poll_controller = mpodp_poll_controller,
 #endif
 };
 
-static void odp_remove(struct net_device *netdev)
+static void mpodp_remove(struct net_device *netdev)
 {
-	struct odp_if_priv *priv = netdev_priv(netdev);
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
 	int chanidx;
 
 
@@ -693,7 +691,7 @@ static void odp_remove(struct net_device *netdev)
 	unregister_netdev(netdev);
 
 	/* clean */
-	for (chanidx = 0; chanidx < ODP_NOC_CHAN_COUNT; chanidx++) {
+	for (chanidx = 0; chanidx < MPODP_NOC_CHAN_COUNT; chanidx++) {
 		dma_release_channel(priv->tx_chan[chanidx]);
 	}
 	kfree(priv->tx_cache);
@@ -709,12 +707,12 @@ static void odp_remove(struct net_device *netdev)
 	free_netdev(netdev);
 }
 
-static struct net_device *odp_create(struct mppa_pcie_device *pdata,
-				     struct odp_if_config *config,
-				     uint32_t eth_control_addr, int id)
+static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
+				       struct mpodp_if_config *config,
+				       uint32_t eth_control_addr, int id)
 {
 	struct net_device *netdev;
-	struct odp_if_priv *priv;
+	struct mpodp_if_priv *priv;
 	dma_cap_mask_t mask;
 	char name[64];
 	int i, entries_addr;
@@ -736,7 +734,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 		 mppa_id.chip_id, mppa_id.ioddr_id, id);
 
 	/* alloc netdev */
-	if (!(netdev = alloc_netdev(sizeof(struct odp_if_priv), name,
+	if (!(netdev = alloc_netdev(sizeof(struct mpodp_if_priv), name,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 16, 0))
 				    NET_NAME_UNKNOWN,
 #endif
@@ -750,8 +748,8 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 	}
 
 	/* init netdev */
-	netdev->netdev_ops = &odp_ops;
-	netdev->needed_headroom = sizeof(struct odp_pkt_hdr);
+	netdev->netdev_ops = &mpodp_ops;
+	netdev->needed_headroom = sizeof(struct mpodp_pkt_hdr);
 	netdev->mtu = config->mtu;
 	memcpy(netdev->dev_addr, &(config->mac_addr), 6);
 	netdev->features |= NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_HW_CSUM;
@@ -765,10 +763,10 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 
 	smem_vaddr = mppa_pcie_get_smem_vaddr(pdata);
 	priv->interrupt_status_addr = smem_vaddr
-	    + eth_control_addr + offsetof(struct odp_control, configs)
-	+ id * sizeof(struct odp_if_config)
-	+ offsetof(struct odp_if_config, interrupt_status);
-	netif_napi_add(netdev, &priv->napi, odp_poll, ODP_NAPI_WEIGHT);
+	    + eth_control_addr + offsetof(struct mpodp_control, configs)
+	+ id * sizeof(struct mpodp_if_config)
+	+ offsetof(struct mpodp_if_config, interrupt_status);
+	netif_napi_add(netdev, &priv->napi, mpodp_poll, MPODP_NAPI_WEIGHT);
 
 	/* init fs */
 	snprintf(name, 64, "netdev%d-txtime", id);
@@ -793,7 +791,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 					    config->c2h_ring_buf_desc_addr,
 					    ring_buffer_entries_addr));
 	priv->rx_ring =
-	    kzalloc(priv->rx_size * sizeof(struct odp_rx), GFP_ATOMIC);
+	    kzalloc(priv->rx_size * sizeof(struct mpodp_rx), GFP_ATOMIC);
 	if (priv->rx_ring == NULL) {
 		dev_err(&pdev->dev, "RX ring allocation failed\n");
 		goto rx_alloc_failed;
@@ -805,7 +803,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 		/* set the RX ring entry address */
 		priv->rx_ring[i].entry_addr = smem_vaddr
 		    + entries_addr
-		    + i * sizeof(struct odp_c2h_ring_buff_entry);
+		    + i * sizeof(struct mpodp_c2h_ring_buff_entry);
 	}
 	priv->rx_config.cfg.direction = DMA_DEV_TO_MEM;
 	priv->rx_config.fifo_mode = _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
@@ -821,12 +819,12 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
 						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
 	mppa_pcie_dmaengine_set_channel_callback(priv->rx_chan,
-						 odp_dma_callback_rx,
+						 mpodp_dma_callback_rx,
 						 priv);
 	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
 						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_ENABLED);
 	priv->rx_mppa_entries =
-	    kmalloc(priv->rx_size * sizeof(struct odp_c2h_ring_buff_entry),
+	    kmalloc(priv->rx_size * sizeof(struct mpodp_c2h_ring_buff_entry),
 		    GFP_ATOMIC);
 
 	/* init TX ring */
@@ -834,7 +832,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 						  config->
 						  h2c_ring_buf_desc_addr,
 						  ring_buffer_entries_count));
-	priv->tx_size = ODP_AUTOLOOP_DESC_COUNT;
+	priv->tx_size = MPODP_AUTOLOOP_DESC_COUNT;
 
 	priv->tx_head_addr = desc_info_addr(smem_vaddr,
 					    config->h2c_ring_buf_desc_addr,
@@ -845,7 +843,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 
 	/* Setup Host TX Ring */
 	priv->tx_ring =
-	    kzalloc(priv->tx_size * sizeof(struct odp_tx), GFP_ATOMIC);
+	    kzalloc(priv->tx_size * sizeof(struct mpodp_tx), GFP_ATOMIC);
 	if (priv->tx_ring == NULL) {
 		dev_err(&pdev->dev, "TX ring allocation failed\n");
 		goto tx_alloc_failed;
@@ -870,11 +868,11 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 		/* set the TX ring entry address */
 		priv->tx_cache[i].entry_addr = smem_vaddr
 		    + entries_addr
-		    + i * sizeof(struct odp_h2c_ring_buff_entry);
+		    + i * sizeof(struct mpodp_h2c_ring_buff_entry);
 	}
 
 	priv->tx_cached_head = 0;
-	for (chanidx = 0; chanidx < ODP_NOC_CHAN_COUNT; chanidx++) {
+	for (chanidx = 0; chanidx < MPODP_NOC_CHAN_COUNT; chanidx++) {
 		priv->tx_config[chanidx].cfg.direction = DMA_MEM_TO_DEV;
 		priv->tx_config[chanidx].fifo_mode =
 		    _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
@@ -906,7 +904,7 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 	}
 
 	/* Tx poll timer */
-	setup_timer(&priv->tx_timer, odp_tx_timer_cb,
+	setup_timer(&priv->tx_timer, mpodp_tx_timer_cb,
 		    (unsigned long) priv);
 
 	printk(KERN_INFO "Registered netdev for %s (ring rx:%d, tx:%d)\n",
@@ -936,18 +934,18 @@ static struct net_device *odp_create(struct mppa_pcie_device *pdata,
 	return NULL;
 }
 
-static int odp_is_magic_set(struct mppa_pcie_device *pdata)
+static int mpodp_is_magic_set(struct mppa_pcie_device *pdata)
 {
 	uint32_t eth_control_addr;
 	int magic;
 
-	eth_control_addr = odp_get_eth_control_addr(pdata);
+	eth_control_addr = mpodp_get_eth_control_addr(pdata);
 	if (eth_control_addr != 0) {
 		/* read magic struct */
 		magic = readl(mppa_pcie_get_smem_vaddr(pdata)
 			      + eth_control_addr
-			      + offsetof(struct odp_control, magic));
-		if (magic == ODP_CONTROL_STRUCT_MAGIC) {
+			      + offsetof(struct mpodp_control, magic));
+		if (magic == MPODP_CONTROL_STRUCT_MAGIC) {
 			dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
 				"MPPA netdev control struct (0x%x) ready\n",
 				eth_control_addr);
@@ -962,28 +960,28 @@ static int odp_is_magic_set(struct mppa_pcie_device *pdata)
 	return 0;
 }
 
-static void odp_enable(struct mppa_pcie_device *pdata,
-		       struct odp_pdata_priv *netdev)
+static void mpodp_enable(struct mppa_pcie_device *pdata,
+			 struct mpodp_pdata_priv *netdev)
 {
 	int i;
-	enum _odp_if_state last_state;
+	enum _mpodp_if_state last_state;
 	uint32_t eth_control_addr;
 	int if_count;
 
 	last_state =
-	    atomic_cmpxchg(&netdev->state, _ODP_IF_STATE_DISABLED,
-			   _ODP_IF_STATE_ENABLING);
-	if (last_state != _ODP_IF_STATE_DISABLED) {
+	    atomic_cmpxchg(&netdev->state, _MPODP_IF_STATE_DISABLED,
+			   _MPODP_IF_STATE_ENABLING);
+	if (last_state != _MPODP_IF_STATE_DISABLED) {
 		return;
 	}
 
-	eth_control_addr = odp_get_eth_control_addr(pdata);
+	eth_control_addr = mpodp_get_eth_control_addr(pdata);
 
 	memcpy_fromio(&netdev->control, mppa_pcie_get_smem_vaddr(pdata)
-		      + eth_control_addr, sizeof(struct odp_control));
+		      + eth_control_addr, sizeof(struct mpodp_control));
 
-	if (netdev->control.magic != ODP_CONTROL_STRUCT_MAGIC) {
-		atomic_set(&netdev->state, _ODP_IF_STATE_DISABLED);
+	if (netdev->control.magic != MPODP_CONTROL_STRUCT_MAGIC) {
+		atomic_set(&netdev->state, _MPODP_IF_STATE_DISABLED);
 		return;
 	}
 
@@ -996,19 +994,19 @@ static void odp_enable(struct mppa_pcie_device *pdata,
 	/* add net devices */
 	for (i = 0; i < if_count; ++i) {
 		netdev->dev[i] =
-		    odp_create(pdata, netdev->control.configs + i,
+		    mpodp_create(pdata, netdev->control.configs + i,
 			       eth_control_addr, i);
 		if (!netdev->dev[i])
 			break;
 	}
 	netdev->if_count = i;
 
-	atomic_set(&netdev->state, _ODP_IF_STATE_ENABLED);
+	atomic_set(&netdev->state, _MPODP_IF_STATE_ENABLED);
 }
 
-static void odp_pre_reset(struct net_device *netdev)
+static void mpodp_pre_reset(struct net_device *netdev)
 {
-	struct odp_if_priv *priv = netdev_priv(netdev);
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
 	int now;
 
 	/* There is no real need to lock these changes
@@ -1034,22 +1032,22 @@ static void odp_pre_reset(struct net_device *netdev)
 	}
 }
 
-static void odp_pre_reset_all(struct odp_pdata_priv *netdev,
+static void mpodp_pre_reset_all(struct mpodp_pdata_priv *netdev,
 			      struct mppa_pcie_device *pdata)
 {
 	int i;
 
 	for (i = 0; i < netdev->if_count; ++i) {
-		odp_pre_reset(netdev->dev[i]);
+		mpodp_pre_reset(netdev->dev[i]);
 	}
 }
 
 
-static void odp_disable(struct odp_pdata_priv *netdev,
+static void mpodp_disable(struct mpodp_pdata_priv *netdev,
 			struct mppa_pcie_device *pdata)
 {
 	int i;
-	enum _odp_if_state last_state;
+	enum _mpodp_if_state last_state;
 	uint32_t eth_control_addr;
 
 	if (!netdev)
@@ -1057,47 +1055,47 @@ static void odp_disable(struct odp_pdata_priv *netdev,
 
 	do {
 		last_state = atomic_cmpxchg(&netdev->state,
-					    _ODP_IF_STATE_ENABLED,
-					    _ODP_IF_STATE_DISABLING);
+					    _MPODP_IF_STATE_ENABLED,
+					    _MPODP_IF_STATE_DISABLING);
 
-		if (last_state == _ODP_IF_STATE_ENABLING) {
+		if (last_state == _MPODP_IF_STATE_ENABLING) {
 			msleep(10);
-		} else if (last_state != _ODP_IF_STATE_ENABLED) {
+		} else if (last_state != _MPODP_IF_STATE_ENABLED) {
 			return;
 		}
-	} while (last_state == _ODP_IF_STATE_ENABLING);
+	} while (last_state == _MPODP_IF_STATE_ENABLING);
 
 	dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
 		"disable: remove interface(s)\n");
 
-	eth_control_addr = odp_get_eth_control_addr(pdata);
+	eth_control_addr = mpodp_get_eth_control_addr(pdata);
 	writel(0, mppa_pcie_get_smem_vaddr(pdata)
-	       + eth_control_addr + offsetof(struct odp_control, magic));
+	       + eth_control_addr + offsetof(struct mpodp_control, magic));
 
 	/* delete net devices */
 	for (i = 0; i < netdev->if_count; ++i) {
-		odp_remove(netdev->dev[i]);
+		mpodp_remove(netdev->dev[i]);
 	}
 
 	netdev->if_count = 0;
 
-	atomic_set(&netdev->state, _ODP_IF_STATE_DISABLED);
+	atomic_set(&netdev->state, _MPODP_IF_STATE_DISABLED);
 }
 
-static void odp_enable_task(struct work_struct *work)
+static void mpodp_enable_task(struct work_struct *work)
 {
-	struct odp_pdata_priv *netdev =
-	    container_of(work, struct odp_pdata_priv, enable);
+	struct mpodp_pdata_priv *netdev =
+	    container_of(work, struct mpodp_pdata_priv, enable);
 
-	odp_enable(netdev->pdata, netdev);
+	mpodp_enable(netdev->pdata, netdev);
 }
 
-static irqreturn_t odp_interrupt(int irq, void *arg)
+static irqreturn_t mpodp_interrupt(int irq, void *arg)
 {
-	struct odp_pdata_priv *netdev = arg;
-	struct odp_if_priv *priv;
+	struct mpodp_pdata_priv *netdev = arg;
+	struct mpodp_if_priv *priv;
 	int i;
-	enum _odp_if_state last_state;
+	enum _mpodp_if_state last_state;
 	uint32_t tx_limit;
 
 	dev_dbg(&netdev->pdev->dev, "netdev interrupt IN\n");
@@ -1105,13 +1103,13 @@ static irqreturn_t odp_interrupt(int irq, void *arg)
 	last_state = atomic_read(&netdev->state);
 
 	/* disabled : try to enable */
-	if (last_state == _ODP_IF_STATE_DISABLED) {
-		if (odp_is_magic_set(netdev->pdata)) {
+	if (last_state == _MPODP_IF_STATE_DISABLED) {
+		if (mpodp_is_magic_set(netdev->pdata)) {
 			schedule_work(&netdev->enable);
 		}
 	}
 	/* not enabled, stop here */
-	if (last_state != _ODP_IF_STATE_ENABLED) {
+	if (last_state != _MPODP_IF_STATE_ENABLED) {
 		dev_dbg(&netdev->pdev->dev,
 			"netdev is disabled. interrupt OUT\n");
 		return IRQ_HANDLED;
@@ -1152,17 +1150,17 @@ static irqreturn_t odp_interrupt(int irq, void *arg)
 }
 
 static int
-odp_dev_notifier_call(struct notifier_block *nb, unsigned long action,
+mpodp_dev_notifier_call(struct notifier_block *nb, unsigned long action,
 		      void *data)
 {
 	struct mppa_pcie_device *pdata = (struct mppa_pcie_device *) data;
-	struct odp_pdata_priv *netdev =
-	    container_of(nb, struct odp_pdata_priv, notifier);
+	struct mpodp_pdata_priv *netdev =
+	    container_of(nb, struct mpodp_pdata_priv, notifier);
 
 	switch (action) {
 	case MPPA_PCIE_DEV_EVENT_RESET:
-		odp_pre_reset_all(netdev, pdata);
-		odp_disable(netdev, pdata);
+		mpodp_pre_reset_all(netdev, pdata);
+		mpodp_disable(netdev, pdata);
 		break;
 	case MPPA_PCIE_DEV_EVENT_POST_RESET:
 	case MPPA_PCIE_DEV_EVENT_STATUS:
@@ -1174,9 +1172,9 @@ odp_dev_notifier_call(struct notifier_block *nb, unsigned long action,
 	return NOTIFY_OK;
 }
 
-static int odp_add_device(struct mppa_pcie_device *pdata)
+static int mpodp_add_device(struct mppa_pcie_device *pdata)
 {
-	struct odp_pdata_priv *netdev;
+	struct mpodp_pdata_priv *netdev;
 	int res, irq;
 
 	netdev = kzalloc(sizeof(*netdev), GFP_KERNEL);
@@ -1192,21 +1190,21 @@ static int odp_add_device(struct mppa_pcie_device *pdata)
 		goto free_netdev;
 
 	dev_dbg(&netdev->pdev->dev, "Registering IRQ %d\n", irq);
-	res = request_irq(irq, odp_interrupt, IRQF_SHARED, "mppa", netdev);
+	res = request_irq(irq, mpodp_interrupt, IRQF_SHARED, "mppa", netdev);
 	if (res)
 		goto free_netdev;
 
-	netdev->notifier.notifier_call = odp_dev_notifier_call;
+	netdev->notifier.notifier_call = mpodp_dev_notifier_call;
 	mppa_pcie_dev_register_notifier(pdata, &netdev->notifier);
 
-	atomic_set(&netdev->state, _ODP_IF_STATE_DISABLED);
+	atomic_set(&netdev->state, _MPODP_IF_STATE_DISABLED);
 	netdev->if_count = 0;
 
-	INIT_WORK(&netdev->enable, odp_enable_task);
+	INIT_WORK(&netdev->enable, mpodp_enable_task);
 
 
-	if (odp_is_magic_set(pdata)) {
-		odp_enable(pdata, netdev);
+	if (mpodp_is_magic_set(pdata)) {
+		mpodp_enable(pdata, netdev);
 	}
 
 	mutex_lock(&netdev_device_list_mutex);
@@ -1221,9 +1219,9 @@ static int odp_add_device(struct mppa_pcie_device *pdata)
 	return -1;
 }
 
-static int odp_remove_device(struct mppa_pcie_device *pdata)
+static int mpodp_remove_device(struct mppa_pcie_device *pdata)
 {
-	struct odp_pdata_priv *netdev = NULL, *dev;
+	struct mpodp_pdata_priv *netdev = NULL, *dev;
 
 	mutex_lock(&netdev_device_list_mutex);
 	list_for_each_entry(dev, &netdev_device_list, link) {
@@ -1240,7 +1238,7 @@ static int odp_remove_device(struct mppa_pcie_device *pdata)
 	if (!netdev)
 		return 0;
 
-	odp_disable(netdev, pdata);
+	mpodp_disable(netdev, pdata);
 
 	dev_dbg(&netdev->pdev->dev, "Removing the associated netdev\n");
 	free_irq(mppa_pcie_get_irq(pdata, MPPA_PCIE_IRQ_USER_IT, 0),
@@ -1253,17 +1251,17 @@ static int odp_remove_device(struct mppa_pcie_device *pdata)
 }
 
 static int
-odp_notifier_call(struct notifier_block *nb, unsigned long action,
+mpodp_notifier_call(struct notifier_block *nb, unsigned long action,
 		  void *data)
 {
 	struct mppa_pcie_device *pdata = (struct mppa_pcie_device *) data;
 
 	switch (action) {
 	case MPPA_PCIE_EVENT_PROBE:
-		odp_add_device(pdata);
+		mpodp_add_device(pdata);
 		break;
 	case MPPA_PCIE_EVENT_REMOVE:
-		odp_remove_device(pdata);
+		mpodp_remove_device(pdata);
 		break;
 	default:
 		return NOTIFY_DONE;
@@ -1272,25 +1270,25 @@ odp_notifier_call(struct notifier_block *nb, unsigned long action,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block odp_notifier = {
-	.notifier_call = odp_notifier_call,
+static struct notifier_block mpodp_notifier = {
+	.notifier_call = mpodp_notifier_call,
 };
 
-static int odp_init(void)
+static int mpodp_init(void)
 {
 	printk(KERN_INFO "Loading PCIe ethernet driver\n");
-	mppa_pcie_register_notifier(&odp_notifier);
+	mppa_pcie_register_notifier(&mpodp_notifier);
 
 	return 0;
 }
 
-static void odp_exit(void)
+static void mpodp_exit(void)
 {
-	mppa_pcie_unregister_notifier(&odp_notifier);
+	mppa_pcie_unregister_notifier(&mpodp_notifier);
 }
 
-module_init(odp_init);
-module_exit(odp_exit);
+module_init(mpodp_init);
+module_exit(mpodp_exit);
 
 MODULE_AUTHOR("Alexis Cellier <alexis.cellier@openwide.fr>");
 MODULE_DESCRIPTION("MPPA PCIe Network Device Driver");
