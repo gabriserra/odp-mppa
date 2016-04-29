@@ -147,7 +147,6 @@ int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget)
 	return worked;
 }
 
-
 netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 			     struct net_device *netdev)
 {
@@ -160,25 +159,23 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	struct mpodp_pkt_hdr *hdr;
 	uint32_t tx_autoloop_next;
 	uint32_t tx_submitted, tx_next;
-	uint32_t tx_full, tx_head;
+	uint32_t tx_full;
 	uint32_t tx_mppa_idx;
 
 	/* make room before adding packets */
 	mpodp_clean_tx_unlocked(priv, -1);
 
 	tx_submitted = atomic_read(&priv->tx_submitted);
+	/* Compute txd id */
 	tx_next = (tx_submitted + 1);
 	if (tx_next == priv->tx_size)
 		tx_next = 0;
-	tx_head = atomic_read(&priv->tx_head);
 
-	/* Compute the ID of the descriptor use on the MPPA side
-	 * - In std mode it's the same
-	 * - In autoloop, it's not because the Host desc ring buffer does NOT
-	 *   have the same size as the MPPA Tx RB */
+	/* MPPA H2C Entry to use */
 	tx_mppa_idx = atomic_read(&priv->tx_autoloop_cur);
-	tx_full = atomic_read(&priv->tx_done);
 
+	/* Check if there are txd available */
+	tx_full = atomic_read(&priv->tx_done);
 	if (tx_next == tx_full) {
 		/* Ring is full */
 		netdev_err(netdev, "TX ring full \n");
@@ -186,9 +183,6 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_BUSY;
 	}
 
-	/* TX: 1st step: start TX transfer */
-
-	/* get tx slot */
 	tx = &(priv->tx_ring[tx_submitted]);
 	entry = &(priv->tx_cache[tx_mppa_idx]);
 
@@ -201,56 +195,48 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 
 	/* configure channel */
 	tx->dst_addr = entry->addr;
-	tx->flags = entry->flags;
 
 	/* Check the provided address */
 	ret =
 	    mppa_pcie_dma_check_addr(priv->pdata, tx->dst_addr, &fifo_mode,
 				     &requested_engine);
-	if ((ret) ||
-	    !fifo_mode ||
-	    requested_engine >= MPODP_NOC_CHAN_COUNT){
-		if (ret) {
-			netdev_err(netdev,
-				   "tx %d: invalid send address %llx\n",
-				   tx_submitted, tx->dst_addr);
-		} else if (!fifo_mode) {
-			netdev_err(netdev,
-				   "tx %d: %llx is not a PCI2Noc addres\n",
-				   tx_submitted, tx->dst_addr);
-		} else {
-			netdev_err(netdev,
-				   "tx %d: address %llx using NoC engine out of range (%d >= %d)\n",
-				   tx_submitted, tx->dst_addr,
-				   requested_engine, MPODP_NOC_CHAN_COUNT);
-		}
-		netdev->stats.tx_dropped++;
-		dev_kfree_skb(skb);
-		/* We can't do anything, just stop the queue artificially */
-		netif_stop_queue(netdev);
-		return NETDEV_TX_BUSY;
+	if (ret) {
+		netdev_err(netdev, "tx %d: invalid send address %llx\n",
+			   tx_submitted, tx->dst_addr);
+		goto addr_error;
+	}
+	if (!fifo_mode) {
+		netdev_err(netdev, "tx %d: %llx is not a PCI2Noc addres\n",
+			   tx_submitted, tx->dst_addr);
+		goto addr_error;
+	}
+	if (requested_engine >= MPODP_NOC_CHAN_COUNT) {
+		netdev_err(netdev,
+			   "tx %d: address %llx using NoC engine out of range (%d >= %d)\n",
+			   tx_submitted, tx->dst_addr,
+			   requested_engine, MPODP_NOC_CHAN_COUNT);
+		goto addr_error;
 	}
 
 	tx->chanidx = requested_engine;
+
+	/* Prepare slave args */
 	priv->tx_config[requested_engine].cfg.dst_addr = tx->dst_addr;
-	priv->tx_config[requested_engine].fifo_mode = fifo_mode;
 	priv->tx_config[requested_engine].requested_engine = requested_engine;
+	/* FIFO mode, direction, latency were filled at setup */
 
 	netdev_vdbg(netdev,
 		    "tx %d: sending to 0x%llx. Fifo=%d Engine=%d\n",
 		    tx_submitted, (uint64_t) tx->dst_addr, fifo_mode,
 		    requested_engine);
 
-	/* The packet needs a header to determine size, add it */
-	netdev_dbg(netdev, "tx %d: Adding header to packet\n",
-		   tx_submitted);
+	/* The packet needs a header to determine size,timestamp, etc.
+	 * Add it */
 	if (skb_headroom(skb) < sizeof(struct mpodp_pkt_hdr)) {
 		struct sk_buff *skb_new;
 
 		skb_new =
-			skb_realloc_headroom(skb,
-					     sizeof(struct
-						    mpodp_pkt_hdr));
+			skb_realloc_headroom(skb, sizeof(struct mpodp_pkt_hdr));
 		if (!skb_new) {
 			netdev->stats.tx_errors++;
 			kfree_skb(skb);
@@ -260,10 +246,8 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 		skb = skb_new;
 	}
 
-	hdr =
-		(struct mpodp_pkt_hdr *) skb_push(skb,
-						  sizeof(struct
-							 mpodp_pkt_hdr));
+	hdr = (struct mpodp_pkt_hdr *)
+		skb_push(skb, sizeof(struct mpodp_pkt_hdr));
 	hdr->timestamp = priv->packet_id;
 	hdr->info.dword = 0ULL;
 	hdr->info._.pkt_size =
@@ -278,9 +262,8 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	/* prepare sg */
 	sg_init_table(tx->sg, MAX_SKB_FRAGS + 1);
 	tx->sg_len = skb_to_sgvec(skb, tx->sg, 0, skb->len);
-	dma_len =
-	    dma_map_sg(&priv->pdev->dev, tx->sg, tx->sg_len,
-		       DMA_TO_DEVICE);
+	dma_len = dma_map_sg(&priv->pdev->dev, tx->sg,
+			     tx->sg_len, DMA_TO_DEVICE);
 	if (dma_len == 0) {
 		/* dma_map_sg failed, retry */
 		netdev_err(netdev, "tx %d: failed to map sg to dma\n",
@@ -309,9 +292,9 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 		goto busy;
 	}
 	netdev_vdbg(netdev,
-		    "tx %d: transfer start (head: %d submitted: %d done: %d) len=%d, sg_len=%d\n",
-		    tx_submitted, atomic_read(&priv->tx_head), tx_next,
-		    atomic_read(&priv->tx_done), tx->len, tx->sg_len);
+		    "tx %d: transfer start (submitted: %d done: %d) len=%d, sg_len=%d\n",
+		    tx_submitted, tx_next, atomic_read(&priv->tx_done),
+		    tx->len, tx->sg_len);
 
 	skb_orphan(skb);
 
@@ -319,11 +302,13 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	tx->cookie = dmaengine_submit(dma_txd);
 	dma_async_issue_pending(priv->tx_chan[requested_engine]);
 
+	/* Count number of bytes on the fly for DQL */
 	netdev_sent_queue(netdev, skb->len);
 
 	/* Increment tail pointer locally */
 	atomic_set(&priv->tx_submitted, tx_next);
 
+	/* Update H2C entry offset */
 	tx_autoloop_next = tx_mppa_idx + 1;
 	if (tx_autoloop_next == priv->tx_cached_head)
 		tx_autoloop_next = 0;
@@ -331,12 +316,13 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 
 	skb_tx_timestamp(skb);
 
+	/* Check if there is room for another txd
+	 * or stop the queue if there is not */
 	tx_next = (tx_next + 1);
 	if (tx_next == priv->tx_size)
 		tx_next = 0;
 
 	if (tx_next == tx_full) {
-		/* Ring is full, stop the queue */
 		netdev_dbg(netdev, "TX ring full \n");
 		netif_stop_queue(netdev);
 	}
@@ -345,6 +331,13 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 
       busy:
 	dma_unmap_sg(&priv->pdev->dev, tx->sg, tx->sg_len, DMA_TO_DEVICE);
+	return NETDEV_TX_BUSY;
+
+ addr_error:
+	netdev->stats.tx_dropped++;
+	dev_kfree_skb(skb);
+	/* We can't do anything, just stop the queue artificially */
+	netif_stop_queue(netdev);
 	return NETDEV_TX_BUSY;
 }
 
@@ -370,10 +363,6 @@ void mpodp_tx_timer_cb(unsigned long data)
 			    readq(entry->entry_addr +
 				  offsetof(struct mpodp_h2c_ring_buff_entry,
 					   pkt_addr));
-			entry->flags =
-			    readl(entry->entry_addr +
-				  offsetof(struct mpodp_h2c_ring_buff_entry,
-					   flags));
 			priv->tx_cached_head++;
 		}
 	}

@@ -353,7 +353,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	for (chanidx = 0; chanidx < MPODP_NOC_CHAN_COUNT; chanidx++) {
 		priv->tx_config[chanidx].cfg.direction = DMA_MEM_TO_DEV;
 		priv->tx_config[chanidx].fifo_mode =
-		    _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
+		    _MPPA_PCIE_ENGINE_FIFO_MODE_ENABLED;
 		priv->tx_config[chanidx].short_latency_load_threshold =
 		    INT_MAX;
 

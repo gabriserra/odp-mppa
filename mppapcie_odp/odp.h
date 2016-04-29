@@ -32,7 +32,6 @@ struct mpodp_tx {
 	union mppa_timestamp time;
 	dma_addr_t dst_addr;
 	int chanidx;
-	uint32_t flags;
 };
 
 struct mpodp_rx {
@@ -47,7 +46,6 @@ struct mpodp_rx {
 struct mpodp_cache_entry {
 	void *entry_addr;
 	u32 addr;
-	u32 flags;
 };
 
 struct mpodp_if_priv {

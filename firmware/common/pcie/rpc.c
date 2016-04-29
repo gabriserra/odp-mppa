@@ -73,9 +73,7 @@ static inline int pcie_add_forward(unsigned int pcie_eth_if_id,
 	struct mppa_pcie_eth_if_config * cfg = netdev_get_eth_if_config(pcie_eth_if_id);
 	struct mppa_pcie_eth_h2c_ring_buff_entry entry;
 
-	entry.len = dnoc_tx_cfg->mtu;
 	entry.pkt_addr = (uint32_t)dnoc_tx_cfg->fifo_addr;
-	entry.flags = MPPA_PCIE_ETH_NEED_PKT_HDR;
 
 	if (netdev_h2c_enqueue_buffer(cfg, &entry)) {
 		PCIE_RPC_ERR_MSG(answer, "Failed to register cluster to pcie interface %d\n",
