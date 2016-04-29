@@ -46,13 +46,13 @@
  * Per interface configuration (Read from host)
  */
 struct odp_if_config {
-	uint64_t c2h_ring_buf_desc_addr; /*< MPPA2Host ring buffer address (`odp_ring_buff_desc`) */
-	uint64_t h2c_ring_buf_desc_addr; /*< Host2MPPA ring buffer address (`odp_ring_buff_desc`) */
-	uint16_t mtu;			 /*< MTU */
-	uint8_t  mac_addr[MAC_ADDR_LEN]; /*< Mac address */
-	uint32_t interrupt_status;       /*< interrupt status (set by host) */
-	uint32_t flags;			 /*< Flags for config (checksum offload, etc) */
-	uint32_t link_status;		 /*< Link status (activity, speed, duplex, etc) */
+	uint64_t c2h_ring_buf_desc_addr;	/*< MPPA2Host ring buffer address (`odp_ring_buff_desc`) */
+	uint64_t h2c_ring_buf_desc_addr;	/*< Host2MPPA ring buffer address (`odp_ring_buff_desc`) */
+	uint16_t mtu;		/*< MTU */
+	uint8_t mac_addr[MAC_ADDR_LEN];	/*< Mac address */
+	uint32_t interrupt_status;	/*< interrupt status (set by host) */
+	uint32_t flags;		/*< Flags for config (checksum offload, etc) */
+	uint32_t link_status;	/*< Link status (activity, speed, duplex, etc) */
 } __attribute__ ((packed));
 
 /**
@@ -60,8 +60,8 @@ struct odp_if_config {
  * This structure is placed at `ODP_CONTROL_STRUCT_ADDR`
  */
 struct odp_control {
-	uint32_t magic;			/*< Magic to test presence of control structure */
-	uint32_t if_count;		/*< Count of interfaces for this PCIe device */
+	uint32_t magic;		/*< Magic to test presence of control structure */
+	uint32_t if_count;	/*< Count of interfaces for this PCIe device */
 	struct odp_if_config configs[ODP_MAX_IF_COUNT];
 } __attribute__ ((packed));
 
@@ -82,7 +82,7 @@ struct odp_c2h_ring_buff_entry {
 	uint16_t status;	/*< Packet status (errors, etc) */
 	uint32_t checksum;	/*< Packet checksum (computed by MPPA) */
 	uint64_t pkt_addr;	/*< Packet Address */
-	uint64_t data;	        /*< Data for MPPA use */
+	uint64_t data;		/*< Data for MPPA use */
 } __attribute__ ((packed));
 
 /**
@@ -103,28 +103,28 @@ struct odp_c2h_ring_buff_entry {
  * the head and tail belongs to the Host in order to receive them.
  */
 struct odp_ring_buff_desc {
-	uint32_t head;				/*< Index of head */
-	uint32_t tail;				/*< Index of tail */
+	uint32_t head;		/*< Index of head */
+	uint32_t tail;		/*< Index of tail */
 	uint32_t ring_buffer_entries_count;	/*< Count of ring buffer entries */
-	uint64_t ring_buffer_entries_addr;	/*< Pointer to ring buffer entries depending on RX or TX*/
+	uint64_t ring_buffer_entries_addr;	/*< Pointer to ring buffer entries depending on RX or TX */
 } __attribute__ ((packed));
 
 /**
  * Header added to packet when needed (fifo mode for instance)
  */
 union odp_pkt_hdr_info {
-		uint64_t dword;
-		uint32_t word[2];
-		uint16_t hword[4];
-		uint8_t bword[8];
-		struct {
-			uint32_t pkt_size : 16;
-			uint32_t hash_key : 16;
-			uint32_t lane_id  : 2;
-			uint32_t io_id    : 1;
-			uint32_t rule_id  : 4;
-			uint32_t pkt_id   : 25;
-		} _;
+	uint64_t dword;
+	uint32_t word[2];
+	uint16_t hword[4];
+	uint8_t bword[8];
+	struct {
+		uint32_t pkt_size:16;
+		uint32_t hash_key:16;
+		uint32_t lane_id:2;
+		uint32_t io_id:1;
+		uint32_t rule_id:4;
+		uint32_t pkt_id:25;
+	} _;
 };
 
 struct odp_pkt_hdr {
