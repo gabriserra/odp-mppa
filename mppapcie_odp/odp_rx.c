@@ -66,9 +66,6 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget)
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
 		rx->skb->protocol = eth_type_trans(rx->skb, netdev);
-		/* rx->skb->csum = readl(rx->entry_addr +
-		   offsetof(struct mpodp_c2h_ring_buff_entry, checksum); */
-		/* rx->skb->ip_summed = CHECKSUM_COMPLETE; */
 		napi_gro_receive(&priv->napi, rx->skb);
 
 		/* update stats */

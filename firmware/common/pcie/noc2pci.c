@@ -64,7 +64,6 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 			 * data to handle consumed packets */
 			pkt.len = pkt_size;
 			pkt.status = 0;
-			pkt.checksum = 0;
 			pkt.pkt_addr = (unsigned long)pkt_addr;
 			pkt.data = (unsigned long)buf;
 			do {
