@@ -5,6 +5,7 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include <pcie_service.h>
 #include <pcie_queue.h>
 #include <pcie_queue_protocol.h>
 #include <mppa/osconfig.h>
@@ -12,20 +13,18 @@
 #include "netdev.h"
 #include "internal/cache.h"
 
-#define MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC	0xCAFEBABE
-
 #define DDR_BUFFER_BASE_ADDR	0x80000000
 
 static uintptr_t g_current_pkt_addr = DDR_BUFFER_BASE_ADDR;
 
-__attribute__((section(".lowmem_data") )) struct mppa_pcie_eth_control eth_control = {
+__attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
 
-int netdev_c2h_is_full(struct mppa_pcie_eth_if_config *cfg)
+int netdev_c2h_is_full(struct mpodp_if_config *cfg)
 {
 
-	struct mppa_pcie_eth_ring_buff_desc *c2h =
+	struct mpodp_ring_buff_desc *c2h =
 		(void*)(unsigned long)cfg->c2h_ring_buf_desc_addr;
 	uint32_t tail = LOAD_U32(c2h->tail);
 	uint32_t next_tail = tail + 1;
@@ -41,11 +40,11 @@ int netdev_c2h_is_full(struct mppa_pcie_eth_if_config *cfg)
 	return 0;
 }
 
-int netdev_c2h_enqueue_data(struct mppa_pcie_eth_if_config *cfg,
-			    struct mppa_pcie_eth_c2h_ring_buff_entry *data,
-			    struct mppa_pcie_eth_c2h_ring_buff_entry *old_entry)
+int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
+			    struct mpodp_c2h_ring_buff_entry *data,
+			    struct mpodp_c2h_ring_buff_entry *old_entry)
 {
-	struct mppa_pcie_eth_ring_buff_desc *c2h =
+	struct mpodp_ring_buff_desc *c2h =
 		(void*)(unsigned long)cfg->c2h_ring_buf_desc_addr;
 	uint32_t tail = LOAD_U32(c2h->tail);
 	uint32_t next_tail = tail + 1;
@@ -58,9 +57,9 @@ int netdev_c2h_enqueue_data(struct mppa_pcie_eth_if_config *cfg,
 		return -1;
 	}
 
-	struct mppa_pcie_eth_c2h_ring_buff_entry *entry_base =
+	struct mpodp_c2h_ring_buff_entry *entry_base =
 		(void*)(unsigned long)c2h->ring_buffer_entries_addr;
-	struct mppa_pcie_eth_c2h_ring_buff_entry *entry = entry_base + tail;
+	struct mpodp_c2h_ring_buff_entry *entry = entry_base + tail;
 
 	if (old_entry) {
 		old_entry->pkt_addr = LOAD_U64(entry->pkt_addr);
@@ -81,27 +80,21 @@ int netdev_c2h_enqueue_data(struct mppa_pcie_eth_if_config *cfg,
 	return 0;
 }
 
-int netdev_h2c_enqueue_buffer(struct mppa_pcie_eth_if_config *cfg,
-			      struct mppa_pcie_eth_h2c_ring_buff_entry *buffer)
+int netdev_h2c_enqueue_buffer(struct mpodp_if_config *cfg,
+			      struct mpodp_h2c_ring_buff_entry *buffer)
 {
-	struct mppa_pcie_eth_ring_buff_desc *h2c =
+	struct mpodp_ring_buff_desc *h2c =
 		(void*)(unsigned long)cfg->h2c_ring_buf_desc_addr;
 	uint32_t head = LOAD_U32(h2c->head);
 
-	if (cfg->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP) {
-		if (head == h2c->ring_buffer_entries_count - 1) {
-			/* Ring is full of FIFO address */
-			return -1;
-		}
-	} else {
-		if(head == LOAD_U32(h2c->tail)) {
-			/* Ring is full of buffers */
-			return -1;
-		}
+	if (head == h2c->ring_buffer_entries_count - 1) {
+		/* Ring is full of FIFO address */
+		return -1;
 	}
-	struct mppa_pcie_eth_h2c_ring_buff_entry *entry_base =
+
+	struct mpodp_h2c_ring_buff_entry *entry_base =
 		(void*)(unsigned long)h2c->ring_buffer_entries_addr;
-	struct mppa_pcie_eth_h2c_ring_buff_entry *entry = entry_base + head;
+	struct mpodp_h2c_ring_buff_entry *entry = entry_base + head;
 
 	memcpy(entry, buffer, sizeof(*entry));
 	__k1_wmb();
@@ -115,45 +108,23 @@ int netdev_h2c_enqueue_buffer(struct mppa_pcie_eth_if_config *cfg,
 	printf("H2C buffer 0x%llx pushed in if:%p | at offset:%lu\n", buffer->pkt_addr, cfg, head);
 #endif
 
-	if (cfg->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP)
-		mppa_pcie_send_it_to_host();
+	mppa_pcie_send_it_to_host();
 
 	return 0;
 
 }
 
-struct mppa_pcie_eth_h2c_ring_buff_entry *
-netdev_h2c_peek_data(const struct mppa_pcie_eth_if_config *cfg)
+struct mpodp_h2c_ring_buff_entry *
+netdev_h2c_peek_data(const struct mpodp_if_config *cfg __attribute__((unused)))
 {
-	const struct mppa_pcie_eth_ring_buff_desc *h2c =
-		(void*)(unsigned long)cfg->h2c_ring_buf_desc_addr;
-
-	if (cfg->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP)
-		return NULL;
-
-
-	uint32_t head = LOAD_U32(h2c->head);
-	uint32_t tail = LOAD_U32(h2c->tail);
-	if (head == tail)
-		return NULL;
-
-	struct mppa_pcie_eth_h2c_ring_buff_entry *entry_base =
-		(void*)(unsigned long)h2c->ring_buffer_entries_addr;
-	struct mppa_pcie_eth_h2c_ring_buff_entry *entry = entry_base + head;
-	INVALIDATE(entry);
-
-#ifdef NETDEV_VERBOSE
-	printf("H2C data found in if:%p | at offset:%lu\n", cfg, head);
-#endif
-
-	return entry;
+	return NULL;
 }
 
-static int netdev_setup_c2h(struct mppa_pcie_eth_if_config *if_cfg,
+static int netdev_setup_c2h(struct mpodp_if_config *if_cfg,
 			    const eth_if_cfg_t *cfg)
 {
-	struct mppa_pcie_eth_ring_buff_desc *c2h;
-	struct mppa_pcie_eth_c2h_ring_buff_entry *entries;
+	struct mpodp_ring_buff_desc *c2h;
+	struct mpodp_c2h_ring_buff_entry *entries;
 	uint32_t i;
 
 	if (if_cfg->mtu == 0) {
@@ -188,12 +159,11 @@ static int netdev_setup_c2h(struct mppa_pcie_eth_if_config *if_cfg,
 	return 0;
 }
 
-static int netdev_setup_h2c(struct mppa_pcie_eth_if_config *if_cfg,
+static int netdev_setup_h2c(struct mpodp_if_config *if_cfg,
 			    const eth_if_cfg_t *cfg)
 {
-	struct mppa_pcie_eth_ring_buff_desc *h2c;
-	struct mppa_pcie_eth_h2c_ring_buff_entry *entries;
-	uint32_t i;
+	struct mpodp_ring_buff_desc *h2c;
+	struct mpodp_h2c_ring_buff_entry *entries;
 
 	if (if_cfg->mtu == 0) {
 		fprintf(stderr, "[netdev] MTU not configured\n");
@@ -209,17 +179,6 @@ static int netdev_setup_h2c(struct mppa_pcie_eth_if_config *if_cfg,
 		return -1;
 	}
 
-	if (!(cfg->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP) && !cfg->noalloc) {
-		for(i = 0; i < cfg->n_h2c_entries; i++) {
-			entries[i].pkt_addr = g_current_pkt_addr;
-			g_current_pkt_addr += if_cfg->mtu;
-#ifdef NETDEV_VERBOSE
-			printf("H2C Packet (%lu/%lu) entry at 0x%"PRIx64"\n", i,
-			       cfg->n_h2c_entries, entries[i].pkt_addr);
-#endif
-		}
-	}
-
 	h2c->ring_buffer_entries_count = cfg->n_h2c_entries;
 	h2c->ring_buffer_entries_addr = (uintptr_t) entries;
 	if_cfg->h2c_ring_buf_desc_addr = (uint64_t)(unsigned long)h2c;
@@ -229,10 +188,10 @@ static int netdev_setup_h2c(struct mppa_pcie_eth_if_config *if_cfg,
 
 int netdev_init_interface(const eth_if_cfg_t *cfg)
 {
-	struct mppa_pcie_eth_if_config *if_cfg;
+	struct mpodp_if_config *if_cfg;
 	int ret;
 
-	if (cfg->if_id >= MPPA_PCIE_ETH_MAX_INTERFACE_COUNT)
+	if (cfg->if_id >= MPODP_MAX_IF_COUNT)
 		return -1;
 
 	if_cfg = &eth_control.configs[cfg->if_id];
@@ -255,7 +214,7 @@ int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 	uint8_t i;
 	int ret;
 
-	if (n_if > MPPA_PCIE_ETH_MAX_INTERFACE_COUNT)
+	if (n_if > MPODP_MAX_IF_COUNT)
 		return -1;
 
 	for (i = 0; i < n_if; ++i) {
@@ -275,13 +234,13 @@ int netdev_start()
 	/* Ensure coherency */
 	__k1_mb();
 	/* Cross fingers for everything to be setup correctly ! */
-	__builtin_k1_swu(&eth_control.magic, MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC);
+	__builtin_k1_swu(&eth_control.magic, MPODP_CONTROL_STRUCT_MAGIC);
 	/* Ensure coherency */
 	__k1_mb();
 
-	__mppa_pcie_control.services[PCIE_SERVICE_ETH].addr = (unsigned int)&eth_control;
+	__mppa_pcie_control.services[PCIE_SERVICE_ODP].addr = (unsigned int)&eth_control;
 	__k1_wmb();
-	__mppa_pcie_control.services[PCIE_SERVICE_ETH].magic = PCIE_SERVICE_MAGIC;
+	__mppa_pcie_control.services[PCIE_SERVICE_ODP].magic = PCIE_SERVICE_MAGIC;
 	__k1_wmb();
 
 

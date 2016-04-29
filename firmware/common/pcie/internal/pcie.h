@@ -7,7 +7,7 @@
 #include "rpc-server.h"
 #include "internal/rpc-server.h"
 #include "ring.h"
-#include "mppa_pcie_netdev.h"
+#include "mppapcie_odp.h"
 
 #define MPPA_PCIE_USABLE_DNOC_IF	4
 
@@ -29,7 +29,7 @@
 #define RX_RM_STACK_SIZE	(0x2000 / (sizeof(uint64_t)))
 
 extern buffer_ring_t g_free_buf_pool;
-extern buffer_ring_t g_full_buf_pool[MPPA_PCIE_ETH_MAX_INTERFACE_COUNT];
+extern buffer_ring_t g_full_buf_pool[MPODP_MAX_IF_COUNT];
 
 struct mppa_pcie_eth_dnoc_tx_cfg {
 	int opened;

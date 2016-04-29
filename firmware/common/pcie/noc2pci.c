@@ -2,7 +2,6 @@
 #include <errno.h>
 #include <mppa_noc.h>
 
-#include "mppa_pcie_netdev.h"
 #include "internal/pcie.h"
 #include "internal/netdev.h"
 #include "noc2pci.h"
@@ -28,9 +27,9 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 	uint32_t left, pkt_size;
 	int ret, buf_idx;
 	void * pkt_addr;
-	union mppa_pcie_eth_pkt_hdr_info info;
-	struct mppa_pcie_eth_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
-	struct mppa_pcie_eth_c2h_ring_buff_entry pkt, free_pkt;
+	union mpodp_pkt_hdr_info info;
+	struct mpodp_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
+	struct mpodp_c2h_ring_buff_entry pkt, free_pkt;
 
 	if (netdev_c2h_is_full(cfg)) {
 		dbg_printf("PCIe eth tx is full !!!\n");
@@ -53,9 +52,9 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 		while (1) {
 			/* Read header from packet */
 
-			info.dword = __builtin_k1_ldu(pkt_addr + offsetof(struct mppa_pcie_eth_pkt_hdr, info));
+			info.dword = __builtin_k1_ldu(pkt_addr + offsetof(struct mpodp_pkt_hdr, info));
 			pkt_size = info._.pkt_size;
-			pkt_addr += sizeof(struct mppa_pcie_eth_pkt_hdr);
+			pkt_addr += sizeof(struct mpodp_pkt_hdr);
 			buf->pkt_count++;
 
 			dbg_printf("packet at addr %p, size %ld\n", pkt_addr, pkt_size);
