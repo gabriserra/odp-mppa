@@ -92,6 +92,7 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 	struct dma_async_tx_descriptor *dma_txd;
 	struct mpodp_rx *rx;
 	int dma_len, limit;
+	int work_done = 0;
 
 	/* RX: 1st step: start transfer */
 	/* read RX tail */
@@ -168,7 +169,7 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 
 		/* submit and issue descriptor */
 		rx->cookie = dmaengine_submit(dma_txd);
-		dma_async_issue_pending(priv->rx_chan);
+		work_done++;
 
 	      pkt_error:
 		priv->rx_avail++;
@@ -183,6 +184,9 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 		/* napi will be rescheduled */
 		break;
 	}
+	if (work_done)
+		dma_async_issue_pending(priv->rx_chan);
+
 	if (limit != priv->rx_tail) {
 		/* make the second part of the ring */
 		limit = priv->rx_tail;
