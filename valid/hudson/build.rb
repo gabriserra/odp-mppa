@@ -276,18 +276,18 @@ end
 
 b.target("dkms") do
 
-  b.logtitle = "Report for mppaeth driver dkms packaging"
+  b.logtitle = "Report for mppapcie_odp driver dkms packaging"
 
   cd odp_path
 
-  src_tar_name = "mppaeth-src"
+  src_tar_name = "mppapcie_odp-src"
   mkdir_p src_tar_name
 
-  b.run(:cmd => "cd mppaeth && make clean")
+  b.run(:cmd => "cd mppapcie_odp && make clean")
 
   cd odp_path
-  b.run("cp -rfL mppaeth/* #{src_tar_name}/")
-	b.run("mkdir -p #{src_tar_name}/package/lib/firmware/kalray")
+  b.run("cp -rfL mppapcie_odp/* #{src_tar_name}/")
+  b.run("mkdir -p #{src_tar_name}/package/lib/firmware")
   b.run("cd #{src_tar_name} && tar zcf ../#{src_tar_name}.tgz ./*")
   src_tar_package = File.expand_path("#{src_tar_name}.tgz")
   cd odp_path
@@ -297,12 +297,12 @@ b.target("dkms") do
   depends = []
   depends.push b.depends_info_struct.new("k1-mppapcie-dkms","=", mppa_pcie_ver)
 
-  unload_script =        "# Unload the mppaeth module if it is loaded\n" +
-    "MPPAETH_IS_LOADED=$(/bin/grep -c \"^mppaeth\" /proc/modules)\n" +
-    "if [ \"${MPPAETH_IS_LOADED}\" -gt 0 ]\n" +
+  unload_script =        "# Unload the mppapcie_odp module if it is loaded\n" +
+    "MPPAPCIE_ODP_IS_LOADED=$(/bin/grep -c \"^mppapcie_odp\" /proc/modules)\n" +
+    "if [ \"${MPPAPCIE_ODP_IS_LOADED}\" -gt 0 ]\n" +
     "then\n" +
-    "	echo \"mppaeth module is loaded, unloading it\" \n" +
-    "	sudo /sbin/rmmod \"mppaeth\" \n" +
+    "	echo \"mppapcie_odp module is loaded, unloading it\" \n" +
+    "	sudo /sbin/rmmod \"mppapcie_odp\" \n" +
     "	if [ $? -ne 0 ]\n" +
     "	then\n" +
     "		echo \"[FAIL]\"\n" +
@@ -322,7 +322,7 @@ b.target("dkms") do
 
   release_info = b.release_info(version,buildID)
 
-  pack_name = "k1-mppaeth-dkms"
+  pack_name = "k1-mppapcie-odp-dkms"
 
   pinfo = b.package_info(pack_name, release_info,
                          package_description, depends,
@@ -334,18 +334,7 @@ b.target("dkms") do
   pinfo.postun_script = ""
   pinfo.installed_files = "%attr(0755,root,root) /lib/firmware/\n%attr(0755,root,root)"
 
-  b.create_dkms_package(src_tar_package,pinfo,["mppaeth"],)
-
-  # Test installation of the driver from the package
-  if $execution_platform == "hw" then
-    cd workspace
-    package = b.find_package(pack_name,"#{release_info.version}-#{release_info.full_buildID}");
-    package_version = b.get_package_version(package[pack_name]);
-    b.run(:cmd => "echo \"mppaeth package file #{package[pack_name]} version: #{package_version} full_version #{release_info.full_version}\"", :verbose => true);
-    b.run(:cmd => "#{workspace}/metabuild/bin/packages.rb --nodeps install --list #{pack_name} --vers #{package_version}", :verbose => true);
-    b.run(:cmd => "sudo rmmod mppaeth && sudo modprobe mppaeth", :env => $extra_env,:verbose => true);
-  end
-
+  b.create_dkms_package(src_tar_package,pinfo,["mppapcie_odp"],)
 end
 
 
