@@ -133,7 +133,6 @@ void mpodp_tx_timer_cb(unsigned long data);
 int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget);
 
 int mpodp_start_rx(struct mpodp_if_priv *priv);
-int mpodp_clean_rx(struct mpodp_if_priv *priv,
-		   int budget, int *work_done);
+int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget);
 
 #endif
