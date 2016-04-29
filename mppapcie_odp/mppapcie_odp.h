@@ -5,7 +5,7 @@
  * Definition of communication structures between MPPA and HOST
  * Since the MPPA is seen as a network card, TX means Host to MPPA and RX means MPPA To Host
  *
- * Basically, the MPPA prepares the mppa_pcie_eth_control struct.
+ * Basically, the MPPA prepares the odp_control struct.
  * Once it is ready, it write the magic and the host knows the device is "available"
  *
  * The host driver then polls the ring buffers descriptors
@@ -14,7 +14,7 @@
 /**
  * Count of interfaces for one PCIe device
  */
-#define MPPA_PCIE_ETH_MAX_INTERFACE_COUNT	16
+#define ODP_MAX_IF_COUNT	                16
 
 /**
  * Mac address length
@@ -24,30 +24,30 @@
 /**
  * Default MTU
  */
-#define MPPA_PCIE_ETH_DEFAULT_MTU		1500
+#define ODP_DEFAULT_MTU		1500
 
 
-#define MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC	0xCAFEBABE
+#define ODP_CONTROL_STRUCT_MAGIC	0xCAFEBABE
 
 /**
  * Flags for config flags
  */
-#define MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP	(1 << 0)
-#define MPPA_PCIE_ETH_CONFIG_SEND_IT_TO_RM	(1 << 1)
-#define MPPA_PCIE_ETH_CONFIG_DISABLED		(1 << 2)
+#define ODP_CONFIG_RING_AUTOLOOP	(1 << 0)
+#define ODP_CONFIG_SEND_IT_TO_RM	(1 << 1)
+#define ODP_CONFIG_DISABLED		(1 << 2)
 
 
 /**
  * Flags for tx flags
  */
-#define MPPA_PCIE_ETH_NEED_PKT_HDR	(1 << 0)
+#define ODP_NEED_PKT_HDR	(1 << 0)
 
 /**
  * Per interface configuration (Read from host)
  */
-struct mppa_pcie_eth_if_config {
-	uint64_t c2h_ring_buf_desc_addr; /*< MPPA2Host ring buffer address (`mppa_pcie_eth_ring_buff_desc`) */
-	uint64_t h2c_ring_buf_desc_addr; /*< Host2MPPA ring buffer address (`mppa_pcie_eth_ring_buff_desc`) */
+struct odp_if_config {
+	uint64_t c2h_ring_buf_desc_addr; /*< MPPA2Host ring buffer address (`odp_ring_buff_desc`) */
+	uint64_t h2c_ring_buf_desc_addr; /*< Host2MPPA ring buffer address (`odp_ring_buff_desc`) */
 	uint16_t mtu;			 /*< MTU */
 	uint8_t  mac_addr[MAC_ADDR_LEN]; /*< Mac address */
 	uint32_t interrupt_status;       /*< interrupt status (set by host) */
@@ -57,18 +57,18 @@ struct mppa_pcie_eth_if_config {
 
 /**
  * Control structure to exchange control data between host and MPPA
- * This structure is placed at `MPPA_PCIE_ETH_CONTROL_STRUCT_ADDR`
+ * This structure is placed at `ODP_CONTROL_STRUCT_ADDR`
  */
-struct mppa_pcie_eth_control {
+struct odp_control {
 	uint32_t magic;			/*< Magic to test presence of control structure */
 	uint32_t if_count;		/*< Count of interfaces for this PCIe device */
-	struct mppa_pcie_eth_if_config configs[MPPA_PCIE_ETH_MAX_INTERFACE_COUNT];
+	struct odp_if_config configs[ODP_MAX_IF_COUNT];
 } __attribute__ ((packed));
 
 /**
  * TX (Host2MPPA) single entry descriptor (Updated by Host)
  */
-struct mppa_pcie_eth_h2c_ring_buff_entry {
+struct odp_h2c_ring_buff_entry {
 	uint32_t len;		/*< Packet length */
 	uint32_t flags;		/*< Flags to control offloading features */
 	uint64_t pkt_addr;	/*< Packet Address */
@@ -77,7 +77,7 @@ struct mppa_pcie_eth_h2c_ring_buff_entry {
 /**
  * RX (MPPA2Host) single entry descriptor (Updated by MPPA)
  */
-struct mppa_pcie_eth_c2h_ring_buff_entry {
+struct odp_c2h_ring_buff_entry {
 	uint16_t len;		/*< Packet length */
 	uint16_t status;	/*< Packet status (errors, etc) */
 	uint32_t checksum;	/*< Packet checksum (computed by MPPA) */
@@ -87,8 +87,8 @@ struct mppa_pcie_eth_c2h_ring_buff_entry {
 
 /**
  * Ring buffer descriptors
- * `ring_buffer_addr` point either to RX ring entries (`mppa_pcie_eth_rx_ring_buff_entry`)
- * or TX ring entries (`mppa_pcie_eth_tx_ring_buff_entry`) depending on ring buffertype
+ * `ring_buffer_addr` point either to RX ring entries (`odp_rx_ring_buff_entry`)
+ * or TX ring entries (`odp_tx_ring_buff_entry`) depending on ring buffertype
  *
  * For a TX ring buffer, the MPPA writes the head pointer to signal that previous
  * packet has been sent and host write the tail pointer to indicate there is new
@@ -102,7 +102,7 @@ struct mppa_pcie_eth_c2h_ring_buff_entry {
  * writes the tail to indicates there is incoming packets. Every descriptor between
  * the head and tail belongs to the Host in order to receive them.
  */
-struct mppa_pcie_eth_ring_buff_desc {
+struct odp_ring_buff_desc {
 	uint32_t head;				/*< Index of head */
 	uint32_t tail;				/*< Index of tail */
 	uint32_t ring_buffer_entries_count;	/*< Count of ring buffer entries */
@@ -112,7 +112,7 @@ struct mppa_pcie_eth_ring_buff_desc {
 /**
  * Header added to packet when needed (fifo mode for instance)
  */
-union mppa_pcie_eth_pkt_hdr_info {
+union odp_pkt_hdr_info {
 		uint64_t dword;
 		uint32_t word[2];
 		uint16_t hword[4];
@@ -127,9 +127,9 @@ union mppa_pcie_eth_pkt_hdr_info {
 		} _;
 };
 
-struct mppa_pcie_eth_pkt_hdr {
+struct odp_pkt_hdr {
 	uint64_t timestamp;
-	union mppa_pcie_eth_pkt_hdr_info info;
+	union odp_pkt_hdr_info info;
 } __attribute__ ((packed));;
 
 #endif

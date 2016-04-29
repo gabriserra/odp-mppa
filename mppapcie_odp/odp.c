@@ -36,10 +36,10 @@ LIST_HEAD(netdev_device_list);
 DEFINE_MUTEX(netdev_device_list_mutex);
 
 
-static uint32_t mppa_pcie_netdev_get_eth_control_addr(struct mppa_pcie_device *pdata)
+static uint32_t odp_get_eth_control_addr(struct mppa_pcie_device *pdata)
 {
 	uint32_t addr;
-	int ret = mppa_pcie_get_service_addr(pdata, PCIE_SERVICE_ETH, &addr);
+	int ret = mppa_pcie_get_service_addr(pdata, PCIE_SERVICE_ODP, &addr);
 
 	if (ret < 0)
 		return 0;
@@ -47,19 +47,19 @@ static uint32_t mppa_pcie_netdev_get_eth_control_addr(struct mppa_pcie_device *p
 	return addr;
 }
 
-static void mppa_pcie_netdev_tx_timeout(struct net_device *netdev)
+static void odp_tx_timeout(struct net_device *netdev)
 {
 	netdev_err(netdev, "tx timeout\n");
 }
 
-static struct net_device_stats *mppa_pcie_netdev_get_stats(struct net_device *netdev)
+static struct net_device_stats *odp_get_stats(struct net_device *netdev)
 {
 	/* TODO: get stats from the MPPA */
 
         return &netdev->stats;
 }
 
-static int mppa_pcie_netdev_rx_is_done(struct mppa_pcie_netdev_priv *priv,
+static int odp_rx_is_done(struct odp_if_priv *priv,
 				       int index)
 {
 	if (priv->rx_ring[index].len == 0) {
@@ -71,18 +71,18 @@ static int mppa_pcie_netdev_rx_is_done(struct mppa_pcie_netdev_priv *priv,
 				    NULL) == DMA_SUCCESS);
 }
 
-static int mppa_pcie_netdev_clean_rx(struct mppa_pcie_netdev_priv *priv,
+static int odp_clean_rx(struct odp_if_priv *priv,
 				     int budget,
 				     int *work_done)
 {
 	struct net_device *netdev = priv->netdev;
-	struct mppa_pcie_netdev_rx *rx;
+	struct odp_rx *rx;
 	struct dma_async_tx_descriptor *dma_txd;
 	int dma_len, limit, worked = 0;
 
 	/* RX: 2nd step: give packet to kernel and update RX head */
 	while (budget-- && priv->rx_used != priv->rx_avail) {
-		if (!mppa_pcie_netdev_rx_is_done(priv, priv->rx_used)) {
+		if (!odp_rx_is_done(priv, priv->rx_used)) {
 			/* DMA transfer not completed */
 			break;
 		}
@@ -102,7 +102,7 @@ static int mppa_pcie_netdev_clean_rx(struct mppa_pcie_netdev_priv *priv,
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
 		rx->skb->protocol = eth_type_trans(rx->skb, netdev);
-		/* rx->skb->csum = readl(rx->entry_addr + offsetof(struct mppa_pcie_eth_c2h_ring_buff_entry, checksum); */
+		/* rx->skb->csum = readl(rx->entry_addr + offsetof(struct odp_c2h_ring_buff_entry, checksum); */
 		/* rx->skb->ip_summed = CHECKSUM_COMPLETE; */
 		napi_gro_receive(&priv->napi, rx->skb);
 
@@ -118,7 +118,7 @@ static int mppa_pcie_netdev_clean_rx(struct mppa_pcie_netdev_priv *priv,
 	/* write new RX head */
 	if (work_done) {
 		writel(priv->rx_used, priv->rx_head_addr);
-		if (priv->config->flags & MPPA_PCIE_ETH_CONFIG_SEND_IT_TO_RM) {
+		if (priv->config->flags & ODP_CONFIG_SEND_IT_TO_RM) {
 			mppa_pcie_send_it_to_rm(priv->pdata, 0);
 		}
 	}
@@ -137,7 +137,7 @@ static int mppa_pcie_netdev_clean_rx(struct mppa_pcie_netdev_priv *priv,
  loop:
 	/* get mppa entries */
 	memcpy_fromio(priv->rx_mppa_entries + priv->rx_avail, priv->rx_ring[priv->rx_avail].entry_addr,
-		      sizeof(struct mppa_pcie_eth_c2h_ring_buff_entry) * (limit - priv->rx_avail));
+		      sizeof(struct odp_c2h_ring_buff_entry) * (limit - priv->rx_avail));
 	while (priv->rx_avail != limit) {
 		/* get rx slot */
 		rx = &(priv->rx_ring[priv->rx_avail]);
@@ -213,7 +213,7 @@ static int mppa_pcie_netdev_clean_rx(struct mppa_pcie_netdev_priv *priv,
 	return worked;
 }
 
-static int mppa_pcie_netdev_tx_is_done(struct mppa_pcie_netdev_priv *priv,
+static int odp_tx_is_done(struct odp_if_priv *priv,
 				       int index)
 {
 	return (dmaengine_tx_status(priv->tx_chan[priv->tx_ring[index].chanidx],
@@ -221,11 +221,11 @@ static int mppa_pcie_netdev_tx_is_done(struct mppa_pcie_netdev_priv *priv,
 				   NULL) == DMA_SUCCESS);
 }
 
-static int mppa_pcie_netdev_clean_tx_unlocked(struct mppa_pcie_netdev_priv *priv,
+static int odp_clean_tx_unlocked(struct odp_if_priv *priv,
 					      unsigned budget)
 {
 	struct net_device *netdev = priv->netdev;
-	struct mppa_pcie_netdev_tx *tx;
+	struct odp_tx *tx;
 	unsigned int packets_completed = 0;
 	unsigned int bytes_completed = 0;
 	unsigned int worked = 0;
@@ -238,7 +238,7 @@ static int mppa_pcie_netdev_clean_tx_unlocked(struct mppa_pcie_netdev_priv *priv
 	last_tx_done = first_tx_done;
 
 	tx_size = priv->tx_size;
-	if (priv->config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP) {
+	if (priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) {
 		int tx_head = atomic_read(&priv->tx_head);
 
 		if (!tx_head) {
@@ -258,7 +258,7 @@ static int mppa_pcie_netdev_clean_tx_unlocked(struct mppa_pcie_netdev_priv *priv
 
 	/* TX: 2nd step: update TX tail (DMA transfer completed) */
 	while (tx_done != tx_submitted && worked < budget) {
-		if (!mppa_pcie_netdev_tx_is_done(priv, tx_done)) {
+		if (!odp_tx_is_done(priv, tx_done)) {
 			/* DMA transfer not completed */
 			break;
 		}
@@ -283,7 +283,7 @@ static int mppa_pcie_netdev_clean_tx_unlocked(struct mppa_pcie_netdev_priv *priv
 	}
 	/* write new TX tail */
 	atomic_set(&priv->tx_done, tx_done);
-	if (worked && !(priv->config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP)) {
+	if (worked && !(priv->config->flags & ODP_CONFIG_RING_AUTOLOOP)) {
 		writel(tx_done, priv->tx_tail_addr);
 	}
 
@@ -314,7 +314,7 @@ static int mppa_pcie_netdev_clean_tx_unlocked(struct mppa_pcie_netdev_priv *priv
 	netdev->stats.tx_bytes += bytes_completed;
 	netdev->stats.tx_packets += packets_completed;
 
-	if (priv->config->flags & MPPA_PCIE_ETH_CONFIG_SEND_IT_TO_RM) {
+	if (priv->config->flags & ODP_CONFIG_SEND_IT_TO_RM) {
 		mppa_pcie_send_it_to_rm(priv->pdata, 0);
 	}
 
@@ -324,45 +324,45 @@ static int mppa_pcie_netdev_clean_tx_unlocked(struct mppa_pcie_netdev_priv *priv
 	return worked;
 }
 
-static int mppa_pcie_netdev_clean_tx(struct mppa_pcie_netdev_priv *priv,
+static int odp_clean_tx(struct odp_if_priv *priv,
 					      unsigned budget)
 {
 	struct netdev_queue *txq = netdev_get_tx_queue(priv->netdev, 0);
 	int worked = 0;
 
 	if (__netif_tx_trylock(txq)) {
-		worked = mppa_pcie_netdev_clean_tx_unlocked(priv, MPPA_PCIE_NETDEV_MAX_TX_RECLAIM);
+		worked = odp_clean_tx_unlocked(priv, ODP_MAX_TX_RECLAIM);
 		__netif_tx_unlock(txq);
 	}
 	return worked;
 }
 
-static void mppa_pcie_netdev_dma_callback_rx(void *param)
+static void odp_dma_callback_rx(void *param)
 {
-	struct mppa_pcie_netdev_priv *priv = param;
+	struct odp_if_priv *priv = param;
 
 	napi_schedule(&priv->napi);
 }
 
-static void mppa_pcie_netdev_dma_callback_tx(void *param)
+static void odp_dma_callback_tx(void *param)
 {
-	struct mppa_pcie_netdev_priv *priv = param;
-	mppa_pcie_netdev_clean_tx(priv, MPPA_PCIE_NETDEV_MAX_TX_RECLAIM);
+	struct odp_if_priv *priv = param;
+	odp_clean_tx(priv, ODP_MAX_TX_RECLAIM);
 }
 
-static void mppa_pcie_netdev_tx_timer_cb(unsigned long data)
+static void odp_tx_timer_cb(unsigned long data)
 {
-	struct mppa_pcie_netdev_priv *priv = (struct mppa_pcie_netdev_priv *)data;
+	struct odp_if_priv *priv = (struct odp_if_priv *)data;
 	unsigned long worked = 0;
 
-	worked = mppa_pcie_netdev_clean_tx(priv, MPPA_PCIE_NETDEV_MAX_TX_RECLAIM);
+	worked = odp_clean_tx(priv, ODP_MAX_TX_RECLAIM);
 
 	/* if netdev is in autoloop, check for new descriptors */
-	if ((priv->config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP) &&
+	if ((priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) &&
 	    atomic_read(&priv->tx_head) != 0 &&
 	    priv->tx_cached_head != priv->tx_size) {
 		uint32_t tx_head;
-		struct mppa_pcie_tx_cache_entry *entry;
+		struct odp_cache_entry *entry;
 
 		tx_head = readl(priv->tx_head_addr);
 		/* In autoloop, we need to cache new elements */
@@ -371,29 +371,29 @@ static void mppa_pcie_netdev_tx_timer_cb(unsigned long data)
 
 			entry->addr =
 				readq(entry->entry_addr +
-				      offsetof(struct mppa_pcie_eth_h2c_ring_buff_entry, pkt_addr));
+				      offsetof(struct odp_h2c_ring_buff_entry, pkt_addr));
 			entry->flags =
 				readl(entry->entry_addr +
-				      offsetof(struct mppa_pcie_eth_h2c_ring_buff_entry, flags));
+				      offsetof(struct odp_h2c_ring_buff_entry, flags));
 			priv->tx_cached_head++;
 		}
 	}
 
 	mod_timer(&priv->tx_timer, jiffies +
-		  (worked < MPPA_PCIE_NETDEV_MAX_TX_RECLAIM ?
-		   MPPA_PCIE_NETDEV_TX_RECLAIM_PERIOD : 2));
+		  (worked < ODP_MAX_TX_RECLAIM ?
+		   ODP_TX_RECLAIM_PERIOD : 2));
 }
 
-static int mppa_pcie_netdev_poll(struct napi_struct *napi, int budget)
+static int odp_poll(struct napi_struct *napi, int budget)
 {
-	struct mppa_pcie_netdev_priv *priv;
+	struct odp_if_priv *priv;
 	int work_done = 0, work = 0;
 
-	priv = container_of(napi, struct mppa_pcie_netdev_priv, napi);
+	priv = container_of(napi, struct odp_if_priv, napi);
 
 	netdev_dbg(priv->netdev, "netdev_poll IN\n");
 
-	work = mppa_pcie_netdev_clean_rx(priv, budget, &work_done);
+	work = odp_clean_rx(priv, budget, &work_done);
 
 	if (work_done < budget && work < budget) {
 		napi_complete(napi);
@@ -405,34 +405,34 @@ static int mppa_pcie_netdev_poll(struct napi_struct *napi, int budget)
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
-static void mppa_pcie_netdev_poll_controller(struct net_device *netdev)
+static void odp_poll_controller(struct net_device *netdev)
 {
-	struct mppa_pcie_netdev_priv *priv = netdev_priv(netdev);
+	struct odp_if_priv *priv = netdev_priv(netdev);
 
 	napi_schedule(&priv->napi);
 }
 #endif
 
-static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
+static netdev_tx_t odp_start_xmit(struct sk_buff *skb,
 					       struct net_device *netdev)
 {
-	struct mppa_pcie_netdev_priv *priv = netdev_priv(netdev);
-	struct mppa_pcie_netdev_tx *tx;
+	struct odp_if_priv *priv = netdev_priv(netdev);
+	struct odp_tx *tx;
 	struct dma_async_tx_descriptor *dma_txd;
-	struct mppa_pcie_tx_cache_entry *entry;
+	struct odp_cache_entry *entry;
 	int dma_len, ret;
 	uint8_t fifo_mode, requested_engine;
-	struct mppa_pcie_eth_pkt_hdr *hdr;
+	struct odp_pkt_hdr *hdr;
 
 	uint32_t tx_submitted, tx_next;
 	uint32_t tx_full, tx_head;
 	uint32_t tx_mppa_idx;
 	uint32_t entry_len;
 	int chanidx = 0;
-	const int autoloop = priv->config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP;
+	const int autoloop = priv->config->flags & ODP_CONFIG_RING_AUTOLOOP;
 
 	/* make room before adding packets */
-	mppa_pcie_netdev_clean_tx_unlocked(priv, -1);
+	odp_clean_tx_unlocked(priv, -1);
 
 	tx_submitted = atomic_read(&priv->tx_submitted);
 	tx_next = (tx_submitted + 1);
@@ -479,9 +479,9 @@ static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
 	/* configure channel */
 	if (!autoloop) {
 		tx->dst_addr = readq(entry->entry_addr +
-				     offsetof(struct mppa_pcie_eth_h2c_ring_buff_entry, pkt_addr));
+				     offsetof(struct odp_h2c_ring_buff_entry, pkt_addr));
 		tx->flags = readl(entry->entry_addr +
-				  offsetof(struct mppa_pcie_eth_h2c_ring_buff_entry, flags));
+				  offsetof(struct odp_h2c_ring_buff_entry, flags));
 	} else {
 		tx->dst_addr = entry->addr;
 		tx->flags = entry->flags;
@@ -489,13 +489,13 @@ static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
 
 	/* Check the provided address */
 	ret = mppa_pcie_dma_check_addr(priv->pdata, tx->dst_addr, &fifo_mode, &requested_engine);
-	if ((ret) || (fifo_mode && (requested_engine >= MPPA_PCIE_NETDEV_NOC_CHAN_COUNT))) {
+	if ((ret) || (fifo_mode && (requested_engine >= ODP_NOC_CHAN_COUNT))) {
 		if (ret) {
 			netdev_err(netdev, "tx %d: invalid send address %llx\n",
 				tx_submitted, tx->dst_addr);
 		} else {
 			netdev_err(netdev, "tx %d: address %llx using NoC engine out of range (%d >= %d)\n",
-				tx_submitted, tx->dst_addr, requested_engine, MPPA_PCIE_NETDEV_NOC_CHAN_COUNT);
+				tx_submitted, tx->dst_addr, requested_engine, ODP_NOC_CHAN_COUNT);
 		}
 		netdev->stats.tx_dropped++;
 		dev_kfree_skb(skb);
@@ -514,12 +514,12 @@ static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
 		    (uint64_t)tx->dst_addr, fifo_mode, requested_engine);
 
 	/* If the packet needs a header to determine size, add it */
-	if (tx->flags & MPPA_PCIE_ETH_NEED_PKT_HDR) {
+	if (tx->flags & ODP_NEED_PKT_HDR) {
 		netdev_dbg(netdev, "tx %d: Adding header to packet\n", tx_submitted);
-		if (skb_headroom(skb) < sizeof(struct mppa_pcie_eth_pkt_hdr)) {
+		if (skb_headroom(skb) < sizeof(struct odp_pkt_hdr)) {
 			struct sk_buff *skb_new;
 
-			skb_new = skb_realloc_headroom(skb, sizeof(struct mppa_pcie_eth_pkt_hdr));
+			skb_new = skb_realloc_headroom(skb, sizeof(struct odp_pkt_hdr));
 			if (!skb_new) {
 				netdev->stats.tx_errors++;
 				kfree_skb(skb);
@@ -529,10 +529,10 @@ static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
 			skb = skb_new;
 		}
 
-		hdr = (struct mppa_pcie_eth_pkt_hdr *) skb_push(skb, sizeof(struct mppa_pcie_eth_pkt_hdr));
+		hdr = (struct odp_pkt_hdr *) skb_push(skb, sizeof(struct odp_pkt_hdr));
 		hdr->timestamp = priv->packet_id;
 		hdr->info.dword = 0ULL;
-		hdr->info._.pkt_size = (skb->len - sizeof(struct mppa_pcie_eth_pkt_hdr));
+		hdr->info._.pkt_size = (skb->len - sizeof(struct odp_pkt_hdr));
 		hdr->info._.pkt_id = priv->packet_id;
 	}
 	priv->packet_id++;
@@ -544,7 +544,7 @@ static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
 	/* write TX entry length field */
 	if (!autoloop) {
 		entry_len = readl(entry->entry_addr +
-		       offsetof(struct mppa_pcie_eth_h2c_ring_buff_entry, len));
+		       offsetof(struct odp_h2c_ring_buff_entry, len));
 		if (tx->len > entry_len) {
 			netdev->stats.tx_errors++;
 			kfree_skb(skb);
@@ -552,7 +552,7 @@ static netdev_tx_t mppa_pcie_netdev_start_xmit(struct sk_buff *skb,
 		}
 
 		writel(skb->len, entry->entry_addr +
-		       offsetof(struct mppa_pcie_eth_h2c_ring_buff_entry, len));
+		       offsetof(struct odp_h2c_ring_buff_entry, len));
 	}
 
 	/* prepare sg */
@@ -621,9 +621,9 @@ busy:
 }
 
 
-static int mppa_pcie_netdev_open(struct net_device *netdev)
+static int odp_open(struct net_device *netdev)
 {
-	struct mppa_pcie_netdev_priv *priv = netdev_priv(netdev);
+	struct odp_if_priv *priv = netdev_priv(netdev);
 	uint32_t tx_tail;
 
 	tx_tail = readl(priv->tx_tail_addr);
@@ -645,9 +645,9 @@ static int mppa_pcie_netdev_open(struct net_device *netdev)
 	priv->interrupt_status = 1;
 	writel(priv->interrupt_status, priv->interrupt_status_addr);
 
-	mod_timer(&priv->tx_timer, jiffies + MPPA_PCIE_NETDEV_TX_RECLAIM_PERIOD);
+	mod_timer(&priv->tx_timer, jiffies + ODP_TX_RECLAIM_PERIOD);
 
-	if (!(priv->config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP) ||
+	if (!(priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) ||
 	    atomic_read(&priv->tx_head) != 0) {
 		/* If we are in autoloop mode, we might not have any buffer available et
 		 * so keep the carrier off */
@@ -660,9 +660,9 @@ static int mppa_pcie_netdev_open(struct net_device *netdev)
 	return 0;
 }
 
-static int mppa_pcie_netdev_close(struct net_device *netdev)
+static int odp_close(struct net_device *netdev)
 {
-	struct mppa_pcie_netdev_priv *priv = netdev_priv(netdev);
+	struct odp_if_priv *priv = netdev_priv(netdev);
 
 	priv->interrupt_status = 0;
 	writel(priv->interrupt_status, priv->interrupt_status_addr);
@@ -675,25 +675,25 @@ static int mppa_pcie_netdev_close(struct net_device *netdev)
 	napi_disable(&priv->napi);
 	netif_stop_queue(netdev);
 
-	mppa_pcie_netdev_clean_tx(priv, -1);
+	odp_clean_tx(priv, -1);
 
 	return 0;
 }
 
-static const struct net_device_ops mppa_pcie_netdev_ops = {
-        .ndo_open               = mppa_pcie_netdev_open,
-        .ndo_stop               = mppa_pcie_netdev_close,
-        .ndo_start_xmit         = mppa_pcie_netdev_start_xmit,
-	.ndo_get_stats          = mppa_pcie_netdev_get_stats,
-	.ndo_tx_timeout         = mppa_pcie_netdev_tx_timeout,
+static const struct net_device_ops odp_ops = {
+        .ndo_open               = odp_open,
+        .ndo_stop               = odp_close,
+        .ndo_start_xmit         = odp_start_xmit,
+	.ndo_get_stats          = odp_get_stats,
+	.ndo_tx_timeout         = odp_tx_timeout,
 #ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller    = mppa_pcie_netdev_poll_controller,
+	.ndo_poll_controller    = odp_poll_controller,
 #endif
 };
 
-static void mppa_pcie_netdev_remove(struct net_device *netdev)
+static void odp_remove(struct net_device *netdev)
 {
-	struct mppa_pcie_netdev_priv *priv = netdev_priv(netdev);
+	struct odp_if_priv *priv = netdev_priv(netdev);
 	int chanidx;
 
 
@@ -701,7 +701,7 @@ static void mppa_pcie_netdev_remove(struct net_device *netdev)
 	unregister_netdev(netdev);
 
 	/* clean */
-	for(chanidx=0; chanidx <= MPPA_PCIE_NETDEV_NOC_CHAN_COUNT; chanidx ++) {
+	for(chanidx=0; chanidx <= ODP_NOC_CHAN_COUNT; chanidx ++) {
 		dma_release_channel(priv->tx_chan[chanidx]);
 	}
 	kfree(priv->tx_cache);
@@ -717,18 +717,18 @@ static void mppa_pcie_netdev_remove(struct net_device *netdev)
 	free_netdev(netdev);
 }
 
-static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata,
-						  struct mppa_pcie_eth_if_config *config,
+static struct net_device *odp_create(struct mppa_pcie_device *pdata,
+						  struct odp_if_config *config,
 						  uint32_t eth_control_addr,
 						  int id)
 {
 	struct net_device *netdev;
-	struct mppa_pcie_netdev_priv *priv;
+	struct odp_if_priv *priv;
 	dma_cap_mask_t mask;
 	char name[64];
 	int i, entries_addr;
 	int chanidx;
-	const bool autoloop = config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP;
+	const bool autoloop = config->flags & ODP_CONFIG_RING_AUTOLOOP;
 	struct mppa_pcie_id mppa_id;
 	struct pci_dev *pdev = mppa_pcie_get_pci_dev(pdata);
 	u8 __iomem* smem_vaddr;
@@ -745,7 +745,7 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	snprintf(name, 64, "mppa%d.%d.%d.%d", mppa_id.board_id, mppa_id.chip_id, mppa_id.ioddr_id, id);
 
 	/* alloc netdev */
-	if (!(netdev = alloc_netdev(sizeof (struct mppa_pcie_netdev_priv), name,
+	if (!(netdev = alloc_netdev(sizeof (struct odp_if_priv), name,
 	#if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 16, 0))
 		NET_NAME_UNKNOWN,
 	#endif
@@ -759,8 +759,8 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	}
 
 	/* init netdev */
-	netdev->netdev_ops = &mppa_pcie_netdev_ops;
-	netdev->needed_headroom = sizeof(struct mppa_pcie_eth_pkt_hdr);
+	netdev->netdev_ops = &odp_ops;
+	netdev->needed_headroom = sizeof(struct odp_pkt_hdr);
 	netdev->mtu = config->mtu;
 	memcpy(netdev->dev_addr, &(config->mac_addr), 6);
 	netdev->features |= NETIF_F_SG
@@ -777,10 +777,10 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	smem_vaddr = mppa_pcie_get_smem_vaddr(pdata);
 	priv->interrupt_status_addr = smem_vaddr
 		+ eth_control_addr
-		+ offsetof(struct mppa_pcie_eth_control, configs)
-		+ id * sizeof(struct mppa_pcie_eth_if_config)
-		+ offsetof(struct mppa_pcie_eth_if_config, interrupt_status);
-	netif_napi_add(netdev, &priv->napi, mppa_pcie_netdev_poll, MPPA_PCIE_NETDEV_NAPI_WEIGHT);
+		+ offsetof(struct odp_control, configs)
+		+ id * sizeof(struct odp_if_config)
+		+ offsetof(struct odp_if_config, interrupt_status);
+	netif_napi_add(netdev, &priv->napi, odp_poll, ODP_NAPI_WEIGHT);
 
 	/* init fs */
 	snprintf(name, 64, "netdev%d-txtime", id);
@@ -804,7 +804,7 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	entries_addr = readl(desc_info_addr(smem_vaddr,
 					    config->c2h_ring_buf_desc_addr,
 					    ring_buffer_entries_addr));
-	priv->rx_ring = kzalloc(priv->rx_size * sizeof (struct mppa_pcie_netdev_rx), GFP_ATOMIC);
+	priv->rx_ring = kzalloc(priv->rx_size * sizeof (struct odp_rx), GFP_ATOMIC);
 	if (priv->rx_ring == NULL) {
 		dev_err(&pdev->dev, "RX ring allocation failed\n");
 		goto rx_alloc_failed;
@@ -816,7 +816,7 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 		/* set the RX ring entry address */
 		priv->rx_ring[i].entry_addr = smem_vaddr
 			+ entries_addr
-			+ i * sizeof (struct mppa_pcie_eth_c2h_ring_buff_entry);
+			+ i * sizeof (struct odp_c2h_ring_buff_entry);
 	}
 	priv->rx_config.cfg.direction = DMA_DEV_TO_MEM;
 	priv->rx_config.fifo_mode = _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
@@ -832,18 +832,18 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
 						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
 	mppa_pcie_dmaengine_set_channel_callback(priv->rx_chan,
-						 mppa_pcie_netdev_dma_callback_rx,
+						 odp_dma_callback_rx,
 						 priv);
 	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
 						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_ENABLED);
-	priv->rx_mppa_entries = kmalloc(priv->rx_size * sizeof (struct mppa_pcie_eth_c2h_ring_buff_entry), GFP_ATOMIC);
+	priv->rx_mppa_entries = kmalloc(priv->rx_size * sizeof (struct odp_c2h_ring_buff_entry), GFP_ATOMIC);
 
 	/* init TX ring */
 	priv->tx_mppa_size = readl(desc_info_addr(smem_vaddr,
 						  config->h2c_ring_buf_desc_addr,
 						  ring_buffer_entries_count));
 	if (autoloop) {
-		priv->tx_size = MPPA_PCIE_NETDEV_AUTOLOOP_DESC_COUNT;
+		priv->tx_size = ODP_AUTOLOOP_DESC_COUNT;
 	} else {
 		priv->tx_size = priv->tx_mppa_size;
 	}
@@ -856,7 +856,7 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 					    tail);
 
 	/* Setup Host TX Ring */
-	priv->tx_ring = kzalloc(priv->tx_size * sizeof (struct mppa_pcie_netdev_tx), GFP_ATOMIC);
+	priv->tx_ring = kzalloc(priv->tx_size * sizeof (struct odp_tx), GFP_ATOMIC);
 	if (priv->tx_ring == NULL) {
 		dev_err(&pdev->dev, "TX ring allocation failed\n");
 		goto tx_alloc_failed;
@@ -879,11 +879,11 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 		/* set the TX ring entry address */
 		priv->tx_cache[i].entry_addr = smem_vaddr
 			+ entries_addr
-			+ i * sizeof (struct mppa_pcie_eth_h2c_ring_buff_entry);
+			+ i * sizeof (struct odp_h2c_ring_buff_entry);
 	}
 
 	priv->tx_cached_head = 0;
-	for(chanidx=0; chanidx <= MPPA_PCIE_NETDEV_NOC_CHAN_COUNT; chanidx ++) {
+	for(chanidx=0; chanidx <= ODP_NOC_CHAN_COUNT; chanidx ++) {
 		priv->tx_config[chanidx].cfg.direction = DMA_MEM_TO_DEV;
 		priv->tx_config[chanidx].fifo_mode = _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
 		priv->tx_config[chanidx].short_latency_load_threshold = INT_MAX;
@@ -900,7 +900,7 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 							       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
 		if (!autoloop) {
 			mppa_pcie_dmaengine_set_channel_callback(priv->tx_chan[chanidx],
-								 mppa_pcie_netdev_dma_callback_tx,
+								 odp_dma_callback_tx,
 								 priv);
 			mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->tx_chan[chanidx],
 								       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_ENABLED);
@@ -916,7 +916,7 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	}
 
 	/* Tx poll timer */
-	setup_timer(&priv->tx_timer, mppa_pcie_netdev_tx_timer_cb, (unsigned long)priv);
+	setup_timer(&priv->tx_timer, odp_tx_timer_cb, (unsigned long)priv);
 
 	printk(KERN_INFO "Registered netdev for %s (ring rx:%d, tx:%d)\n",
 	       netdev->name, priv->rx_size, priv->tx_size);
@@ -945,18 +945,18 @@ static struct net_device *mppa_pcie_netdev_create(struct mppa_pcie_device *pdata
 	return NULL;
 }
 
-static int mppa_pcie_netdev_is_magic_set(struct mppa_pcie_device *pdata)
+static int odp_is_magic_set(struct mppa_pcie_device *pdata)
 {
 	uint32_t eth_control_addr;
 	int magic;
 
-	eth_control_addr = mppa_pcie_netdev_get_eth_control_addr(pdata);
+	eth_control_addr = odp_get_eth_control_addr(pdata);
 	if (eth_control_addr != 0) {
 		/* read magic struct */
 		magic = readl(mppa_pcie_get_smem_vaddr(pdata)
 			      + eth_control_addr
-			      + offsetof(struct mppa_pcie_eth_control, magic));
-		if (magic == MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC) {
+			      + offsetof(struct odp_control, magic));
+		if (magic == ODP_CONTROL_STRUCT_MAGIC) {
 			dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
 				"MPPA netdev control struct (0x%x) ready\n",
 				eth_control_addr);
@@ -971,27 +971,27 @@ static int mppa_pcie_netdev_is_magic_set(struct mppa_pcie_device *pdata)
 	return 0;
 }
 
-static void mppa_pcie_netdev_enable(struct mppa_pcie_device *pdata,
-				    struct mppa_pcie_pdata_netdev *netdev)
+static void odp_enable(struct mppa_pcie_device *pdata,
+				    struct odp_pdata_priv *netdev)
 {
 	int i;
-	enum _mppa_pcie_netdev_state last_state;
+	enum _odp_if_state last_state;
 	uint32_t eth_control_addr;
 	int if_count;
 
-	last_state = atomic_cmpxchg(&netdev->state, _MPPA_PCIE_NETDEV_STATE_DISABLED, _MPPA_PCIE_NETDEV_STATE_ENABLING);
-	if (last_state != _MPPA_PCIE_NETDEV_STATE_DISABLED) {
+	last_state = atomic_cmpxchg(&netdev->state, _ODP_IF_STATE_DISABLED, _ODP_IF_STATE_ENABLING);
+	if (last_state != _ODP_IF_STATE_DISABLED) {
 		return;
 	}
 
-	eth_control_addr = mppa_pcie_netdev_get_eth_control_addr(pdata);
+	eth_control_addr = odp_get_eth_control_addr(pdata);
 
 	memcpy_fromio(&netdev->control, mppa_pcie_get_smem_vaddr(pdata)
 		      + eth_control_addr,
-		      sizeof (struct mppa_pcie_eth_control));
+		      sizeof (struct odp_control));
 
-	if (netdev->control.magic != MPPA_PCIE_ETH_CONTROL_STRUCT_MAGIC) {
-		atomic_set(&netdev->state, _MPPA_PCIE_NETDEV_STATE_DISABLED);
+	if (netdev->control.magic != ODP_CONTROL_STRUCT_MAGIC) {
+		atomic_set(&netdev->state, _ODP_IF_STATE_DISABLED);
 		return;
 	}
 
@@ -1003,18 +1003,18 @@ static void mppa_pcie_netdev_enable(struct mppa_pcie_device *pdata,
 
 	/* add net devices */
 	for (i = 0; i < if_count; ++i) {
-		netdev->dev[i] = mppa_pcie_netdev_create(pdata, netdev->control.configs + i, eth_control_addr, i);
+		netdev->dev[i] = odp_create(pdata, netdev->control.configs + i, eth_control_addr, i);
 		if (!netdev->dev[i])
 			break;
 	}
 	netdev->if_count = i;
 
-	atomic_set(&netdev->state, _MPPA_PCIE_NETDEV_STATE_ENABLED);
+	atomic_set(&netdev->state, _ODP_IF_STATE_ENABLED);
 }
 
-static void mppa_pcie_netdev_pre_reset(struct net_device *netdev)
+static void odp_pre_reset(struct net_device *netdev)
 {
-	struct mppa_pcie_netdev_priv *priv = netdev_priv(netdev);
+	struct odp_if_priv *priv = netdev_priv(netdev);
 	int now;
 
 	/* There is no real need to lock these changes
@@ -1037,22 +1037,22 @@ static void mppa_pcie_netdev_pre_reset(struct net_device *netdev)
 	}
 }
 
-static void mppa_pcie_netdev_pre_reset_all(struct mppa_pcie_pdata_netdev * netdev,
+static void odp_pre_reset_all(struct odp_pdata_priv * netdev,
 						struct mppa_pcie_device *pdata)
 {
 	int i;
 
 	for (i = 0; i < netdev->if_count; ++i) {
-		mppa_pcie_netdev_pre_reset(netdev->dev[i]);
+		odp_pre_reset(netdev->dev[i]);
 	}
 }
 
 
-static void mppa_pcie_netdev_disable(struct mppa_pcie_pdata_netdev * netdev,
+static void odp_disable(struct odp_pdata_priv * netdev,
 				     struct mppa_pcie_device *pdata)
 {
 	int i;
-	enum _mppa_pcie_netdev_state last_state;
+	enum _odp_if_state last_state;
 	uint32_t eth_control_addr;
 
 	if (!netdev)
@@ -1060,48 +1060,48 @@ static void mppa_pcie_netdev_disable(struct mppa_pcie_pdata_netdev * netdev,
 
 	do {
 		last_state = atomic_cmpxchg(&netdev->state,
-					    _MPPA_PCIE_NETDEV_STATE_ENABLED,
-					    _MPPA_PCIE_NETDEV_STATE_DISABLING);
+					    _ODP_IF_STATE_ENABLED,
+					    _ODP_IF_STATE_DISABLING);
 
-		if (last_state == _MPPA_PCIE_NETDEV_STATE_ENABLING) {
+		if (last_state == _ODP_IF_STATE_ENABLING) {
 			msleep(10);
-		} else if (last_state != _MPPA_PCIE_NETDEV_STATE_ENABLED) {
+		} else if (last_state != _ODP_IF_STATE_ENABLED) {
 			return;
 		}
-	} while (last_state == _MPPA_PCIE_NETDEV_STATE_ENABLING);
+	} while (last_state == _ODP_IF_STATE_ENABLING);
 
 	dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
 		"disable: remove interface(s)\n");
 
-	eth_control_addr = mppa_pcie_netdev_get_eth_control_addr(pdata);
+	eth_control_addr = odp_get_eth_control_addr(pdata);
 	writel(0, mppa_pcie_get_smem_vaddr(pdata)
 			      + eth_control_addr
-			      + offsetof(struct mppa_pcie_eth_control, magic));
+			      + offsetof(struct odp_control, magic));
 
 	/* delete net devices */
 	for (i = 0; i < netdev->if_count; ++i) {
-		mppa_pcie_netdev_remove(netdev->dev[i]);
+		odp_remove(netdev->dev[i]);
 	}
 
 	netdev->if_count = 0;
 
-	atomic_set(&netdev->state, _MPPA_PCIE_NETDEV_STATE_DISABLED);
+	atomic_set(&netdev->state, _ODP_IF_STATE_DISABLED);
 }
 
-static void mppa_pcie_netdev_enable_task(struct work_struct *work)
+static void odp_enable_task(struct work_struct *work)
 {
-	struct mppa_pcie_pdata_netdev *netdev =
-		container_of(work, struct mppa_pcie_pdata_netdev, enable);
+	struct odp_pdata_priv *netdev =
+		container_of(work, struct odp_pdata_priv, enable);
 
-	mppa_pcie_netdev_enable(netdev->pdata, netdev);
+	odp_enable(netdev->pdata, netdev);
 }
 
-static irqreturn_t mppa_pcie_netdev_interrupt(int irq, void *arg)
+static irqreturn_t odp_interrupt(int irq, void *arg)
 {
-	struct mppa_pcie_pdata_netdev * netdev = arg;
-	struct mppa_pcie_netdev_priv *priv;
+	struct odp_pdata_priv * netdev = arg;
+	struct odp_if_priv *priv;
 	int i;
-	enum _mppa_pcie_netdev_state last_state;
+	enum _odp_if_state last_state;
 	uint32_t tx_limit;
 
 	dev_dbg(&netdev->pdev->dev, "netdev interrupt IN\n");
@@ -1109,13 +1109,13 @@ static irqreturn_t mppa_pcie_netdev_interrupt(int irq, void *arg)
 	last_state = atomic_read(&netdev->state);
 
 	/* disabled : try to enable */
-	if (last_state == _MPPA_PCIE_NETDEV_STATE_DISABLED) {
-		if (mppa_pcie_netdev_is_magic_set(netdev->pdata)) {
+	if (last_state == _ODP_IF_STATE_DISABLED) {
+		if (odp_is_magic_set(netdev->pdata)) {
 				schedule_work(&netdev->enable);
 		}
 	}
 	/* not enabled, stop here */
-	if (last_state != _MPPA_PCIE_NETDEV_STATE_ENABLED) {
+	if (last_state != _ODP_IF_STATE_ENABLED) {
 		dev_dbg(&netdev->pdev->dev, "netdev is disabled. interrupt OUT\n");
 		return IRQ_HANDLED;
 	}
@@ -1143,7 +1143,7 @@ static irqreturn_t mppa_pcie_netdev_interrupt(int irq, void *arg)
 		 * - In std mode, submitted is just before head
 		 * - In autoloop, submitted is just before done (we don't care at all about head)
 		 */
-		if (priv->config->flags & MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP) {
+		if (priv->config->flags & ODP_CONFIG_RING_AUTOLOOP) {
 			if (!atomic_read(&priv->tx_head))
 				continue;
 			tx_limit = atomic_read(&priv->tx_done);
@@ -1158,15 +1158,15 @@ static irqreturn_t mppa_pcie_netdev_interrupt(int irq, void *arg)
 }
 
 static int
-mppa_pcie_netdev_dev_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
+odp_dev_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
 {
 	struct mppa_pcie_device *pdata = (struct mppa_pcie_device *) data;
-	struct mppa_pcie_pdata_netdev *netdev = container_of(nb, struct mppa_pcie_pdata_netdev, notifier);
+	struct odp_pdata_priv *netdev = container_of(nb, struct odp_pdata_priv, notifier);
 
 	switch (action) {
 		case MPPA_PCIE_DEV_EVENT_RESET:
-			mppa_pcie_netdev_pre_reset_all(netdev, pdata);
-			mppa_pcie_netdev_disable(netdev, pdata);
+			odp_pre_reset_all(netdev, pdata);
+			odp_disable(netdev, pdata);
 			break;
 		case MPPA_PCIE_DEV_EVENT_POST_RESET:
 		case MPPA_PCIE_DEV_EVENT_STATUS:
@@ -1179,9 +1179,9 @@ mppa_pcie_netdev_dev_notifier_call(struct notifier_block *nb, unsigned long acti
 }
 
 static int
-mppa_pcie_netdev_add_device(struct mppa_pcie_device *pdata)
+odp_add_device(struct mppa_pcie_device *pdata)
 {
-	struct mppa_pcie_pdata_netdev *netdev;
+	struct odp_pdata_priv *netdev;
 	int res, irq;
 
 	netdev = kzalloc(sizeof(*netdev), GFP_KERNEL);
@@ -1197,22 +1197,22 @@ mppa_pcie_netdev_add_device(struct mppa_pcie_device *pdata)
 		goto free_netdev;
 
 	dev_dbg(&netdev->pdev->dev, "Registering IRQ %d\n", irq);
-	res = request_irq(irq, mppa_pcie_netdev_interrupt, IRQF_SHARED,
+	res = request_irq(irq, odp_interrupt, IRQF_SHARED,
 					   "mppa", netdev);
 	if (res)
 		goto free_netdev;
 
-	netdev->notifier.notifier_call = mppa_pcie_netdev_dev_notifier_call;
+	netdev->notifier.notifier_call = odp_dev_notifier_call;
 	mppa_pcie_dev_register_notifier(pdata, &netdev->notifier);
 
-	atomic_set(&netdev->state, _MPPA_PCIE_NETDEV_STATE_DISABLED);
+	atomic_set(&netdev->state, _ODP_IF_STATE_DISABLED);
 	netdev->if_count = 0;
 
-	INIT_WORK(&netdev->enable, mppa_pcie_netdev_enable_task);
+	INIT_WORK(&netdev->enable, odp_enable_task);
 
 
-	if (mppa_pcie_netdev_is_magic_set(pdata)){
-		mppa_pcie_netdev_enable(pdata, netdev);
+	if (odp_is_magic_set(pdata)){
+		odp_enable(pdata, netdev);
 	}
 
 	mutex_lock(&netdev_device_list_mutex);
@@ -1228,9 +1228,9 @@ mppa_pcie_netdev_add_device(struct mppa_pcie_device *pdata)
 }
 
 static int
-mppa_pcie_netdev_remove_device(struct mppa_pcie_device *pdata)
+odp_remove_device(struct mppa_pcie_device *pdata)
 {
-	struct mppa_pcie_pdata_netdev *netdev = NULL, *dev;
+	struct odp_pdata_priv *netdev = NULL, *dev;
 
 	mutex_lock(&netdev_device_list_mutex);
 	list_for_each_entry(dev, &netdev_device_list, link) {
@@ -1247,7 +1247,7 @@ mppa_pcie_netdev_remove_device(struct mppa_pcie_device *pdata)
 	if (!netdev)
 		return 0;
 
-	mppa_pcie_netdev_disable(netdev, pdata);
+	odp_disable(netdev, pdata);
 
 	dev_dbg(&netdev->pdev->dev, "Removing the associated netdev\n");
 	free_irq(mppa_pcie_get_irq(pdata, MPPA_PCIE_IRQ_USER_IT, 0), netdev);
@@ -1259,16 +1259,16 @@ mppa_pcie_netdev_remove_device(struct mppa_pcie_device *pdata)
 }
 
 static int
-mppa_pcie_netdev_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
+odp_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
 {
 	struct mppa_pcie_device *pdata = (struct mppa_pcie_device *) data;
 
 	switch (action) {
 		case MPPA_PCIE_EVENT_PROBE:
-			mppa_pcie_netdev_add_device(pdata);
+			odp_add_device(pdata);
 			break;
 		case MPPA_PCIE_EVENT_REMOVE:
-			mppa_pcie_netdev_remove_device(pdata);
+			odp_remove_device(pdata);
 			break;
 		default:
 			return NOTIFY_DONE;
@@ -1277,25 +1277,25 @@ mppa_pcie_netdev_notifier_call(struct notifier_block *nb, unsigned long action, 
 	return NOTIFY_OK;
 }
 
-static struct notifier_block mppa_pcie_netdev_notifier = {
-	.notifier_call = mppa_pcie_netdev_notifier_call,
+static struct notifier_block odp_notifier = {
+	.notifier_call = odp_notifier_call,
 };
 
-static int mppa_pcie_netdev_init(void)
+static int odp_init(void)
 {
 	printk(KERN_INFO "Loading PCIe ethernet driver\n");
-	mppa_pcie_register_notifier(&mppa_pcie_netdev_notifier);
+	mppa_pcie_register_notifier(&odp_notifier);
 
 	return 0;
 }
 
-static void mppa_pcie_netdev_exit(void)
+static void odp_exit(void)
 {
-	mppa_pcie_unregister_notifier(&mppa_pcie_netdev_notifier);
+	mppa_pcie_unregister_notifier(&odp_notifier);
 }
 
-module_init(mppa_pcie_netdev_init);
-module_exit(mppa_pcie_netdev_exit);
+module_init(odp_init);
+module_exit(odp_exit);
 
 MODULE_AUTHOR("Alexis Cellier <alexis.cellier@openwide.fr>");
 MODULE_DESCRIPTION("MPPA PCIe Network Device Driver");
