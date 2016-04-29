@@ -66,8 +66,6 @@ struct mpodp_control {
  * TX (Host2MPPA) single entry descriptor (Updated by Host)
  */
 struct mpodp_h2c_ring_buff_entry {
-	uint32_t len;		/*< Packet length */
-	uint32_t flags;		/*< Flags to control offloading features */
 	uint64_t pkt_addr;	/*< Packet Address */
 } __attribute__ ((packed));
 
