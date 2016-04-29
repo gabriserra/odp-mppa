@@ -22,7 +22,7 @@
 
 #define RING_BUFFER_ENTRIES	16
 
-#define BUF_POOL_COUNT	(1 + MPPA_PCIE_ETH_MAX_INTERFACE_COUNT)
+#define BUF_POOL_COUNT	(1 + MPODP_MAX_IF_COUNT)
 
 /**
  * PCIe ethernet interface config
@@ -50,7 +50,7 @@ static int pcie_init_buff_pools()
 	}
 	buffer_ring_init(&g_free_buf_pool, buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
 
-	for (i = 0; i < MPPA_PCIE_ETH_MAX_INTERFACE_COUNT; i++) {
+	for (i = 0; i < MPODP_MAX_IF_COUNT; i++) {
 		buf_pool += MPPA_PCIE_MULTIBUF_COUNT;
 		buffer_ring_init(&g_full_buf_pool[i], buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
 	}
@@ -79,10 +79,10 @@ int pcie_init(int if_count)
 
 	eth_if_cfg_t if_cfgs[if_count];
 	for (int i = 0; i < if_count; ++i){
-		if_cfgs[i].mtu = MPPA_PCIE_ETH_DEFAULT_MTU;
+		if_cfgs[i].mtu = MPODP_DEFAULT_MTU;
 		if_cfgs[i].n_c2h_entries = RING_BUFFER_ENTRIES;
 		if_cfgs[i].n_h2c_entries = RING_BUFFER_ENTRIES;
-		if_cfgs[i].flags = MPPA_PCIE_ETH_CONFIG_RING_AUTOLOOP;
+		if_cfgs[i].flags = 0;
 		if_cfgs[i].if_id = i;
 		memcpy(if_cfgs[i].mac_addr, "\x02\xde\xad\xbe\xef", 5);
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((odp_rpc_get_cluster_id(0) - 128) << 1);

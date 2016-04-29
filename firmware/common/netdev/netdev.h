@@ -1,7 +1,7 @@
 #ifndef NETDEV__H
 #define NETDEV__H
 
-#include <mppa_pcie_netdev.h>
+#include <mppapcie_odp.h>
 
 typedef struct {
 	uint8_t if_id;
