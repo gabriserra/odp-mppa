@@ -14,7 +14,7 @@
 /**
  * Count of interfaces for one PCIe device
  */
-#define ODP_MAX_IF_COUNT	                16
+#define MPODP_MAX_IF_COUNT	                16
 
 /**
  * Mac address length
@@ -24,28 +24,27 @@
 /**
  * Default MTU
  */
-#define ODP_DEFAULT_MTU		1500
+#define MPODP_DEFAULT_MTU		1500
 
 
-#define ODP_CONTROL_STRUCT_MAGIC	0xCAFEBABE
+#define MPODP_CONTROL_STRUCT_MAGIC	0xCAFEBABE
 
 /**
  * Flags for config flags
  */
-#define ODP_CONFIG_DISABLED		(1 << 0)
+#define MPODP_CONFIG_DISABLED		(1 << 0)
 
 
 /**
  * Flags for tx flags
  */
-#define ODP_NEED_PKT_HDR	(1 << 0)
 
 /**
  * Per interface configuration (Read from host)
  */
-struct odp_if_config {
-	uint64_t c2h_ring_buf_desc_addr;	/*< MPPA2Host ring buffer address (`odp_ring_buff_desc`) */
-	uint64_t h2c_ring_buf_desc_addr;	/*< Host2MPPA ring buffer address (`odp_ring_buff_desc`) */
+struct mpodp_if_config {
+	uint64_t c2h_ring_buf_desc_addr;	/*< MPPA2Host ring buffer address (`mpodp_ring_buff_desc`) */
+	uint64_t h2c_ring_buf_desc_addr;	/*< Host2MPPA ring buffer address (`mpodp_ring_buff_desc`) */
 	uint16_t mtu;		/*< MTU */
 	uint8_t mac_addr[MAC_ADDR_LEN];	/*< Mac address */
 	uint32_t interrupt_status;	/*< interrupt status (set by host) */
@@ -55,18 +54,18 @@ struct odp_if_config {
 
 /**
  * Control structure to exchange control data between host and MPPA
- * This structure is placed at `ODP_CONTROL_STRUCT_ADDR`
+ * This structure is placed at `MPODP_CONTROL_STRUCT_ADDR`
  */
-struct odp_control {
+struct mpodp_control {
 	uint32_t magic;		/*< Magic to test presence of control structure */
 	uint32_t if_count;	/*< Count of interfaces for this PCIe device */
-	struct odp_if_config configs[ODP_MAX_IF_COUNT];
+	struct mpodp_if_config configs[MPODP_MAX_IF_COUNT];
 } __attribute__ ((packed));
 
 /**
  * TX (Host2MPPA) single entry descriptor (Updated by Host)
  */
-struct odp_h2c_ring_buff_entry {
+struct mpodp_h2c_ring_buff_entry {
 	uint32_t len;		/*< Packet length */
 	uint32_t flags;		/*< Flags to control offloading features */
 	uint64_t pkt_addr;	/*< Packet Address */
@@ -75,7 +74,7 @@ struct odp_h2c_ring_buff_entry {
 /**
  * RX (MPPA2Host) single entry descriptor (Updated by MPPA)
  */
-struct odp_c2h_ring_buff_entry {
+struct mpodp_c2h_ring_buff_entry {
 	uint16_t len;		/*< Packet length */
 	uint16_t status;	/*< Packet status (errors, etc) */
 	uint32_t checksum;	/*< Packet checksum (computed by MPPA) */
@@ -85,8 +84,8 @@ struct odp_c2h_ring_buff_entry {
 
 /**
  * Ring buffer descriptors
- * `ring_buffer_addr` point either to RX ring entries (`odp_rx_ring_buff_entry`)
- * or TX ring entries (`odp_tx_ring_buff_entry`) depending on ring buffertype
+ * `ring_buffer_addr` point either to RX ring entries (`mpodp_rx_ring_buff_entry`)
+ * or TX ring entries (`mpodp_tx_ring_buff_entry`) depending on ring buffertype
  *
  * For a TX ring buffer, the MPPA writes the head pointer to signal that previous
  * packet has been sent and host write the tail pointer to indicate there is new
@@ -100,7 +99,7 @@ struct odp_c2h_ring_buff_entry {
  * writes the tail to indicates there is incoming packets. Every descriptor between
  * the head and tail belongs to the Host in order to receive them.
  */
-struct odp_ring_buff_desc {
+struct mpodp_ring_buff_desc {
 	uint32_t head;		/*< Index of head */
 	uint32_t tail;		/*< Index of tail */
 	uint32_t ring_buffer_entries_count;	/*< Count of ring buffer entries */
@@ -110,7 +109,7 @@ struct odp_ring_buff_desc {
 /**
  * Header added to packet when needed (fifo mode for instance)
  */
-union odp_pkt_hdr_info {
+union mpodp_pkt_hdr_info {
 	uint64_t dword;
 	uint32_t word[2];
 	uint16_t hword[4];
@@ -125,9 +124,9 @@ union odp_pkt_hdr_info {
 	} _;
 };
 
-struct odp_pkt_hdr {
+struct mpodp_pkt_hdr {
 	uint64_t timestamp;
-	union odp_pkt_hdr_info info;
+	union mpodp_pkt_hdr_info info;
 } __attribute__ ((packed));;
 
 #endif
