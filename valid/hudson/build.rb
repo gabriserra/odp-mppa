@@ -50,7 +50,7 @@ long_build = Target.new("long-build", repo, [install])
 apps = Target.new("apps", repo, [install])
 long = Target.new("long", repo, [])
 dkms = Target.new("dkms", repo, [])
-package = Target.new("package", repo, [install, apps, long_build])
+package = Target.new("package", repo, [install, apps, long_build, dkms])
 
 b = Builder.new("odp", options, [clean, build, valid, valid_packages,
                                  long_build, long, apps, dkms, package, install])
