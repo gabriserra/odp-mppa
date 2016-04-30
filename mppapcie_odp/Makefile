@@ -2,7 +2,8 @@ obj-m += mppapcie_odp.o
 
 TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
 KERNELBUILD_DIR ?= /lib/modules/$(shell uname -r)/build
-MPPAPCIE_INCLUDE_DIR ?= $(shell readlink -f $$(readlink -f $${K1_TOOLCHAIN_DIR})/../../src/k1-mppapcie-dkms*/include)
+K1_TOOLCHAIN_DIR ?= /usr/local/k1tools
+MPPAPCIE_INCLUDE_DIR ?= $(shell readlink -f $$(readlink -m $$(readlink -m $(K1_TOOLCHAIN_DIR))/../../src/k1-mppapcie-dkms*/include))
 
 ifneq ($(MPPAPCIE_INCLUDE_DIR),)
 MPPA_EXTRA_SYMBOLS = $(shell find $(MPPAPCIE_INCLUDE_DIR)/.. -name Module.symvers)
