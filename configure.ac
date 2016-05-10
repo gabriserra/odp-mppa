@@ -262,7 +262,7 @@ AM_CONDITIONAL([HAVE_IMAGEMAGIC], [test "x${IMAGEMAGIC}" = "xconvert"])
 ##########################################################################
        AC_CHECK_PROGS([MSCGEN], [mscgen])
        if test -z "$MSCGEN";
-          then AC_MSG_ERROR([mscgen not found - continuing without sequence message support])
+          then AC_MSG_WARN([mscgen not found - continuing without sequence message support])
        fi
 
 AM_CONDITIONAL([HAVE_MSCGEN], [test "x${MSCGEN}" = "xmscgen"])
