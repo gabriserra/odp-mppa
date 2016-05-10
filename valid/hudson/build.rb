@@ -64,6 +64,7 @@ debug_flags = options["debug"] == true ? "--enable-debug" : ""
 configs=nil
 valid_configs = options["valid-configs"].split()
 valid_type = "sim"
+
 if ENV["label"].to_s() != "" then
     case ENV["label"]
     when /MPPADevelopers-ab01b*/, /MPPAEthDevelopers-ab01b*/
@@ -75,7 +76,7 @@ if ENV["label"].to_s() != "" then
     when /MPPA_EMB01b_centos7-with-eth-loopback/
         valid_configs = [ "k1b-kalray-nodeos_emb01", "k1b-kalray-mos_emb01" ]
         valid_type = "remote"
-    when "fedora19-64","debian6-64","debian7-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
+    when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
         # Validate nothing.
         valid_configs = [ ]
     when "fedora17-64"
@@ -83,6 +84,7 @@ if ENV["label"].to_s() != "" then
         # Validate nothing.
         valid_configs = [ ]
     when "debian7-64"
+	configs = [ "k1b-kalray-mos_developer", "k1b-kalray-mos_konic80" ]
         # Validate nothing.
         valid_configs = [ ]
     when "centos7-64"
