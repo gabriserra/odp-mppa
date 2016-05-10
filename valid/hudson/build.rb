@@ -133,7 +133,7 @@ b.target("long-build") do
     b.logtitle = "Report for odp tests."
     cd odp_path
 
-    b.run(:cmd => "make long-install")
+    b.run(:cmd => "make long-install  CONFIGS='#{configs.join(" ")}'")
 end
 
 b.target("long") do
