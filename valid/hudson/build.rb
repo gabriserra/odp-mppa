@@ -82,6 +82,9 @@ if ENV["label"].to_s() != "" then
         configs= [ "k1b-kalray-nodeos_explorer", "k1b-kalray-mos_explorer" ]
         # Validate nothing.
         valid_configs = [ ]
+    when "debian7-64"
+        # Validate nothing.
+        valid_configs = [ ]
     when "centos7-64"
         valid_configs = "k1b-kalray-nodeos_simu", "k1b-kalray-mos_simu"
         valid_type = "sim"
