@@ -293,7 +293,14 @@ b.target("dkms") do
   cd odp_path
   b.run("rm -rf #{src_tar_name}")
 
-  mppa_pcie_ver=`rpm -qp --qf '%{VERSION}-%{RELEASE}' $K1_TOOLCHAIN_DIR/../../../k1-mppapcie-dkms-*.rpm`
+  mppa_pcie_ver=`rpm -qp --qf '%{VERSION}-%{RELEASE}' $K1_TOOLCHAIN_DIR/../../../k1-mppapcie-dkms-*.rpm`.chomp()
+  if mppa_pcie_ver.to_s() == "" then
+      mppa_pcie_ver = `dpkg-deb -f $K1_TOOLCHAIN_DIR/../../../k1-mppapcie-dkms-*.deb  Version`.chomp()
+  end
+  if mppa_pcie_ver.to_s() == "" then
+      raise("Could not extract mppapcie pacage version")
+  end
+
   depends = []
   depends.push b.depends_info_struct.new("k1-mppapcie-dkms","=", mppa_pcie_ver)
 
