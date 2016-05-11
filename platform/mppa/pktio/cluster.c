@@ -136,7 +136,7 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
 	uint8_t *payload;
 
-	odp_rpc_do_query(rpc_server_id,
+	odp_rpc_do_query(rpc_server_id + odp_rpc_get_dma_offset(cluster_id),
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
@@ -178,7 +178,7 @@ static int cluster_rpc_send_c2c_query(pkt_cluster_t *cluster)
 	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
 	uint8_t *payload;
 
-	odp_rpc_do_query(rpc_server_id,
+	odp_rpc_do_query(rpc_server_id + odp_rpc_get_dma_offset(cluster_id),
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
@@ -393,7 +393,7 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 		odp_spinlock_unlock(&g_cnoc_tx_lock);
 	}
 
-	odp_rpc_do_query(rpc_server_id,
+	odp_rpc_do_query(rpc_server_id + odp_rpc_get_dma_offset(cluster_id),
 			 odp_rpc_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
