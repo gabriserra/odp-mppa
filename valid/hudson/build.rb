@@ -84,7 +84,7 @@ if ENV["label"].to_s() != "" then
         # Validate nothing.
         valid_configs = [ ]
     when "debian7-64"
-	configs = [ "k1b-kalray-mos_developer", "k1b-kalray-mos_konic80" ]
+	    configs = [ "k1b-kalray-mos_developer", "k1b-kalray-mos_konic80" ]
         # Validate nothing.
         valid_configs = [ ]
     when "centos7-64"

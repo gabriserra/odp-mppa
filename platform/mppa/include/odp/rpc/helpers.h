@@ -33,12 +33,28 @@ static inline int ODP_RPC_FUNCTION(undensify_cluster_id)(unsigned cluster_id){
 	return cluster_id;
 }
 
-static inline int ODP_RPC_FUNCTION(get_io_dma_id)(unsigned io_id, unsigned cluster_id){
+static inline int ODP_RPC_FUNCTION(get_dma_offset)(unsigned cluster_id){
 	int dense_id = ODP_RPC_FUNCTION(densify_cluster_id)(cluster_id);
 	int dma_offset = (dense_id / 4) % 4;
 #if defined(K1B_EXPLORER)
 	dma_offset = 0;
 #endif
+	return dma_offset;
+}
+
+static inline int ODP_RPC_FUNCTION(get_tag_offset)(unsigned cluster_id){
+	int dense_id = ODP_RPC_FUNCTION(densify_cluster_id)(cluster_id);
+	int tag_offset = (dense_id / 16) * 4 + dense_id % 4;
+
+#if defined(K1B_EXPLORER)
+	/* Only DMA4 available on explorer + eth530 */
+	tag_offset = dense_id;
+#endif
+	return tag_offset;
+}
+
+static inline int ODP_RPC_FUNCTION(get_io_dma_id)(unsigned io_id, unsigned cluster_id){
+	int dma_offset = ODP_RPC_FUNCTION(get_dma_offset)(cluster_id);
 
 	switch(io_id){
 	case 0:
@@ -53,13 +69,8 @@ static inline int ODP_RPC_FUNCTION(get_io_dma_id)(unsigned io_id, unsigned clust
 }
 
 static inline int ODP_RPC_FUNCTION(get_io_tag_id)(unsigned cluster_id){
-	int dense_id = ODP_RPC_FUNCTION(densify_cluster_id)(cluster_id);
-	int tag_offset = (dense_id / 16) * 4 + dense_id % 4;
+	int tag_offset = ODP_RPC_FUNCTION(get_tag_offset)(cluster_id);
 
-#if defined(K1B_EXPLORER)
-	/* Only DMA4 available on explorer + eth530 */
-	tag_offset = dense_id;
-#endif
 	return RPC_BASE_RX + tag_offset;
 }
 
