@@ -1,4 +1,5 @@
 CONFIGS :=
+K1_CONFIGS :=
 _CONFIGS :=
 
 $(foreach FIRM, $(FIRMWARES), $(eval $(FIRM)_CONFIGS := ))
@@ -20,7 +21,7 @@ k1b-kalray-nodeos_developer_PLATFORM    := mppa
 k1b-kalray-nodeos_developer_INC_DIR     := k1-nodeos
 k1b-kalray-nodeos_developer_MAKE_VALID  := -j1
 k1b-kalray-nodeos_developer_INSTALL     := true
-CONFIGS += k1b-kalray-nodeos_developer
+K1_CONFIGS += k1b-kalray-nodeos_developer
 
 k1b-kalray-nodeos_explorer_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_explorer_CONF_OPTS   :=
@@ -40,7 +41,7 @@ k1b-kalray-nodeos_simu_PLATFORM    := mppa
 k1b-kalray-nodeos_simu_INC_DIR     := k1-nodeos
 k1b-kalray-nodeos_simu_MAKE_VALID  :=
 k1b-kalray-nodeos_simu_INSTALL     := true
-CONFIGS += k1b-kalray-nodeos_simu
+K1_CONFIGS += k1b-kalray-nodeos_simu
 
 k1b-kalray-nodeos_konic80_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_konic80_CONF_OPTS   :=
@@ -50,7 +51,7 @@ k1b-kalray-nodeos_konic80_PLATFORM    := mppa
 k1b-kalray-nodeos_konic80_INC_DIR     := k1-nodeos
 k1b-kalray-nodeos_konic80_MAKE_VALID  := -j1
 k1b-kalray-nodeos_konic80_INSTALL     := true
-CONFIGS += k1b-kalray-nodeos_konic80
+K1_CONFIGS += k1b-kalray-nodeos_konic80
 
 k1b-kalray-nodeos_emb01_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP=k1-strip
 k1b-kalray-nodeos_emb01_CONF_OPTS   :=
@@ -60,7 +61,7 @@ k1b-kalray-nodeos_emb01_PLATFORM    := mppa
 k1b-kalray-nodeos_emb01_INC_DIR     := k1-nodeos
 k1b-kalray-nodeos_emb01_MAKE_VALID  := -j1
 k1b-kalray-nodeos_emb01_INSTALL     := true
-CONFIGS += k1b-kalray-nodeos_emb01
+K1_CONFIGS += k1b-kalray-nodeos_emb01
 
 k1b-kalray-mos_developer_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_developer_CONF_OPTS   :=
@@ -72,7 +73,7 @@ k1b-kalray-mos_developer_INC_DIR     := k1-elf
 k1b-kalray-mos_developer_MAKE_VALID  := -j1
 k1b-kalray-mos_developer_INSTALL     := true
 k1b-kalray-mos_developer_INSTALL_DOC := true
-CONFIGS += k1b-kalray-mos_developer
+K1_CONFIGS += k1b-kalray-mos_developer
 
 k1b-kalray-mos_explorer_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_explorer_CONF_OPTS   :=
@@ -94,7 +95,7 @@ k1b-kalray-mos_konic80_PLATFORM    := mppa
 k1b-kalray-mos_konic80_INC_DIR     := k1-elf
 k1b-kalray-mos_konic80_MAKE_VALID  := -j1
 k1b-kalray-mos_konic80_INSTALL     := true
-CONFIGS += k1b-kalray-mos_konic80
+K1_CONFIGS += k1b-kalray-mos_konic80
 
 k1b-kalray-mos_emb01_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_emb01_CONF_OPTS   :=
@@ -105,7 +106,7 @@ k1b-kalray-mos_emb01_PLATFORM    := mppa
 k1b-kalray-mos_emb01_INC_DIR     := k1-elf
 k1b-kalray-mos_emb01_MAKE_VALID  := -j1
 k1b-kalray-mos_emb01_INSTALL     := true
-CONFIGS += k1b-kalray-mos_emb01
+K1_CONFIGS += k1b-kalray-mos_emb01
 
 k1b-kalray-mos_simu_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP=k1-strip
 k1b-kalray-mos_simu_CONF_OPTS   :=
@@ -117,10 +118,12 @@ k1b-kalray-mos_simu_PLATFORM    := mppa
 k1b-kalray-mos_simu_INC_DIR     := k1-elf
 k1b-kalray-mos_simu_MAKE_VALID  :=
 k1b-kalray-mos_simu_INSTALL     := true
-CONFIGS += k1b-kalray-mos_simu
+K1_CONFIGS += k1b-kalray-mos_simu
+
+CONFIGS += $(K1_CONFIGS)
 
 # Buid long for all BUT x86_64
-LONG_CONFIGS := $(CONFIGS)
+LONG_CONFIGS ?= $(K1_CONFIGS)
 #
 #
 #

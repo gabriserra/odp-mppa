@@ -148,7 +148,7 @@ CHECK_LIST += $(foreach FIRMWARE, $(FIRMWARES), firmware-$(FIRMWARE)-$(1))
 apps-$(1): $(foreach APP, $(APPS), app-$(APP)-$(1))
 CHECK_LIST += $(foreach APP, $(APPS), app-$(APP)-$(1))
 
-long-$(1): $(foreach CONFIG, $(LONG_CONFIGS), long-$(CONFIG)-$(1))
+long-$(1): $(foreach CONFIG, $(filter-out x86_64-unknown-linux-gnu,$(LONG_CONFIGS)), long-$(CONFIG)-$(1))
 CHECK_LIST +=  $(foreach CONFIG, $(LONG_CONFIGS), long-$(CONFIG)-$(1))
 CHECK_LIST +=  $(foreach APP, $(LONGS), $(foreach CONFIG, $(LONG_CONFIGS), long-$(CONFIG)-$(APP)-$(1)))
 
