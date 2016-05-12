@@ -80,7 +80,7 @@ doc-build:
 doc-long:
 doc-valid:
 doc-install:
-	$(MAKE) -C$(TOP_DIR)/doc-kalray install DOCDIR=$(K1ST_DIR)/doc/ODP/
+	$(MAKE) -C$(TOP_DIR)/doc-kalray install DOCDIR=$(K1ST_DIR)/share/doc/ODP/
 
 #
 # Extra rules:

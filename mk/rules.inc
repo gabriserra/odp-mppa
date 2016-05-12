@@ -5,7 +5,7 @@ define CONFIG_RULE
 #Arg1 = machine name
 cunit-$(1)-configure: $(ARCH_DIR)/cunit/$(1)/Makefile
 
-$(eval ODP_$(1)_DOC_INST := $(K1ST_DIR)/doc/ODP/$($(1)_PLATFORM))
+$(eval ODP_$(1)_DOC_INST := $(K1ST_DIR)/share/doc/ODP/$($(1)_PLATFORM))
 $(eval ODP_$(1)_OS_NAME := $(firstword $(subst _, ,$(1))))
 $(eval ODP_$(1)_BOARD_NAME := $(lastword $(subst _, ,$(1))))
 $(eval ODP_$(1)_ARCH_BUILDDIR := $(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME))
