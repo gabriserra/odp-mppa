@@ -69,10 +69,11 @@ int odp_rpc_client_get_default_server(void)
 		io_id = __k1_spawner_id() / 128 - 1;
 
 	rpc_default_server_id = odp_rpc_get_io_dma_id(io_id,
-												  __k1_get_cluster_id());
+						      __k1_get_cluster_id());
 
 	if (getenv("SYNC_IODDR_ID")) {
-		rpc_default_server_id = atoi(getenv("SYNC_IODDR_ID"));
+		rpc_default_server_id = atoi(getenv("SYNC_IODDR_ID"))
+			+ odp_rpc_get_dma_offset(__k1_get_cluster_id());
 	}
 
 	return rpc_default_server_id;

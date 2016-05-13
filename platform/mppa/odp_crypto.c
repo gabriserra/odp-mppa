@@ -930,7 +930,7 @@ odp_random_data(uint8_t *buf, int32_t len, odp_bool_t use_entropy ODP_UNUSED)
 		const unsigned int rpc_server_id =
 			odp_rpc_client_get_default_server();
 
-		odp_rpc_do_query(rpc_server_id + odp_rpc_get_dma_offset(cluster_id),
+		odp_rpc_do_query(rpc_server_id,
 				 odp_rpc_get_io_tag_id(cluster_id),
 				 &cmd, NULL);
 		int ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload,
