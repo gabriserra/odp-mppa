@@ -90,23 +90,19 @@ void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 odp_packet_t odp_packet_alloc(odp_pool_t pool_hdl, uint32_t len)
 {
 	pool_entry_t *pool = odp_pool_to_entry(pool_hdl);
-	uint32_t size = len;
+	size_t pkt_size = len ? len : pool->s.params.buf.size;
 	odp_packet_t pkt = ODP_PACKET_INVALID;
 
 	if (pool->s.params.type != ODP_POOL_PACKET)
 		return pkt;
 
-	/* Handle special case for zero-length packets */
-	if (len == 0)
-		size = pool->s.params.buf.size;
-
-	if (buffer_alloc(pool_hdl, len, (odp_buffer_hdr_t **)&pkt, 1) != 1)
+	if (buffer_alloc(pool_hdl, pkt_size, (odp_buffer_hdr_t **)&pkt, 1) != 1)
 		return ODP_PACKET_INVALID;
 
-	packet_init(pool, (odp_packet_hdr_t*)pkt, len, 0);
+	packet_init(pool, (odp_packet_hdr_t*)pkt, pkt_size, 0);
 
 	if (len == 0)
-		pull_tail(odp_packet_hdr(pkt), size);
+		pull_tail(odp_packet_hdr(pkt), pkt_size);
 
 	return pkt;
 }
