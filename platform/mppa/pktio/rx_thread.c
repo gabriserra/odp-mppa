@@ -280,8 +280,8 @@ static int _reload_rx(int th_id, int rx_id)
 		rx_hdl.tag[rx_id].pkt = ODP_PACKET_INVALID;
 	} else {
 		rx_hdl.tag[rx_id].pkt = newpkt;
-
 	}
+
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list;
 
@@ -291,6 +291,7 @@ static int _reload_rx(int th_id, int rx_id)
 		hdr_list->count++;
 		return 1 << pktio_id;
 	}
+
 	return 0;
 }
 
