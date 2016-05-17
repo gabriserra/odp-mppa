@@ -37,7 +37,7 @@ $(TEST_NAME)-multibinary := $(TEST_NAME)_multibin.mpk
 # => in 200 seconds, each will process max 100M packets
 TIMEOUT=400 # seconds
 TARGET_PERF=0.50 # *1e6 packets per second / cluster (if freq != 500MHz it is scaled accordingly)
-TARGET_COUNT=100 # *1e6 packets
+TARGET_COUNT=25 # *1e6 packets
 
 ifeq ($(board),$(BOARD_konic80))
 # see parameters in firmware/main.c
