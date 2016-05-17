@@ -172,7 +172,7 @@ static int _close_rx(rx_config_t *rx_config ODP_UNUSED, int rx_id)
 	return 0;
 }
 
-static int _reload_rx(int th_id, int rx_id)
+static uint64_t _reload_rx(int th_id, int rx_id)
 {
 	const int dma_if = 0;
 	const int pktio_id = rx_hdl.tag[rx_id].pktio_id;
@@ -290,7 +290,7 @@ static int _reload_rx(int th_id, int rx_id)
 		*(hdr_list->tail) = (odp_buffer_hdr_t *)pkt;
 		hdr_list->tail = &((odp_buffer_hdr_t *)pkt)->next;
 		hdr_list->count++;
-		return 1 << pktio_id;
+		return 1ULL << pktio_id;
 	}
 	return 0;
 }
@@ -304,7 +304,8 @@ static void _poll_masks(int th_id)
 	const rx_th_t * const th = &rx_hdl.th[th_id];
 	const int min_mask =  th->min_mask;
 	const int max_mask =  th->max_mask;
-	int if_mask = 0;
+	uint64_t if_mask = 0ULL;
+
 	for (int iter = 0; iter < N_ITER_LOCKED; ++iter) {
 
 		for (i = min_mask; i <= max_mask; ++i) {
@@ -325,10 +326,10 @@ static void _poll_masks(int th_id)
 		}
 
 		if ((iter & FLUSH_PERIOD) == FLUSH_PERIOD) {
-			int if_mask_incomplete = 0;
+			uint64_t if_mask_incomplete = 0ULL;
 			while (if_mask) {
-				i = __builtin_k1_ctz(if_mask);
-				if_mask ^= (1 << i);
+				i = __builtin_k1_ctzdl(if_mask);
+				if_mask ^= (1ULL << i);
 
 				rx_buffer_list_t * hdr_list =
 					&rx_hdl.th[th_id].ifce[i].hdr_list;
@@ -346,7 +347,7 @@ static void _poll_masks(int th_id)
 					hdr_list->tail = &hdr_list->head;
 				} else {
 					/* Not all buffers were flushed to the ring */
-					if_mask_incomplete = 1 << i;
+					if_mask_incomplete = 1ULL << i;
 				}
 
 			}
