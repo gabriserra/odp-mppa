@@ -1072,9 +1072,6 @@ uint64_t pkt_cnt = 0;
 int
 main(int argc, char *argv[])
 {
-
-    if (__k1_get_cluster_id()==0) printf("__bsp_frequency : %u\n", __bsp_frequency);
-
 	odp_atomic_init_u64(&counters.seq, 0);
 
 	odph_linux_pthread_t thread_tbl[MAX_WORKERS];
@@ -1184,6 +1181,9 @@ main(int argc, char *argv[])
 	resolve_stream_db();
 	stream_count = create_stream_db_inputs();
 
+    /* Try and make all clusters start at about the same time */
+    my_sleep(15-__k1_get_cluster_id());
+
 	/*
 	 * Create and init worker threads
 	 */
@@ -1205,17 +1205,22 @@ main(int argc, char *argv[])
         uint64_t prev = 0;
         uint64_t prevcy = 0;
         float pps = 0.0f;
-        // ref pps @ 500 Mhz 
         float ref_pps_at_500 = ref_perf;
         float freq = __bsp_frequency;
         float target_pps = ref_pps_at_500*(freq/500e6);
         float min_pps = 0.0f;
         int target_reached = 0, steady_reached = 0;
-        if (__k1_get_cluster_id()==0) printf("target_pps = %e\n", target_pps);
+
         uint64_t start = __k1_read_dsu_timestamp();
 
+        uint64_t ts_wait_end = 0;
+        float wait_end_seconds = 10.0f;
         int err = 0, end = 0;
-        while (!end) {
+
+        char status_str[10];
+        sprintf(status_str, "start");
+
+        while (1) {
             uint64_t cy = __k1_read_dsu_timestamp();
             float seconds_from_start = ((float)(cy-start))*(1.0f/freq);
             int i;
@@ -1224,44 +1229,48 @@ main(int argc, char *argv[])
                 curpkt += __builtin_k1_ldu(&pkt__[i]);
 
             pps = (float)(curpkt-prev) / ((float)(cy-prevcy)*(1.0f/freq));
-            if (!target_reached) {
+
+            if (end) {
+                if (__k1_read_dsu_timestamp()-ts_wait_end >= wait_end_seconds*freq)
+                    break;
+
+            } else if (!target_reached) {
                 if (pps >= target_pps) {
-                    //printf("%sSTATS: %10llu pkts in %12llu cycles (%7.3e pps)\n",
-                    //        __k1_get_cluster_id()<10?" ":"",
-                    //        curpkt-prev, cy-prevcy, pps);
                     target_reached = 1;
                 } else if (seconds_from_start > 30.0f) {
-                    my_sleep(15);
                     printf("Error, pps (%.6e) could not reach target (%.6e) after 30 seconds\n", pps, target_pps);
                     err = 1;
                     end = 1;
                 }
             } else if (!steady_reached) {
-                // we just waited 1 more second
-                // (actual steady perf is most likely greater than the target perf)
                 steady_reached = 1;
                 min_pps = pps*0.98; // allow pps to drop by 2% compared to max reached
                 //printf("%ssteady pps reached (%7.3e), min_pps = %7.3e\n",
                 //        __k1_get_cluster_id()<10?" ":"", pps, min_pps);
+                sprintf(status_str, "steady");
             } else {
                 if (pps < min_pps) {
-                    my_sleep(15);
                     printf("Error, pps (%.6e) below allowed minimum (%.6e)\n", pps, min_pps);
                     err = 1;
                     end = 1;
                 } else if (curpkt > pkt_cnt) {
-                    my_sleep(15);
                     end = 1;
+                }
+                if (end) {
+                    ts_wait_end = __k1_read_dsu_timestamp();
+                    sprintf(status_str, "end");
                 }
             }
 
-            if (__k1_get_cluster_id() == 9)
-                printf("%s%7.3e pps (T0+%3.0f)\n", __k1_get_cluster_id()<10?" ":"", pps, seconds_from_start);
+            if ((int)seconds_from_start%4 == 0 && __k1_get_cluster_id() == 15) {
+                    printf("%s%7.3e pps (T0+%3i) [%s]\n", __k1_get_cluster_id()<10?" ":"",
+                    pps, (int)seconds_from_start, status_str);
+            }
 
             prev= curpkt;
             prevcy = cy;
 
-            my_sleep(10);
+            my_sleep(1);
         }
 
         if (err == 1)

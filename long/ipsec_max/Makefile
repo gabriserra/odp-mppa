@@ -3,6 +3,8 @@ TEST_NAME := $(lastword $(subst /, ,$(DIR)))
 
 include $(DIR)/../Makefile
 
+cflags += . -std=gnu11 -O3 -g0
+
 pre-build-hooks := build-firmware
 clean-hooks := clean-firmware
 
@@ -21,8 +23,6 @@ clean-firmware:
 	ODP_TOOLCHAIN_DIR="$(ODP_TOOLCHAIN_DIR)" clean; else true; fi
 
 
-cflags += . -std=gnu11 -O3
-
 # use genuine apps/ipsec sources along with custom odp_ipsec.c
 $(TEST_NAME)-srcs := $(wildcard $(DIR)/ipsec/odp_ipsec_*.[ch]) $(DIR)/odp_ipsec.c
 $(TEST_NAME)-nameinmpk := odp_ipsec.kelf
@@ -33,11 +33,10 @@ $(TEST_NAME)_multibin-objs := $(cluster-bin) $(FIRMWARE_ELF)
 mppa-bin += $(TEST_NAME)_multibin
 $(TEST_NAME)-multibinary := $(TEST_NAME)_multibin.mpk
 
-# @ 500MHz, perf is ~500Kpps / cluster
-# => in 200 seconds, each will process max 100M packets
-TIMEOUT=400 # seconds
+# at 500Mhz test should take ~75 seconds for 15M packets
+TIMEOUT=150 # seconds
 TARGET_PERF=0.50 # *1e6 packets per second / cluster (if freq != 500MHz it is scaled accordingly)
-TARGET_COUNT=25 # *1e6 packets
+TARGET_COUNT=15 # *1e6 packets
 
 ifeq ($(board),$(BOARD_konic80))
 # see parameters in firmware/main.c
