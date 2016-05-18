@@ -26,6 +26,8 @@
 #define N_ITER_LOCKED 1000000 /* About once per sec */
 #define FLUSH_PERIOD 7 /* Must pe a (power of 2) - 1*/
 #define MIN_RING_SIZE (2 * PKT_BURST_SZ)
+#define BUFFER_ORDER_BITS 64
+
 typedef struct {
 	odp_packet_t pkt;
 	uint8_t broken;
@@ -176,9 +178,19 @@ static int _close_rx(rx_config_t *rx_config ODP_UNUSED, int rx_id)
  * Returns 1 if a < b
  */
 static inline int _buffer_ordered_cmp(const odp_buffer_hdr_t *a,
-				    const odp_buffer_hdr_t *b)
+				      const odp_buffer_hdr_t *b)
 {
-	return a->order < b->order;
+	if (BUFFER_ORDER_BITS == 64)
+		return a->order < b->order;
+
+	/* Order may be wrapping, check that they are not too far from each other */
+	unsigned long long diff = llabs(b->order - a->order);
+	if (diff  > (1ULL << (BUFFER_ORDER_BITS - 1))) {
+		/*  Diff is too big, the order is reversed */
+		return b->order < a->order;
+	} else {
+		return a->order < b->order;
+	}
 }
 
 static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
