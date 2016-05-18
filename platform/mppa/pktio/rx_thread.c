@@ -172,6 +172,44 @@ static int _close_rx(rx_config_t *rx_config ODP_UNUSED, int rx_id)
 	return 0;
 }
 
+static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
+			  const unsigned n_buffers)
+{
+	odp_buffer_hdr_t *sorted  = (*head);
+	odp_buffer_hdr_t **last_insertion = head;
+	odp_buffer_hdr_t *buf, *next;
+	unsigned count;
+
+	for (count = 1, buf = sorted->next; buf && count < n_buffers; count+=1, buf = next) {
+		next = buf->next;
+		if (odp_unlikely(buf->order < sorted->order)){
+			/* Remove unsorted elnt */
+			sorted->next = buf->next;
+
+			/* Out of order */
+			odp_buffer_hdr_t **prev = last_insertion;
+			odp_buffer_hdr_t *ptr = *last_insertion;
+
+			if (odp_unlikely(buf->order < ptr->order)) {
+				/* We need to be inserted before the last insertion point */
+				prev = head;
+				ptr = *head;
+			}
+			/* Find slot */
+			for(; ptr->order < buf->order; prev=&ptr->next, ptr = ptr->next){}
+			/* Insert element in its rightful place */
+			*prev = buf;
+			buf->next = ptr;
+			last_insertion = prev;
+		} else {
+			sorted = buf;
+		}
+	}
+	/* Update tail ptr */
+	*tail = &(sorted->next);
+}
+
+
 static uint64_t _reload_rx(int th_id, int rx_id)
 {
 	const int dma_if = 0;
@@ -337,11 +375,12 @@ static void _poll_masks(int th_id)
 				if (hdr_list->tail == &hdr_list->head)
 					continue;
 
+				_sort_buffers(&hdr_list->head, &hdr_list->tail,
+					      hdr_list->count);
 				hdr_list->count =
-					odp_buffer_ring_push_sort_list(&rx_hdl.ifce[i].ring,
-								       &hdr_list->head,
-								       &hdr_list->tail,
-								       hdr_list->count);
+					odp_buffer_ring_push_list(&rx_hdl.ifce[i].ring,
+								  &hdr_list->head,
+								  hdr_list->count);
 				if (!hdr_list->count) {
 					/* All were flushed */
 					hdr_list->tail = &hdr_list->head;
