@@ -32,6 +32,16 @@ int main(int argc, char **argv)
 	}
 
 	if ( __k1_get_cluster_id() == 128 ) {
+
+        float freq = __bsp_frequency;
+        float ref_pps_at_500 = atof(argv[1])*1e6;
+        float target_perf = ref_pps_at_500*(freq/500e6);
+        float target_count = atof(argv[2])*1e6;
+
+        printf("chip freq    : %.2e\n", (float)__bsp_frequency);
+        printf("target perf  : %.2e pps\n", target_perf);
+        printf("target count : %.2e pkts\n", target_count);
+
 		printf("Spawning clusters\n");
 		{
 			static char const * _argv[] = {
