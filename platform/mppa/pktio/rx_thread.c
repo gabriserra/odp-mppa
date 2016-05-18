@@ -26,7 +26,7 @@
 #define N_ITER_LOCKED 1000000 /* About once per sec */
 #define FLUSH_PERIOD 7 /* Must pe a (power of 2) - 1*/
 #define MIN_RING_SIZE (2 * PKT_BURST_SZ)
-#define BUFFER_ORDER_BITS 64
+#define BUFFER_ORDER_BITS 25
 
 typedef struct {
 	odp_packet_t pkt;
@@ -271,7 +271,9 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			 rx_config->pkt_offset);
 
-		pkt_hdr->buf_hdr.order = LOAD_U64(header->timestamp);
+		union mppa_ethernet_header_info_t info;
+		info.dword = LOAD_U64(header->info);
+		pkt_hdr->buf_hdr.order = info._.pkt_id;
 	}
 
 	typeof(mppa_dnoc[dma_if]->rx_queues[0]) * const rx_queue =
