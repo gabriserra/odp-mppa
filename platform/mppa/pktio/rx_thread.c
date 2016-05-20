@@ -108,6 +108,18 @@ typedef struct rx_thread {
 
 static rx_thread_t rx_hdl;
 
+static inline void _print_eth_header(const mppa_ethernet_header_t * _hdr)
+{
+	mppa_ethernet_header_t hdr;
+	hdr.timestamp = LOAD_U64(_hdr->timestamp);
+	hdr.info.dword = LOAD_U64(_hdr->info.dword);
+	printf("Timestamp: %llx\n\tSize: %d Hash: %d\n\tLane: %d Io: %d\n\tRule: %d Id: %d\n",
+	       hdr.timestamp,
+	       hdr.info._.pkt_size, hdr.info._.hash_key,
+	       hdr.info._.lane_id, hdr.info._.io_id,
+	       hdr.info._.rule_id, hdr.info._.pkt_id);
+}
+
 static inline int MIN(int a, int b)
 {
 	return a > b ? b : a;
