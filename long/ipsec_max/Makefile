@@ -35,7 +35,7 @@ $(TEST_NAME)-multibinary := $(TEST_NAME)_multibin.mpk
 
 # at 500Mhz test should take ~75 seconds for 15M packets
 TIMEOUT=150 # seconds
-TARGET_PERF=0.50 # *1e6 packets per second / cluster (if freq != 500MHz it is scaled accordingly)
+TARGET_PERF=0.485 # *1e6 packets per second / cluster (if freq != 500MHz it is scaled accordingly)
 TARGET_COUNT=15 # *1e6 packets
 
 ifeq ($(board),$(BOARD_konic80))

@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 	int ret;
 
     // default values
-    static char _z[] = "0.50"; // target pps at 500Mhz: z * 1e6
+    static char _z[] = "0.500"; // target pps at 500Mhz: z * 1e6
     static char _k[] = "100"; // target pkt count perf cluster : k * 1e6
 
     if (argc < 2 || argc > 3) {
