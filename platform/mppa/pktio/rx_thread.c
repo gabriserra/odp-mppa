@@ -128,11 +128,11 @@ static int _configure_rx(rx_config_t *rx_config, int rx_id)
 	rx_hdl.tag[rx_id].pkt = pkt;
 
 	int ret;
-	uint32_t len;
-	uint8_t * base_addr = packet_map(pkt_hdr, 0, &len);
 	mppa_noc_dnoc_rx_configuration_t conf = {
-		.buffer_base = (unsigned long)base_addr - rx_config->header_sz,
-		.buffer_size = len + rx_config->header_sz,
+		.buffer_base = (unsigned long)pkt_hdr->buf_hdr.addr +
+		rx_config->pkt_offset,
+		.buffer_size = pkt_hdr->buf_hdr.size -
+		1 * rx_config->header_sz,
 		.current_offset = 0,
 		.event_counter = 0,
 		.item_counter = 1,
@@ -241,7 +241,7 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 		/* Rearm the DMA Rx and check for droppped packets */
 		rx_queue->current_offset.reg = 0ULL;
 
-		rx_queue->buffer_size.dword = pkt_hdr->frame_len +
+		rx_queue->buffer_size.dword = pkt_hdr->buf_hdr.size -
 			1 * rx_config->header_sz;
 	}
 
