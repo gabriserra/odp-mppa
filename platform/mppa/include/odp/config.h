@@ -139,7 +139,7 @@ static inline int odp_config_packet_tailroom(void)
  * defined segment length (seg_len in odp_pool_param_t) will be rounded up into
  * this value.
  */
-#define ODP_CONFIG_PACKET_SEG_LEN_MIN 64
+#define ODP_CONFIG_PACKET_SEG_LEN_MIN (ODP_CONFIG_PACKET_HEADROOM + 64)
 static inline int odp_config_packet_seg_len_min(void)
 {
 	return ODP_CONFIG_PACKET_SEG_LEN_MIN;
