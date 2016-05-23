@@ -25,14 +25,14 @@ TESTS_ENVIRONMENT+= ODP_PLATFORM=${with_platform} EXEEXT=${EXEEXT} ODP_TOOLCHAIN
 bindir      = $(datarootdir)/$(subst $(top_srcdir)/,,$(srcdir))
 
 install-exec-local:
-	mkdir -p $(bindir)
+	mkdir -p $(DESTDIR)/$(bindir)
 	( echo "#!/bin/bash -ex"; \
 	  echo "export $(TESTS_ENVIRONMENT)";\
 	  echo 'cd $$(readlink -e $$(dirname $$0))';\
 	  for test in $(TESTS); do \
 		echo "$$(echo $(subst $(top_srcdir)/,,$(srcdir)) | sed -e 's/[a-zA-Z0-9]*/../g')/../../ktest-wrapper.sh $${test}"; \
-	  done) > $(bindir)/runtests.sh
-	chmod +x $(bindir)/runtests.sh
+	  done) > $(DESTDIR)/$(bindir)/runtests.sh
+	chmod +x $(DESTDIR)/$(bindir)/runtests.sh
 	( \
 	  echo '# Generated test file'; \
 	  echo 'SET(ENV{LD_LIBRARY_PATH} ../lib/host/:$$ENV{LD_LIBRARY_PATH})'; \
@@ -49,10 +49,10 @@ install-exec-local:
 		  echo 'SET_TESTS_PROPERTIES($$test_name PROPERTIES TIMEOUT "400")'; \
 		  echo 'SET_TESTS_PROPERTIES($$test_name PROPERTIES COST "0")';\
 	  done \
-	 ) > $(bindir)/CTestTestfile.cmake
+	 ) > $(DESTDIR)/$(bindir)/CTestTestfile.cmake
 	 ( \
 	   echo 'Name: odp'; \
 	   echo 'BuildName: odp'; \
 	   echo "Site: $$(hostname)" \
-	 ) > $(bindir)/DartConfiguration.tcl
+	 ) > $(DESTDIR)/$(bindir)/DartConfiguration.tcl
 
