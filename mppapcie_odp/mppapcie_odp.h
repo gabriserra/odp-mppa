@@ -45,12 +45,12 @@
 struct mpodp_if_config {
 	uint64_t c2h_ring_buf_desc_addr;	/*< MPPA2Host ring buffer address (`mpodp_ring_buff_desc`) */
 	uint64_t h2c_ring_buf_desc_addr;	/*< Host2MPPA ring buffer address (`mpodp_ring_buff_desc`) */
-	uint16_t mtu;		/*< MTU */
-	uint8_t mac_addr[MAC_ADDR_LEN];	/*< Mac address */
 	uint32_t interrupt_status;	/*< interrupt status (set by host) */
 	uint32_t flags;		/*< Flags for config (checksum offload, etc) */
 	uint32_t link_status;	/*< Link status (activity, speed, duplex, etc) */
-} __attribute__ ((packed));
+	uint16_t mtu;		/*< MTU */
+	uint8_t mac_addr[MAC_ADDR_LEN];	/*< Mac address */
+} __attribute__ ((packed, aligned(8)));
 
 /**
  * Control structure to exchange control data between host and MPPA
@@ -60,24 +60,24 @@ struct mpodp_control {
 	uint32_t magic;		/*< Magic to test presence of control structure */
 	uint32_t if_count;	/*< Count of interfaces for this PCIe device */
 	struct mpodp_if_config configs[MPODP_MAX_IF_COUNT];
-} __attribute__ ((packed));
+} __attribute__ ((packed, aligned(8)));
 
 /**
  * TX (Host2MPPA) single entry descriptor (Updated by Host)
  */
 struct mpodp_h2c_ring_buff_entry {
 	uint64_t pkt_addr;	/*< Packet Address */
-} __attribute__ ((packed));
+} __attribute__ ((packed, aligned(8)));
 
 /**
  * RX (MPPA2Host) single entry descriptor (Updated by MPPA)
  */
 struct mpodp_c2h_ring_buff_entry {
-	uint16_t len;		/*< Packet length */
-	uint16_t status;	/*< Packet status (errors, etc) */
 	uint64_t pkt_addr;	/*< Packet Address */
 	uint64_t data;		/*< Data for MPPA use */
-} __attribute__ ((packed));
+	uint16_t len;		/*< Packet length */
+	uint16_t status;	/*< Packet status (errors, etc) */
+} __attribute__ ((packed, aligned(8)));
 
 /**
  * Ring buffer descriptors
@@ -97,11 +97,11 @@ struct mpodp_c2h_ring_buff_entry {
  * the head and tail belongs to the Host in order to receive them.
  */
 struct mpodp_ring_buff_desc {
+	uint64_t ring_buffer_entries_addr;	/*< Pointer to ring buffer entries depending on RX or TX */
 	uint32_t head;		/*< Index of head */
 	uint32_t tail;		/*< Index of tail */
 	uint32_t ring_buffer_entries_count;	/*< Count of ring buffer entries */
-	uint64_t ring_buffer_entries_addr;	/*< Pointer to ring buffer entries depending on RX or TX */
-} __attribute__ ((packed));
+} __attribute__ ((packed, aligned(8)));
 
 /**
  * Header added to packet when needed (fifo mode for instance)
