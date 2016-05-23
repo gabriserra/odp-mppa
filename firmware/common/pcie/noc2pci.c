@@ -26,7 +26,7 @@ void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
 static uint64_t pkt_count[MPPA_PCIE_ETH_IF_MAX] = {0};
 static void poll_noc_rx_buffer(int pcie_eth_if)
 {
-	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_COUNT], *buf;
+	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST], *buf;
 	uint32_t left, pkt_size;
 	int ret, buf_idx;
 	void * pkt_addr;
@@ -41,7 +41,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 	}
 
 	nb_bufs = buffer_ring_get_multi(&g_full_buf_pool[pcie_eth_if], bufs,
-								MPPA_PCIE_MULTIBUF_COUNT, &left);
+					MPPA_PCIE_MULTIBUF_BURST, &left);
 	if (nb_bufs == 0)
 		return;
 	assert(ret <= MPPA_PCIE_MULTIBUF_COUNT);

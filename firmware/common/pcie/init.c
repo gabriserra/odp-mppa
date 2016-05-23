@@ -38,12 +38,13 @@ static void *g_pkt_base_addr = (void *) DDR_BUFFER_BASE_ADDR;
 static int pcie_init_buff_pools()
 {
 	mppa_pcie_noc_rx_buf_t **buf_pool;
-	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_COUNT];
+	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST];
 	int i;
+	int j = 0;
 	uint32_t buf_left;
 
-	buf_pool = calloc(MPPA_PCIE_MULTIBUF_COUNT * BUF_POOL_COUNT
-					  , sizeof(mppa_pcie_noc_rx_buf_t *));
+	buf_pool = calloc(MPPA_PCIE_MULTIBUF_COUNT * BUF_POOL_COUNT,
+			  sizeof(mppa_pcie_noc_rx_buf_t *));
 	if (!buf_pool) {
 		fprintf(stderr, "Failed to alloc pool descriptor\n");
 		return 1;
@@ -55,16 +56,18 @@ static int pcie_init_buff_pools()
 		buffer_ring_init(&g_full_buf_pool[i], buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
 	}
 
-	for (i = 0; i < MPPA_PCIE_MULTIBUF_COUNT; i++) {
-		bufs[i] = (mppa_pcie_noc_rx_buf_t *) g_pkt_base_addr;
-		g_pkt_base_addr += sizeof(mppa_pcie_noc_rx_buf_t);
+	for (i = 0; i < MPPA_PCIE_MULTIBUF_COUNT; i+= j) {
+		for (j = 0; j < MPPA_PCIE_MULTIBUF_BURST && i + j < MPPA_PCIE_MULTIBUF_COUNT; ++j){
+			bufs[j] = (mppa_pcie_noc_rx_buf_t *) g_pkt_base_addr;
+			g_pkt_base_addr += sizeof(mppa_pcie_noc_rx_buf_t);
 
-		bufs[i]->buf_addr = (void *) g_pkt_base_addr;
-		bufs[i]->pkt_count = 0;
-		g_pkt_base_addr += MPPA_PCIE_MULTIBUF_SIZE;
+			bufs[j]->buf_addr = (void *) g_pkt_base_addr;
+			bufs[j]->pkt_count = 0;
+			g_pkt_base_addr += MPPA_PCIE_MULTIBUF_SIZE;
+		}
+		buffer_ring_push_multi(&g_free_buf_pool, bufs, j, &buf_left);
 	}
 
-	buffer_ring_push_multi(&g_free_buf_pool, bufs, MPPA_PCIE_MULTIBUF_COUNT, &buf_left);
 	dbg_printf("Allocation done\n");
 	return 0;
 }
