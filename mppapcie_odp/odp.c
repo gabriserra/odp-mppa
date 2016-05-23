@@ -208,7 +208,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	filter.wanted_device = mppa_pcie_get_dma_device(pdata);
 
 	mppa_pcie_get_id(pdata, &mppa_id);
-	snprintf(name, 64, "mppa%d.%d.%d.%d", mppa_id.board_id,
+	snprintf(name, 64, "modp%d.%d.%d.%d", mppa_id.board_id,
 		 mppa_id.chip_id, mppa_id.ioddr_id, id);
 
 	/* alloc netdev */

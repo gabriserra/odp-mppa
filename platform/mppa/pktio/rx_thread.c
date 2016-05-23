@@ -26,6 +26,8 @@
 #define N_ITER_LOCKED 1000000 /* About once per sec */
 #define FLUSH_PERIOD 7 /* Must pe a (power of 2) - 1*/
 #define MIN_RING_SIZE (2 * PKT_BURST_SZ)
+#define BUFFER_ORDER_BITS 25
+
 typedef struct {
 	odp_packet_t pkt;
 	uint8_t broken;
@@ -106,6 +108,18 @@ typedef struct rx_thread {
 
 static rx_thread_t rx_hdl;
 
+static inline void _print_eth_header(const mppa_ethernet_header_t * _hdr)
+{
+	mppa_ethernet_header_t hdr;
+	hdr.timestamp = LOAD_U64(_hdr->timestamp);
+	hdr.info.dword = LOAD_U64(_hdr->info.dword);
+	printf("Timestamp: %llx\n\tSize: %d Hash: %d\n\tLane: %d Io: %d\n\tRule: %d Id: %d\n",
+	       hdr.timestamp,
+	       hdr.info._.pkt_size, hdr.info._.hash_key,
+	       hdr.info._.lane_id, hdr.info._.io_id,
+	       hdr.info._.rule_id, hdr.info._.pkt_id);
+}
+
 static inline int MIN(int a, int b)
 {
 	return a > b ? b : a;
@@ -128,11 +142,11 @@ static int _configure_rx(rx_config_t *rx_config, int rx_id)
 	rx_hdl.tag[rx_id].pkt = pkt;
 
 	int ret;
-	uint32_t len;
-	uint8_t * base_addr = packet_map(pkt_hdr, 0, &len);
 	mppa_noc_dnoc_rx_configuration_t conf = {
-		.buffer_base = (unsigned long)base_addr - rx_config->header_sz,
-		.buffer_size = len + rx_config->header_sz,
+		.buffer_base = (unsigned long)pkt_hdr->buf_hdr.addr +
+		rx_config->pkt_offset,
+		.buffer_size = pkt_hdr->buf_hdr.size -
+		1 * rx_config->header_sz,
 		.current_offset = 0,
 		.event_counter = 0,
 		.item_counter = 1,
@@ -171,6 +185,63 @@ static int _close_rx(rx_config_t *rx_config ODP_UNUSED, int rx_id)
 
 	return 0;
 }
+
+/*
+ * Returns 1 if a < b
+ */
+static inline int _buffer_ordered_cmp(const odp_buffer_hdr_t *a,
+				      const odp_buffer_hdr_t *b)
+{
+	if (BUFFER_ORDER_BITS == 64)
+		return a->order < b->order;
+
+	/* Order may be wrapping, check that they are not too far from each other */
+	unsigned long long diff = llabs(b->order - a->order);
+	if (diff  > (1ULL << (BUFFER_ORDER_BITS - 1))) {
+		/*  Diff is too big, the order is reversed */
+		return b->order < a->order;
+	} else {
+		return a->order < b->order;
+	}
+}
+
+static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
+			  const unsigned n_buffers)
+{
+	odp_buffer_hdr_t *sorted  = (*head);
+	odp_buffer_hdr_t **last_insertion = head;
+	odp_buffer_hdr_t *buf, *next;
+	unsigned count;
+
+	for (count = 1, buf = sorted->next; buf && count < n_buffers; count+=1, buf = next) {
+		next = buf->next;
+		if (odp_unlikely(_buffer_ordered_cmp(buf, sorted))){
+			/* Remove unsorted elnt */
+			sorted->next = buf->next;
+
+			/* Out of order */
+			odp_buffer_hdr_t **prev = last_insertion;
+			odp_buffer_hdr_t *ptr = *last_insertion;
+
+			if (odp_unlikely(_buffer_ordered_cmp(buf, ptr))) {
+				/* We need to be inserted before the last insertion point */
+				prev = head;
+				ptr = *head;
+			}
+			/* Find slot */
+			for(; ptr && _buffer_ordered_cmp(ptr, buf); prev=&ptr->next, ptr = ptr->next){}
+			/* Insert element in its rightful place */
+			*prev = buf;
+			buf->next = ptr;
+			last_insertion = prev;
+		} else {
+			sorted = buf;
+		}
+	}
+	/* Update tail ptr */
+	*tail = &(sorted->next);
+}
+
 
 static uint64_t _reload_rx(int th_id, int rx_id)
 {
@@ -212,7 +283,9 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			 rx_config->pkt_offset);
 
-		pkt_hdr->buf_hdr.order = LOAD_U64(header->timestamp);
+		union mppa_ethernet_header_info_t info;
+		info.dword = LOAD_U64(header->info);
+		pkt_hdr->buf_hdr.order = info._.pkt_id;
 	}
 
 	typeof(mppa_dnoc[dma_if]->rx_queues[0]) * const rx_queue =
@@ -241,7 +314,7 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 		/* Rearm the DMA Rx and check for droppped packets */
 		rx_queue->current_offset.reg = 0ULL;
 
-		rx_queue->buffer_size.dword = pkt_hdr->frame_len +
+		rx_queue->buffer_size.dword = pkt_hdr->buf_hdr.size -
 			1 * rx_config->header_sz;
 	}
 
@@ -337,11 +410,15 @@ static void _poll_masks(int th_id)
 				if (hdr_list->tail == &hdr_list->head)
 					continue;
 
+				/* Do not sort if there is more than 1 rx thread.
+				 * order will be broken anyway */
+				if(odp_global_data.n_rx_thr == 1)
+					_sort_buffers(&hdr_list->head, &hdr_list->tail,
+						      hdr_list->count);
 				hdr_list->count =
-					odp_buffer_ring_push_sort_list(&rx_hdl.ifce[i].ring,
-								       &hdr_list->head,
-								       &hdr_list->tail,
-								       hdr_list->count);
+					odp_buffer_ring_push_list(&rx_hdl.ifce[i].ring,
+								  &hdr_list->head,
+								  hdr_list->count);
 				if (!hdr_list->count) {
 					/* All were flushed */
 					hdr_list->tail = &hdr_list->head;

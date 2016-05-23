@@ -111,52 +111,15 @@ void odp_buffer_ring_push_multi(odp_buffer_ring_t *ring,
 	}
 }
 
-unsigned odp_buffer_ring_push_sort_list(odp_buffer_ring_t *ring,
-					odp_buffer_hdr_t **head,
-					odp_buffer_hdr_t ***tail,
-					unsigned n_buffers)
+unsigned odp_buffer_ring_push_list(odp_buffer_ring_t *ring,
+				   odp_buffer_hdr_t **head,
+				   unsigned n_buffers)
 {
 	const unsigned total_bufs = n_buffers;
 	uint32_t prod_head, prod_next, cons_tail;
 
 	if (!total_bufs)
 		return 0;
-
-	/* Sort the list first */
-	{
-		odp_buffer_hdr_t *sorted  = (*head);
-		odp_buffer_hdr_t **last_insertion = head;
-		odp_buffer_hdr_t *buf, *next;
-		unsigned count;
-
-		for (count = 1, buf = sorted->next; buf && count < total_bufs; count+=1, buf = next) {
-			next = buf->next;
-			if (odp_unlikely(buf->order < sorted->order)){
-				/* Remove unsorted elnt */
-				sorted->next = buf->next;
-
-				/* Out of order */
-				odp_buffer_hdr_t **prev = last_insertion;
-				odp_buffer_hdr_t *ptr = *last_insertion;
-
-				if (odp_unlikely(buf->order < ptr->order)) {
-					/* We need to be inserted before the last insertion point */
-					prev = head;
-					ptr = *head;
-				}
-				/* Find slot */
-				for(; ptr->order < buf->order; prev=&ptr->next, ptr = ptr->next){}
-				/* Insert element in its rightful place */
-				*prev = buf;
-				buf->next = ptr;
-				last_insertion = prev;
-			} else {
-				sorted = buf;
-			}
-		}
-		/* Update tail ptr */
-		*tail = &(sorted->next);
-	}
 
 	do {
 		n_buffers = total_bufs;
