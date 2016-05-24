@@ -66,7 +66,7 @@ mppa-bin =
 cluster-bin :=
 cluster-tests :=
 mppa-tests :=
-sim-runner-opts := --mboard=developer --march=bostan
+sim-runner-opts := --mboard=developer 
 
 build: all
 
