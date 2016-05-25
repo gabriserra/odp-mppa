@@ -156,6 +156,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			hdr = (mppa_ethernet_header_t*) base_addr;
 
 			hdr->timestamp = 4 * head + i;
+			hdr->info._.pkt_id = 4 * head + i;
 			hdr->info.dword = 0ULL;
 			hdr->info._.pkt_size = len;
 			/* Add the packet end marker */
@@ -247,6 +248,7 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 			hdr = (mppa_ethernet_header_t*) base_addr;
 
 			hdr->timestamp = 8 * head + i;
+			hdr->info._.pkt_id = 8 * head + i;
 			hdr->info.dword = 0ULL;
 			hdr->info._.pkt_size = len;
 			/* Add the packet end marker */
