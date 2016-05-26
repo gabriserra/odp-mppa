@@ -157,10 +157,10 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 	tx_credit->cnoc_tx = pcie_get_cnoc_tx_tag(if_id);
 
 	tx_credit->credit = MPPA_PCIE_NOC_RX_NB;
-	tx_credit->remote_cnoc_rx = open_cmd.cnoc_rx;
+	tx_credit->header._.tag = tx_credit->remote_cnoc_rx = open_cmd.cnoc_rx;
 	rret = mppa_routing_get_cnoc_unicast_route(odp_rpc_get_cluster_id(if_id),
-											   remoteClus, &tx_credit->config,
-											   &tx_credit->header);
+						   remoteClus, &tx_credit->config,
+						   &tx_credit->header);
 	assert(rret == 0);
 
 	ret = mppa_noc_cnoc_tx_configure(if_id,
