@@ -120,6 +120,7 @@ static int mpodp_open(struct net_device *netdev)
 	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
 	if (atomic_read(&priv->tx_head) != 0) {
+		mpodp_tx_update_cache(priv);
 		netif_carrier_on(netdev);
 	} else {
 		netif_carrier_off(netdev);
