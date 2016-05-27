@@ -96,7 +96,7 @@ int pcie_init(int if_count)
 		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_control.configs[i].c2h_ring_buf_desc_addr;
 	}
 
-	netdev_start();
+	__k1_mb();
 
 	for (int i = 0; i < BSP_NB_DMA_IO_MAX; i++) {
 		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_TX);
