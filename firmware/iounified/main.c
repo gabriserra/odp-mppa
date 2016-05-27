@@ -19,6 +19,11 @@ int main (int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	if (ret != 0) {
+		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
+		exit(1);
+	}
 	boot_clusters(argc, argv);
 
 	if ((ret = join_clusters(&status)) != 0) {
