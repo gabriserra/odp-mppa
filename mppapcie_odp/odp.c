@@ -165,6 +165,9 @@ static void mpodp_remove(struct net_device *netdev)
 	int chanidx;
 
 
+	if (priv->tx_timer.function)
+		del_timer_sync(&priv->tx_timer);
+
 	/* unregister */
 	unregister_netdev(netdev);
 
@@ -178,9 +181,6 @@ static void mpodp_remove(struct net_device *netdev)
 	kfree(priv->rx_ring);
 	mppa_pcie_time_destroy(priv->tx_time);
 	netif_napi_del(&priv->napi);
-
-	if (priv->tx_timer.function)
-		del_timer_sync(&priv->tx_timer);
 
 	free_netdev(netdev);
 }
