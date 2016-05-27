@@ -342,13 +342,8 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	return NETDEV_TX_BUSY;
 }
 
-void mpodp_tx_timer_cb(unsigned long data)
+void mpodp_tx_update_cache(struct mpodp_if_priv *priv)
 {
-	struct mpodp_if_priv *priv = (struct mpodp_if_priv *) data;
-	unsigned long worked = 0;
-
-	worked = mpodp_clean_tx(priv, MPODP_MAX_TX_RECLAIM);
-
 	/* check for new descriptors */
 	if (atomic_read(&priv->tx_head) != 0 &&
 	    priv->tx_cached_head != priv->tx_size) {
@@ -367,6 +362,16 @@ void mpodp_tx_timer_cb(unsigned long data)
 			priv->tx_cached_head++;
 		}
 	}
+}
+
+void mpodp_tx_timer_cb(unsigned long data)
+{
+	struct mpodp_if_priv *priv = (struct mpodp_if_priv *) data;
+	unsigned long worked = 0;
+
+	worked = mpodp_clean_tx(priv, MPODP_MAX_TX_RECLAIM);
+
+	mpodp_tx_update_cache(priv);
 
 	mod_timer(&priv->tx_timer, jiffies +
 		  (worked < MPODP_MAX_TX_RECLAIM ?
