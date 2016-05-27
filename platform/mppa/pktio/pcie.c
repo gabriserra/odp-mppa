@@ -253,7 +253,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
 	assert(ret >= 0);
-	pcie->local_credit = 0;
+	pcie->pkt_count = 0;
 	__k1_wmb();
 
 	ret = pcie_rpc_send_pcie_open(pcie);
@@ -400,15 +400,43 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 	tx_uc_ctx_t *ctx = pcie_get_ctx(pcie);
 
-	uint64_t local_credit = __builtin_k1_afdau((int64_t*)&pcie->local_credit, 1);
+	odp_spinlock_lock(&pcie->wlock);
+	INVALIDATE(pcie);
 
-	pkt_tx_uc_config tx_config = pcie->tx_config;
-	tx_config.header._.tag = pcie->min_tx_tag + ( local_credit % pcie->nb_tx_tags );
+	uint64_t credit = mppa_noc_cnoc_rx_get_value(0, pcie->cnoc_rx) -
+		pcie->pkt_count;
 
-	while (local_credit >= mppa_noc_cnoc_rx_get_value(0, pcie->cnoc_rx) );
+	if (credit * MAX_PKT_PER_UC  < len)
+		len = credit * MAX_PKT_PER_UC ;
 
-	return tx_uc_send_aligned_packets(&tx_config, ctx,
-					  pkt_table, len, PKTIO_PKT_MTU);
+	int sent = 0;
+
+	while (len > 0) {
+		int count = len > MAX_PKT_PER_UC ? MAX_PKT_PER_UC : len;
+		int ret = tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
+						     pkt_table, count, pcie->mtu);
+		if (ret < 0){
+			if (sent) {
+				__odp_errno = 0;
+				break;
+			}
+			odp_spinlock_unlock(&pcie->wlock);
+			return ret;
+		}
+
+		len -= count;
+
+		pcie->tx_config.header._.tag += 1;
+		if (pcie->tx_config.header._.tag > pcie->max_tx_tag)
+			pcie->tx_config.header._.tag = pcie->min_tx_tag;
+
+		sent += ret;
+	}
+
+	pcie->pkt_count += sent;
+	odp_spinlock_unlock(&pcie->wlock);
+
+	return sent;
 }
 
 static int pcie_promisc_mode_set(pktio_entry_t *const pktio_entry ODP_UNUSED,

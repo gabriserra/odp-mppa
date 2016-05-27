@@ -13,6 +13,12 @@ int main (int argc, char *argv[])
 
 	int ret, status;
 
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	if (ret != 0) {
+		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
+		exit(1);
+	}
+
 	ret = odp_rpc_server_start();
 	if (ret) {
 		fprintf(stderr, "[RPC] Error: Failed to start server\n");

@@ -120,6 +120,7 @@ static int mpodp_open(struct net_device *netdev)
 	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
 	if (atomic_read(&priv->tx_head) != 0) {
+		mpodp_tx_update_cache(priv);
 		netif_carrier_on(netdev);
 	} else {
 		netif_carrier_off(netdev);
@@ -165,6 +166,9 @@ static void mpodp_remove(struct net_device *netdev)
 	int chanidx;
 
 
+	if (priv->tx_timer.function)
+		del_timer_sync(&priv->tx_timer);
+
 	/* unregister */
 	unregister_netdev(netdev);
 
@@ -178,9 +182,6 @@ static void mpodp_remove(struct net_device *netdev)
 	kfree(priv->rx_ring);
 	mppa_pcie_time_destroy(priv->tx_time);
 	netif_napi_del(&priv->napi);
-
-	if (priv->tx_timer.function)
-		del_timer_sync(&priv->tx_timer);
 
 	free_netdev(netdev);
 }

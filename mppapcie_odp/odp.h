@@ -129,6 +129,7 @@ struct mpodp_pdata_priv {
 netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 			     struct net_device *netdev);
 void mpodp_tx_timeout(struct net_device *netdev);
+void mpodp_tx_update_cache(struct mpodp_if_priv *priv);
 void mpodp_tx_timer_cb(unsigned long data);
 int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget);
 

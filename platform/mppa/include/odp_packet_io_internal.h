@@ -135,7 +135,7 @@ typedef struct {
 					 *   to Eth Egress */
 	uint16_t cnoc_rx;               /**< Cnoc RX port for cluster -> host
 					 *   flow control */
-	uint64_t local_credit;          /**< Flow control credit for cluster
+	uint64_t pkt_count;             /**< Flow control credit for cluster
 					 *   -> host */
 
 	pkt_tx_uc_config tx_config;
