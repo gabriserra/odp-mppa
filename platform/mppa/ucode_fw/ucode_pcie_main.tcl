@@ -8,7 +8,13 @@ dma_write_bundle
 
 ## Test if we must send 64 bits elements or not.
 dma_decr dcnt0
-dma_bez dcnt0 skip_label${POINTER}
+if { $i == 0 } {
+    # If the first packet is 0, skip to the end WITHOUT and EOT
+    dma_bez dcnt0 no_data
+} {
+    # For other packets, skip to the end WITH and EOT
+    dma_bez dcnt0 end_of_data
+}
 dma_write_bundle
 
 ## Send 64 bits elements

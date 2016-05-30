@@ -410,6 +410,7 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		len = credit * MAX_PKT_PER_UC ;
 
 	int sent = 0;
+	int uc_sent = 0;
 
 	while (len > 0) {
 		int count = len > MAX_PKT_PER_UC ? MAX_PKT_PER_UC : len;
@@ -431,9 +432,10 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 			pcie->tx_config.header._.tag = pcie->min_tx_tag;
 
 		sent += ret;
+		uc_sent += 1;
 	}
 
-	pcie->pkt_count += sent;
+	pcie->pkt_count += uc_sent;
 	odp_spinlock_unlock(&pcie->wlock);
 
 	return sent;
