@@ -28,7 +28,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 {
 	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST], *buf;
 	uint32_t left, pkt_size;
-	int ret, buf_idx;
+	int ret = 0, buf_idx;
 	void * pkt_addr;
 	union mpodp_pkt_hdr_info info;
 	struct mpodp_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
