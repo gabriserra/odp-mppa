@@ -21,6 +21,9 @@ case "$RUN_TARGET" in
 	    "konic80")
 		FIRMWARES="--exec-file IODDR0:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/konic80/k1b/iounified.kelf --exec-file IODDR1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/konic80/k1b/iounified.kelf "
 		;;
+	    "ab04")
+		FIRMWARES="--exec-file IODDR0:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/ab04/k1b/iounified.kelf --exec-file IODDR1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/ab04/k1b/iounified.kelf "
+		;;
 	    "emb01")
 		FIRMWARES="--exec-file IODDR0:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/emb01/k1b/iounified.kelf --exec-file IODDR1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/emb01/k1b/iounified.kelf "
 		;;

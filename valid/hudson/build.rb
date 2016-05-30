@@ -89,8 +89,8 @@ if ENV["label"].to_s() != "" then
         valid_configs = [ "k1b-kalray-mos_emb01" ]
         valid_type = "remote"
     when /MPPA_AB04_Developers-with-loopback/
-	b.run("	echo 'SKIP'");
-	b.log.finish(b.current_target)
+        valid_configs = [ "k1b-kalray-mos_ab04" ]
+        valid_type = "jtag"
     when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
         # Validate nothing.
         valid_configs = [ ]
