@@ -453,24 +453,19 @@ static void update_lut(unsigned if_id)
 
 
 	}
-	int chunks[nb_registered];
+	// dispatch hash lut between registered clusters
 
-	for ( int j = 0; j < nb_registered; ++j ) {
-		chunks[j] = MPPABETHLB_LUT_ARRAY_SIZE / nb_registered +
-			( ( j < ( MPPABETHLB_LUT_ARRAY_SIZE % nb_registered ) ) ? 1 : 0 );
-	}
-
-	for ( int i = 0, j = 0; i < MPPABETHLB_LUT_ARRAY_SIZE ; i+= chunks[j], j++ ) {
-		int registered_cluster = __k1_ctz(clusters);
-		clusters &= ~(1 << registered_cluster);
-		int tx_id = status[eth_if].cluster[registered_cluster].txId;
-		int noc_if = status[eth_if].cluster[registered_cluster].nocIf;
+	for ( int cluster_nb = 0; cluster_nb < nb_registered; ++ cluster_nb ) {
+		int cluster_id = __k1_ctz(clusters);
+		clusters &= ~(1 << cluster_id);
+		int tx_id = status[eth_if].cluster[cluster_id].txId;
+		int noc_if = status[eth_if].cluster[cluster_id].nocIf;
 #ifdef VERBOSE
-		printf("config lut[%3d-%3d] -> C%2d: %d %d %d %d\n",
-			   i, i + chunks[j] - 1, registered_cluster,
-			   eth_if, tx_id, ETH_DEFAULT_CTX, noc_if - 4);
+		printf("config lut[%02d, +=%02d] -> C%2d: %d %d %d %d\n",
+			   cluster_nb, nb_registered, cluster_id,
+			   eth_if, tx_id, ETH_DEFAULT_CTX, noc_if - ETH_BASE_TX);
 #endif
-		for ( int lut_id = i; lut_id < i + chunks[j] ; ++lut_id ) {
+		for ( int lut_id = cluster_nb; lut_id < MPPABETHLB_LUT_ARRAY_SIZE; lut_id+=nb_registered ) {
 			mppabeth_lb_cfg_luts((void *) &(mppa_ethernet[0]->lb),
 								 eth_if, lut_id, tx_id,
 								 ETH_DEFAULT_CTX,
