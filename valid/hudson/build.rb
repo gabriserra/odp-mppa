@@ -73,7 +73,7 @@ if ENV["label"].to_s() != "" then
         valid_configs = [ "k1b-kalray-nodeos_konic80", "k1b-kalray-mos_konic80" ]
         valid_type = "jtag"
     when /MPPA_EMB01b_centos7-with-eth-loopback/
-        valid_configs = [ "k1b-kalray-nodeos_emb01", "k1b-kalray-mos_emb01" ]
+        valid_configs = [ "k1b-kalray-mos_emb01" ]
         valid_type = "remote"
     when "debian7-64"
 	b.run("	echo 'SKIP'");
