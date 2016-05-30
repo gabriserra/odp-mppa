@@ -511,6 +511,8 @@ static int cluster_send(pktio_entry_t *const pktio_entry,
 	pkt_cluster_t *pkt_cluster = &pktio_entry->s.pkt_cluster;
 
 	odp_spinlock_lock(&pkt_cluster->wlock);
+	INVALIDATE(pkt_cluster);
+
 	if (pkt_cluster->remote.min_rx < 0) {
 		/* We need to sync with the target first */
 		if (cluster_rpc_send_c2c_query(pkt_cluster)){

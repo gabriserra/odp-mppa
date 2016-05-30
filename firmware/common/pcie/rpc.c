@@ -6,6 +6,7 @@
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"
+#include "netdev.h"
 #include "noc2pci.h"
 
 struct mppa_pcie_eth_dnoc_tx_cfg g_mppa_pcie_tx_cfg[BSP_NB_IOCLUSTER_MAX][BSP_DNOC_TX_PACKETSHAPER_NB_MAX] = {{{0}}};
@@ -20,6 +21,7 @@ buffer_ring_t g_free_buf_pool;
  */
 buffer_ring_t g_full_buf_pool[MPODP_MAX_IF_COUNT];
 
+static int netdev_initialized = 0;
 
 static int pcie_setup_tx(unsigned int iface_id, unsigned int *tx_id,
 			 unsigned int cluster_id, unsigned int min_rx,
@@ -106,6 +108,13 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 	unsigned int tx_id;
 
 	dbg_printf("Received request to open PCIe\n");
+	if (!netdev_initialized) {
+		if (netdev_start()){
+			PCIE_RPC_ERR_MSG(answer, "Failed to initialize netdevs\n");
+			return;
+		}
+		netdev_initialized = 1;
+	}
 	int ret = pcie_setup_tx(if_id, &tx_id, remoteClus,
 							open_cmd.min_rx, open_cmd.max_rx);
 	if (ret) {
@@ -157,10 +166,10 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 	tx_credit->cnoc_tx = pcie_get_cnoc_tx_tag(if_id);
 
 	tx_credit->credit = MPPA_PCIE_NOC_RX_NB;
-	tx_credit->remote_cnoc_rx = open_cmd.cnoc_rx;
+	tx_credit->header._.tag = tx_credit->remote_cnoc_rx = open_cmd.cnoc_rx;
 	rret = mppa_routing_get_cnoc_unicast_route(odp_rpc_get_cluster_id(if_id),
-											   remoteClus, &tx_credit->config,
-											   &tx_credit->header);
+						   remoteClus, &tx_credit->config,
+						   &tx_credit->header);
 	assert(rret == 0);
 
 	ret = mppa_noc_cnoc_tx_configure(if_id,

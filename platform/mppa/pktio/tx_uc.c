@@ -157,6 +157,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 
 			hdr->timestamp = 4 * head + i;
 			hdr->info.dword = 0ULL;
+			hdr->info._.pkt_id = 4 * head + i;
 			hdr->info._.pkt_size = len;
 			/* Add the packet end marker */
 			if (tx_config->add_end_marker && i == (pkt_count - 1))
@@ -248,6 +249,7 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 
 			hdr->timestamp = 8 * head + i;
 			hdr->info.dword = 0ULL;
+			hdr->info._.pkt_id = 8 * head + i;
 			hdr->info._.pkt_size = len;
 			/* Add the packet end marker */
 			if (tx_config->add_end_marker && i == (pkt_count - 1))
