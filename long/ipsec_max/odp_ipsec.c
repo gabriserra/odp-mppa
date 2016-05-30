@@ -808,6 +808,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
     /* sender threads */
     if ( 0
             ||thr==2
+            //||thr==6
             ||thr==8
        ) {
         //if (__k1_get_cluster_id() == 2)
@@ -841,6 +842,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
     if ( 0
             ||thr==4
             ||thr==10
+            //||thr==12
        )
     {
         //if (__k1_get_cluster_id() == 2)
@@ -1202,6 +1204,8 @@ main(int argc, char *argv[])
         } while (!done);
         printf("All received\n");
     } else {
+        int lapse = 0;
+        my_sleep(__k1_get_cluster_id()*lapse);
         uint64_t prev = 0;
         uint64_t prevcy = 0;
         float pps = 0.0f;
@@ -1262,7 +1266,12 @@ main(int argc, char *argv[])
                 }
             }
 
-            if ((int)seconds_from_start%4 == 0 && __k1_get_cluster_id() == 15) {
+#if 1
+            if ((int)seconds_from_start%4 == 0 && __k1_get_cluster_id() == 15)
+#else
+            if ((int)seconds_from_start%(16*lapse) == 0)
+#endif
+            {
                     printf("%s%7.3e pps (T0+%3i) [%s]\n", __k1_get_cluster_id()<10?" ":"",
                     pps, (int)seconds_from_start, status_str);
             }
