@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 	int ret;
 
     // default values
-    static char _z[] = "0.500"; // target pps at 500Mhz: z * 1e6
+    static char _z[] = "0.30"; // target pps at 500Mhz: z * 1e6
     static char _k[] = "100"; // target pkt count perf cluster : k * 1e6
 
     if (argc < 2 || argc > 3) {
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 				"odp_ipsec.kelf",
                 "-z", _z,
                 "-k", _k,
-#if 1
+#if 0
 				"-i", "e0:loop,e1:loop",
 #else
 				"-i", "e0,e1",
