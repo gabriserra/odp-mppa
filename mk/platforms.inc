@@ -57,6 +57,16 @@ k1b-kalray-nodeos_konic80_INSTALL     := true
 k1b-kalray-nodeos_konic80_VALID_TYPE  := jtag
 K1_CONFIGS += k1b-kalray-nodeos_konic80
 
+k1b-kalray-nodeos_ab04_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
+k1b-kalray-nodeos_ab04_CONF_OPTS   :=
+k1b-kalray-nodeos_ab04_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=ab04
+k1b-kalray-nodeos_ab04_LDFLAGS     :=
+k1b-kalray-nodeos_ab04_PLATFORM    := mppa
+k1b-kalray-nodeos_ab04_INC_DIR     := k1-nodeos
+k1b-kalray-nodeos_ab04_MAKE_VALID  := -j1
+k1b-kalray-nodeos_ab04_INSTALL     := true
+K1_CONFIGS += k1b-kalray-nodeos_ab04
+
 k1b-kalray-nodeos_emb01_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
 k1b-kalray-nodeos_emb01_CONF_OPTS   :=
 k1b-kalray-nodeos_emb01_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=emb01
@@ -104,6 +114,17 @@ k1b-kalray-mos_konic80_MAKE_VALID  := -j1
 k1b-kalray-mos_konic80_INSTALL     := true
 k1b-kalray-mos_konic80_VALID_TYPE  := jtag
 K1_CONFIGS += k1b-kalray-mos_konic80
+
+k1b-kalray-mos_ab04_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
+k1b-kalray-mos_ab04_CONF_OPTS   :=
+k1b-kalray-mos_ab04_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -mboard=ab04
+k1b-kalray-mos_ab04_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
+				   -Wl,--undefined=DEBUGGER_HAVE_USER_MODE_SUPPORT
+k1b-kalray-mos_ab04_PLATFORM    := mppa
+k1b-kalray-mos_ab04_INC_DIR     := k1-elf
+k1b-kalray-mos_ab04_MAKE_VALID  := -j1
+k1b-kalray-mos_ab04_INSTALL     := true
+K1_CONFIGS += k1b-kalray-mos_ab04
 
 k1b-kalray-mos_emb01_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
 k1b-kalray-mos_emb01_CONF_OPTS   :=
@@ -168,6 +189,11 @@ firmware_k1b-kalray_konic80_CFLAGS        := -march=k1b -mos=bare -mcore=k1bio -
 firmware_k1b-kalray_konic80_LDFLAGS       :=
 firmware_k1b-kalray_konic80_INSTDIR        = $(K1ST_DIR)/share/odp/firmware/konic80/k1b
 
+firmware_k1b-kalray_ab04_CC            := $(CCACHE) k1-gcc
+firmware_k1b-kalray_ab04_CFLAGS        := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -mboard=ab04
+firmware_k1b-kalray_ab04_LDFLAGS       :=
+firmware_k1b-kalray_ab04_INSTDIR        = $(K1ST_DIR)/share/odp/firmware/ab04/k1b
+
 firmware_k1b-kalray_emb01_CC              := $(CCACHE) k1-gcc
 firmware_k1b-kalray_emb01_CFLAGS          := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -mboard=emb01
 firmware_k1b-kalray_emb01_LDFLAGS         :=
@@ -190,6 +216,7 @@ firmware_k1b-kalray_explorer_INSTDIR       = $(K1ST_DIR)/share/odp/firmware/expl
 #
 iopcie_CONFIGS += k1b-kalray_developer
 iopcie_CONFIGS += k1b-kalray_konic80
+iopcie_CONFIGS += k1b-kalray_ab04
 iopcie_CONFIGS += k1b-kalray_emb01
 iopcie_CONFIGS += k1b-kalray_simu
 _iopcie_CONFIGS += k1b-kalray_explorer
@@ -200,6 +227,7 @@ _iopcie_CONFIGS += k1b-kalray_explorer
 iounified_CONFIGS += k1b-kalray_developer
 iounified_CONFIGS += k1b-kalray_simu
 iounified_CONFIGS += k1b-kalray_konic80
+iounified_CONFIGS += k1b-kalray_ab04
 iounified_CONFIGS += k1b-kalray_emb01
 
 
@@ -209,6 +237,7 @@ iounified_CONFIGS += k1b-kalray_emb01
 ioeth_CONFIGS += k1b-kalray_developer
 ioeth_CONFIGS += k1b-kalray_simu
 ioeth_CONFIGS += k1b-kalray_konic80
+ioeth_CONFIGS += k1b-kalray_ab04
 ioeth_CONFIGS += k1b-kalray_emb01
 
 #
