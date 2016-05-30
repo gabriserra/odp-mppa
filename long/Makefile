@@ -24,6 +24,7 @@ BOARD_simu := developer
 BOARD_explorer := explorer
 BOARD_konic80 := konic80
 BOARD_emb01 := emb01
+BOARD_ab04 := ab04
 
 # extract OS name and board name
 REAL_OS_NAME = $(lastword $(subst -, ,$(OS_PLAT_NAME)))
