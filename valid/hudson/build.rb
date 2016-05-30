@@ -75,7 +75,7 @@ if ENV["label"].to_s() != "" then
     when /MPPA_EMB01b_centos7-with-eth-loopback/
         valid_configs = [ "k1b-kalray-mos_emb01" ]
         valid_type = "remote"
-    when "debian7-64"
+    when "debian7-64", /MPPA_AB04_Developers-with-loopback/
 	b.run("	echo 'SKIP'");
 	b.log.finish(b.current_target)
     when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
