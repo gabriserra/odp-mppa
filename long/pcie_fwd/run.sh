@@ -6,8 +6,8 @@ cd $CUR_DIR
 #Save initial freq
 INIT_FREQ=$(cat /mppa/board0/mppa0/chip_freq)
 
-#Set it at 500 for the test
-echo 500 > /mppa/board0/mppa0/chip_freq
+#Set it at 400 for the test
+echo 400 > /mppa/board0/mppa0/chip_freq
 echo 1 > /mppa/board0/mppa0/reset
 
 #Start jtag runner in the BG
