@@ -65,7 +65,11 @@ run_test()
 
 	${TARGET_RUNNER} $(which pktio${EXEEXT}) ${IFLIST}
 	if [ $? -ne 0 ]; then
+	    echo "Trying once more just in case"
+	    ${TARGET_RUNNER} $(which pktio${EXEEXT}) ${IFLIST}
+	    if [ $? -ne 0 ]; then
 		ret=1
+	    fi
 	fi
 
 	if [ $ret -ne 0 ]; then
