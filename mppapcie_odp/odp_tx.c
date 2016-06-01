@@ -251,8 +251,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	hdr->timestamp = priv->packet_id;
 	hdr->info._.pkt_id = priv->packet_id;
 	hdr->info.dword = 0ULL;
-	hdr->info._.pkt_size =
-		(skb->len - sizeof(struct mpodp_pkt_hdr));
+	hdr->info._.pkt_size = skb->len; /* Also count the header size */
 	hdr->info._.pkt_id = priv->packet_id;
 	priv->packet_id++;
 
