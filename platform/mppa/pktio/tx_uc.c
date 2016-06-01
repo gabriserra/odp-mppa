@@ -158,7 +158,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			hdr->timestamp = 4 * head + i;
 			hdr->info.dword = 0ULL;
 			hdr->info._.pkt_id = 4 * head + i;
-			hdr->info._.pkt_size = len;
+			hdr->info._.pkt_size = len + sizeof(*hdr);
 			/* Add the packet end marker */
 			if (tx_config->add_end_marker && i == (pkt_count - 1))
 				hdr->info._.hash_key |= END_OF_PACKETS;
@@ -250,7 +250,9 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 			hdr->timestamp = 8 * head + i;
 			hdr->info.dword = 0ULL;
 			hdr->info._.pkt_id = 8 * head + i;
-			hdr->info._.pkt_size = len;
+			hdr->info._.pkt_size = len; /* This one is an exception.
+						     * It is for the IO thread for the netdev
+						     * and they must NOT count the extra header size */
 			/* Add the packet end marker */
 			if (tx_config->add_end_marker && i == (pkt_count - 1))
 				hdr->info._.hash_key |= END_OF_PACKETS;

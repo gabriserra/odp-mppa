@@ -486,7 +486,7 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 
 		info.dword = LOAD_U64(header->info.dword);
 		const unsigned frame_len =
-			info._.pkt_size;
+			info._.pkt_size - sizeof(*header);
 		pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
 		packet_parse_l2(pkt_hdr);
 	}
