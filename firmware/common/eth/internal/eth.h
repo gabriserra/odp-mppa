@@ -36,6 +36,7 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
 int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   int nocIf, int externalAddress,
 			   int min_rx, int max_rx,
+			   int min_payload, int max_payload,
 			   odp_rpc_answer_t *answer);
 int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
 			   odp_rpc_answer_t *answer);
