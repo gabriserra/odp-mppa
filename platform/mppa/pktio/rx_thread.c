@@ -251,6 +251,7 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 	const rx_config_t * rx_config = &rx_hdl.ifce[pktio_id].rx_config;
 	rx_pool_t * rx_pool = &rx_hdl.th[th_id].
 		pools[rx_hdl.ifce[pktio_id].pool_id];
+	int mapped_pkt = 0;
 
 	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 
@@ -286,12 +287,23 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 		union mppa_ethernet_header_info_t info;
 		info.dword = LOAD_U64(header->info);
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
+		if (info._.pkt_size < sizeof(*header)) {
+			/* Probably a spurious EOT. */
+			STORE_U64(header->info, 0ULL);
+			pkt = ODP_PACKET_INVALID;
+			if_th->dropped_pkts++;
+			mapped_pkt = 1;
+		}
 	}
 
 	typeof(mppa_dnoc[dma_if]->rx_queues[0]) * const rx_queue =
 		&mppa_dnoc[dma_if]->rx_queues[rx_id];
 
-	if (odp_unlikely(!rx_pool->n_spares)) {
+	if (mapped_pkt) {
+		/* We had a spurious EOT or a broken pkt.
+		 * Leave in in place and juste restore the current offset */
+		rx_queue->current_offset.reg = 0ULL;
+	} else if (odp_unlikely(!rx_pool->n_spares)) {
 		/* No packets were available. Map small dirty
 		 * buffer to receive NoC packet but drop
 		 * the frame */
