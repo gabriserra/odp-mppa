@@ -72,6 +72,7 @@ typedef struct {
 	int dst_change;		/**< Change destination eth addresses */
 	int src_change;		/**< Change source eth addresses */
 	int error_check;        /**< Check packet errors */
+	int pktio_stats;        /**< Show pktio stats before exit */
 } appl_args_t;
 
 static int exit_threads;	/**< Break workers loop if set to 1 */
@@ -617,7 +618,16 @@ int main(int argc, char *argv[])
 	ret = print_speed_stats(num_workers, stats, gbl_args->appl.time,
 				gbl_args->appl.accuracy);
 	exit_threads = 1;
-
+#ifdef __K1__
+	if (gbl_args->appl.pktio_stats) {
+		for (i = 0; i < gbl_args->appl.if_count; ++i) {
+			_odp_pktio_stats_t pktio_stats;
+			pktio = gbl_args->pktios[i];
+			_odp_pktio_stats(pktio, &pktio_stats);
+			_odp_pktio_stats_print(pktio, &pktio_stats);
+		}
+	}
+#endif
 	/* Master thread waits for other threads to exit */
 	odph_linux_pthread_join(thread_tbl, num_workers);
 
@@ -712,6 +722,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{"dst_change", required_argument, NULL, 'd'},
 		{"src_change", required_argument, NULL, 's'},
 		{"error_check", required_argument, NULL, 'e'},
+		{"pktio_stats", no_argument, NULL, 'S'},
 		{"help", no_argument, NULL, 'h'},
 		{NULL, 0, NULL, 0}
 	};
@@ -720,9 +731,10 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	appl_args->accuracy = 1; /* get and print pps stats second */
 	appl_args->src_change = 1; /* change eth src address by default */
 	appl_args->error_check = 0; /* don't check packet errors by default */
+	appl_args->pktio_stats = 0;
 
 	while (1) {
-		opt = getopt_long(argc, argv, "+c:+t:+a:i:m:d:s:e:h",
+		opt = getopt_long(argc, argv, "+c:+t:+a:i:m:d:Ss:e:h",
 				  longopts, &long_index);
 
 		if (opt == -1)
@@ -791,6 +803,9 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 		case 'd':
 			appl_args->dst_change = atoi(optarg);
+			break;
+		case 'S':
+			appl_args->pktio_stats = 1;
 			break;
 		case 's':
 			appl_args->src_change = atoi(optarg);
@@ -887,6 +902,7 @@ static void usage(char *progname)
 	       "                    1: Change packets' src eth addresses (default)\n"
 	       "  -e, --error_check 0: Don't check packet errors (default)\n"
 	       "                    1: Check packet errors\n"
+	       "  -S, --pktio_stats  : Display pktio statistics before exiting\n"
 	       "  -h, --help           Display help and exit.\n\n"
 	       " environment variables: ODP_PKTIO_DISABLE_NETMAP\n"
 	       "                        ODP_PKTIO_DISABLE_SOCKET_MMAP\n"
