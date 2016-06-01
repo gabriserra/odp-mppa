@@ -78,7 +78,7 @@ void eth_open(unsigned remoteClus, odp_rpc_t *msg,
 	if (ethtool_open_cluster(remoteClus, data.ifId, answer))
 		goto err;
 	if (ethtool_setup_eth2clus(remoteClus, data.ifId, nocIf, externalAddress,
-				   data.min_rx, data.max_rx, answer))
+				   data.min_rx, data.max_rx, 0, 0, answer))
 		goto err;
 	if (ethtool_setup_clus2eth(remoteClus, data.ifId, nocIf, answer))
 		goto err;
