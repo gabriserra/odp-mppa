@@ -73,7 +73,6 @@ struct mpodp_if_priv {
 	 * same as tail in MPPA Tx ring buffer
 	 * Range [0 .. tx_size [ */
 	atomic_t tx_done;
-	u8 __iomem *tx_tail_addr;
 
 	/* Position of the latest submited desc
 	 * Range [0 .. tx_size [ */
