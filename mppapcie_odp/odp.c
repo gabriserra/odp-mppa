@@ -96,12 +96,10 @@ static void mpodp_poll_controller(struct net_device *netdev)
 static int mpodp_open(struct net_device *netdev)
 {
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
-	uint32_t tx_tail;
 
-	tx_tail = readl(priv->tx_tail_addr);
-	atomic_set(&priv->tx_submitted, tx_tail);
+	atomic_set(&priv->tx_submitted, 0);
 	atomic_set(&priv->tx_head, readl(priv->tx_head_addr));
-	atomic_set(&priv->tx_done, tx_tail);
+	atomic_set(&priv->tx_done, 0);
 	atomic_set(&priv->tx_autoloop_cur, 0);
 
 	priv->rx_tail = readl(priv->rx_tail_addr);
@@ -316,9 +314,6 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	priv->tx_head_addr = desc_info_addr(smem_vaddr,
 					    config->h2c_ring_buf_desc_addr,
 					    head);
-	priv->tx_tail_addr = desc_info_addr(smem_vaddr,
-					    config->h2c_ring_buf_desc_addr,
-					    tail);
 
 	/* Setup Host TX Ring */
 	priv->tx_ring =
