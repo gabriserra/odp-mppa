@@ -36,6 +36,65 @@ static int mpodp_tx_is_done(struct mpodp_if_priv *priv, int index)
 		 priv->tx_ring[index].cookie, NULL) == DMA_SUCCESS);
 }
 
+static void unmap_skb(struct device *dev, const struct sk_buff *skb,
+		      const struct mpodp_tx *tx)
+{
+	const skb_frag_t *fp, *end;
+	const struct skb_shared_info *si;
+	int count = 1;
+
+	dma_unmap_single(dev, sg_dma_address(&tx->sg[0]), skb_headlen(skb), DMA_TO_DEVICE);
+
+	si = skb_shinfo(skb);
+	end = &si->frags[si->nr_frags];
+	for (fp = si->frags; fp < end; fp++, count++) {
+		dma_unmap_page(dev, sg_dma_address(&tx->sg[count]), skb_frag_size(fp), DMA_TO_DEVICE);
+	}
+}
+
+static int map_skb(struct device *dev, const struct sk_buff *skb,
+		   struct mpodp_tx *tx)
+{
+	const skb_frag_t *fp, *end;
+	const struct skb_shared_info *si;
+	int count = 1;
+	dma_addr_t handler;
+
+	sg_init_table(tx->sg, MAX_SKB_FRAGS + 1);
+	handler = dma_map_single(dev, skb->data, skb_headlen(skb), DMA_TO_DEVICE);
+	if (dma_mapping_error(dev, handler))
+		goto out_err;
+	sg_dma_address(&tx->sg[0]) = handler;
+	sg_dma_len(&tx->sg[0]) = skb_headlen(skb);
+
+	si = skb_shinfo(skb);
+	end = &si->frags[si->nr_frags];
+	for (fp = si->frags; fp < end; fp++, count++) {
+		handler = skb_frag_dma_map(dev, fp, 0, skb_frag_size(fp),
+					 DMA_TO_DEVICE);
+		if (dma_mapping_error(dev, handler))
+			goto unwind;
+
+		sg_dma_address(&tx->sg[count]) = handler;
+		sg_dma_len(&tx->sg[count]) = skb_frag_size(fp);
+
+	}
+	sg_mark_end(&tx->sg[count - 1]);
+	tx->sg_len = count;
+
+	return 0;
+
+unwind:
+	while (fp-- > si->frags)
+		dma_unmap_page(dev, sg_dma_address(&tx->sg[--count]),
+			       skb_frag_size(fp), DMA_TO_DEVICE);
+	dma_unmap_single(dev, sg_dma_address(&tx->sg[0]),
+			 skb_headlen(skb), DMA_TO_DEVICE);
+
+out_err:
+	return -ENOMEM;
+}
+
 static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
 {
 	struct net_device *netdev = priv->netdev;
@@ -85,8 +144,7 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
 		tx = &(priv->tx_ring[tx_done]);
 
 		/* free ressources */
-		dma_unmap_sg(&priv->pdev->dev, tx->sg, tx->sg_len,
-			     DMA_TO_DEVICE);
+		unmap_skb(&priv->pdev->dev, tx->skb, tx);
 		consume_skb(tx->skb);
 
 		worked++;
@@ -154,7 +212,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	struct mpodp_tx *tx;
 	struct dma_async_tx_descriptor *dma_txd;
 	struct mpodp_cache_entry *entry;
-	int dma_len, ret;
+	int ret;
 	uint8_t fifo_mode, requested_engine;
 	struct mpodp_pkt_hdr *hdr;
 	uint32_t tx_autoloop_next;
@@ -260,13 +318,8 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	tx->len = skb->len;
 
 	/* prepare sg */
-	sg_init_table(tx->sg, MAX_SKB_FRAGS + 1);
-	tx->sg_len = skb_to_sgvec(skb, tx->sg, 0, skb->len);
-	dma_len = dma_map_sg(&priv->pdev->dev, tx->sg,
-			     tx->sg_len, DMA_TO_DEVICE);
-	if (dma_len == 0) {
-		/* dma_map_sg failed, retry */
-		netdev_err(netdev, "tx %d: failed to map sg to dma\n",
+	if (map_skb(&priv->pdev->dev, skb, tx)){
+		netdev_err(netdev, "tx %d: failed to map skb to dma\n",
 			   tx_submitted);
 		goto busy;
 	}
@@ -284,7 +337,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	/* get transfer descriptor */
 	dma_txd =
 	    dmaengine_prep_slave_sg(priv->tx_chan[requested_engine], tx->sg,
-				    dma_len, DMA_MEM_TO_DEV, 0);
+				    tx->sg_len, DMA_MEM_TO_DEV, 0);
 	if (dma_txd == NULL) {
 		/* dmaengine_prep_slave_sg failed, retry */
 		netdev_err(netdev, "tx %d: cannot get dma descriptor\n",
@@ -330,7 +383,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 
       busy:
-	dma_unmap_sg(&priv->pdev->dev, tx->sg, tx->sg_len, DMA_TO_DEVICE);
+	unmap_skb(&priv->pdev->dev, skb, tx);
 	return NETDEV_TX_BUSY;
 
  addr_error:
