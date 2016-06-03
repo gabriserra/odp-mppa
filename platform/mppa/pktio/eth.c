@@ -88,8 +88,8 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 			.tx_enabled = 1,
 			.nb_rules = nb_rules,
 			.verbose = eth->verbose,
-			.min_payload = 0,
-			.max_payload = 0,
+			.min_payload = eth->min_payload,
+			.max_payload = eth->max_payload,
 		}
 	};
 	if (params) {
