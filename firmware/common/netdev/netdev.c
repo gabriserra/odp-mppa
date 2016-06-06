@@ -21,15 +21,15 @@ __attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
 
-int netdev_c2h_is_full(struct mpodp_if_config *cfg)
+int netdev_c2h_is_full(struct mpodp_if_config *cfg, uint32_t c2h_q)
 {
 
 	struct mpodp_ring_buff_desc *c2h =
-		(void*)(unsigned long)cfg->c2h_ring_buf_desc_addr;
+		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
 	uint32_t tail = LOAD_U32(c2h->tail);
 	uint32_t next_tail = tail + 1;
 
-	if (next_tail == c2h->ring_buffer_entries_count)
+	if (next_tail == c2h->count)
 		next_tail = 0;
 
 	if(next_tail == LOAD_U32(c2h->head)) {
@@ -41,15 +41,16 @@ int netdev_c2h_is_full(struct mpodp_if_config *cfg)
 }
 
 int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
-			    struct mpodp_c2h_ring_buff_entry *data,
-			    struct mpodp_c2h_ring_buff_entry *old_entry)
+			    uint32_t c2h_q,
+			    struct mpodp_c2h_entry *data,
+			    struct mpodp_c2h_entry *old_entry)
 {
 	struct mpodp_ring_buff_desc *c2h =
-		(void*)(unsigned long)cfg->c2h_ring_buf_desc_addr;
+		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
 	uint32_t tail = LOAD_U32(c2h->tail);
 	uint32_t next_tail = tail + 1;
 
-	if (next_tail == c2h->ring_buffer_entries_count)
+	if (next_tail == c2h->count)
 		next_tail = 0;
 
 	if(next_tail == LOAD_U32(c2h->head)) {
@@ -57,9 +58,9 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 		return -1;
 	}
 
-	struct mpodp_c2h_ring_buff_entry *entry_base =
-		(void*)(unsigned long)c2h->ring_buffer_entries_addr;
-	struct mpodp_c2h_ring_buff_entry *entry = entry_base + tail;
+	struct mpodp_c2h_entry *entry_base =
+		(void*)(unsigned long)c2h->addr;
+	struct mpodp_c2h_entry *entry = entry_base + tail;
 
 	if (old_entry) {
 		old_entry->pkt_addr = LOAD_U64(entry->pkt_addr);
@@ -81,26 +82,27 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 }
 
 int netdev_h2c_enqueue_buffer(struct mpodp_if_config *cfg,
-			      struct mpodp_h2c_ring_buff_entry *buffer)
+			      uint32_t h2c_q,
+			      struct mpodp_h2c_entry *buffer)
 {
 	struct mpodp_ring_buff_desc *h2c =
-		(void*)(unsigned long)cfg->h2c_ring_buf_desc_addr;
+		(void*)(unsigned long)cfg->h2c_addr[h2c_q];
 	uint32_t head = LOAD_U32(h2c->head);
 
-	if (head == h2c->ring_buffer_entries_count - 1) {
+	if (head == h2c->count - 1) {
 		/* Ring is full of FIFO address */
 		return -1;
 	}
 
-	struct mpodp_h2c_ring_buff_entry *entry_base =
-		(void*)(unsigned long)h2c->ring_buffer_entries_addr;
-	struct mpodp_h2c_ring_buff_entry *entry = entry_base + head;
+	struct mpodp_h2c_entry *entry_base =
+		(void*)(unsigned long)h2c->addr;
+	struct mpodp_h2c_entry *entry = entry_base + head;
 
 	memcpy(entry, buffer, sizeof(*entry));
 	__k1_wmb();
 
 	uint32_t next_head = head + 1;
-	if (next_head == h2c->ring_buffer_entries_count)
+	if (next_head == h2c->count)
 		next_head = 0;
 
 	STORE_U32(h2c->head, next_head);
@@ -114,17 +116,19 @@ int netdev_h2c_enqueue_buffer(struct mpodp_if_config *cfg,
 
 }
 
-struct mpodp_h2c_ring_buff_entry *
-netdev_h2c_peek_data(const struct mpodp_if_config *cfg __attribute__((unused)))
+struct mpodp_h2c_entry *
+netdev_h2c_peek_data(const struct mpodp_if_config *cfg __attribute__((unused)),
+		     uint32_t h2c_q __attribute__((unused)))
 {
 	return NULL;
 }
 
 static int netdev_setup_c2h(struct mpodp_if_config *if_cfg,
+			    const int c2h_q,
 			    const eth_if_cfg_t *cfg)
 {
 	struct mpodp_ring_buff_desc *c2h;
-	struct mpodp_c2h_ring_buff_entry *entries;
+	struct mpodp_c2h_entry *entries;
 	uint32_t i;
 
 	if (if_cfg->mtu == 0) {
@@ -152,18 +156,19 @@ static int netdev_setup_c2h(struct mpodp_if_config *if_cfg,
 		}
 	}
 
-	c2h->ring_buffer_entries_count = cfg->n_c2h_entries;
-	c2h->ring_buffer_entries_addr = (uintptr_t) entries;
-	if_cfg->c2h_ring_buf_desc_addr = (uint64_t)(unsigned long)c2h;
+	c2h->count = cfg->n_c2h_entries;
+	c2h->addr = (uintptr_t) entries;
+	if_cfg->c2h_addr[c2h_q] = (uint64_t)(unsigned long)c2h;
 
 	return 0;
 }
 
 static int netdev_setup_h2c(struct mpodp_if_config *if_cfg,
+			    const int h2c_q,
 			    const eth_if_cfg_t *cfg)
 {
 	struct mpodp_ring_buff_desc *h2c;
-	struct mpodp_h2c_ring_buff_entry *entries;
+	struct mpodp_h2c_entry *entries;
 
 	if (if_cfg->mtu == 0) {
 		fprintf(stderr, "[netdev] MTU not configured\n");
@@ -179,9 +184,9 @@ static int netdev_setup_h2c(struct mpodp_if_config *if_cfg,
 		return -1;
 	}
 
-	h2c->ring_buffer_entries_count = cfg->n_h2c_entries;
-	h2c->ring_buffer_entries_addr = (uintptr_t) entries;
-	if_cfg->h2c_ring_buf_desc_addr = (uint64_t)(unsigned long)h2c;
+	h2c->count = cfg->n_h2c_entries;
+	h2c->addr = (uintptr_t) entries;
+	if_cfg->h2c_addr[h2c_q] = (uint64_t)(unsigned long)h2c;
 
 	return 0;
 }
@@ -190,6 +195,7 @@ int netdev_init_interface(const eth_if_cfg_t *cfg)
 {
 	struct mpodp_if_config *if_cfg;
 	int ret;
+	uint32_t i;
 
 	if (cfg->if_id >= MPODP_MAX_IF_COUNT)
 		return -1;
@@ -200,13 +206,23 @@ int netdev_init_interface(const eth_if_cfg_t *cfg)
 	if_cfg->interrupt_status = 1;
 	memcpy(if_cfg->mac_addr, cfg->mac_addr, MAC_ADDR_LEN);
 
-	ret = netdev_setup_c2h(if_cfg, cfg);
-	if (ret)
-		return ret;
+	if (cfg->n_c2h_q > MPODP_MAX_RX_QUEUES)
+		return -1;
+	if_cfg->n_rxqs = cfg->n_c2h_q;
+	for (i = 0; i < cfg->n_c2h_q; ++i) {
+		ret = netdev_setup_c2h(if_cfg, i, cfg);
+		if (ret)
+			return ret;
+	}
 
-	ret = netdev_setup_h2c(if_cfg, cfg);
-	if (ret)
-		return ret;
+	if (cfg->n_h2c_q > MPODP_MAX_TX_QUEUES)
+		return -1;
+	if_cfg->n_txqs = cfg->n_h2c_q;
+	for (i = 0; i < cfg->n_h2c_q; ++i) {
+		ret = netdev_setup_h2c(if_cfg, i, cfg);
+		if (ret)
+			return ret;
+	}
 	return 0;
 }
 

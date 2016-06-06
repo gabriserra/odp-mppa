@@ -48,6 +48,7 @@ typedef struct tx_credit {
 typedef struct rx_cfg {
 	mppa_pcie_noc_rx_buf_t *mapped_buf;
 	uint8_t pcie_eth_if; /* PCIe ethernet interface */
+	uint8_t c2h_q;
 	uint8_t broken;
 	tx_credit_t *tx_credit;
 } rx_cfg_t;

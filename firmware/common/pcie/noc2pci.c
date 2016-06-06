@@ -5,7 +5,7 @@
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"
-#include "noc2pci.h"
+#include "internal/noc2pci.h"
 #include "pcie.h"
 
 void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
@@ -24,7 +24,7 @@ void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
 
 
 static uint64_t pkt_count[MPPA_PCIE_ETH_IF_MAX] = {0};
-static void poll_noc_rx_buffer(int pcie_eth_if)
+static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 {
 	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST], *buf;
 	uint32_t left, pkt_size;
@@ -32,15 +32,15 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 	void * pkt_addr;
 	union mpodp_pkt_hdr_info info;
 	struct mpodp_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
-	struct mpodp_c2h_ring_buff_entry pkt, free_pkt;
+	struct mpodp_c2h_entry pkt, free_pkt;
 	int nb_bufs;
 
-	if (netdev_c2h_is_full(cfg)) {
+	if (netdev_c2h_is_full(cfg, c2h_q)) {
 		dbg_printf("PCIe eth tx is full !!!\n");
 		return;
 	}
 
-	nb_bufs = buffer_ring_get_multi(&g_full_buf_pool[pcie_eth_if], bufs,
+	nb_bufs = buffer_ring_get_multi(&g_full_buf_pool[pcie_eth_if][c2h_q], bufs,
 					MPPA_PCIE_MULTIBUF_BURST, &left);
 	if (nb_bufs == 0)
 		return;
@@ -71,7 +71,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
 			pkt.pkt_addr = (unsigned long)pkt_addr;
 			pkt.data = (unsigned long)buf;
 			do {
-				ret = netdev_c2h_enqueue_data(cfg, &pkt, &free_pkt);
+				ret = netdev_c2h_enqueue_data(cfg, c2h_q, &pkt, &free_pkt);
 			} while (ret < 0);
 
 			if (free_pkt.data != 0)
@@ -96,11 +96,12 @@ static void poll_noc_rx_buffer(int pcie_eth_if)
  */
 static void mppa_pcie_pcie_tx_sender()
 {
-	unsigned int i = 0;
+	unsigned int i, j;
 
 	while(1) {
-		for (i = 0; i < *(volatile uint32_t*)&(eth_control.if_count); i++)
-			poll_noc_rx_buffer(i);
+		for (i = 0; i < eth_control.if_count; i++)
+			for (j = 0; j < eth_control.configs[i].n_rxqs; ++j)
+				poll_noc_rx_buffer(i, j);
 	}
 }
 
@@ -132,7 +133,6 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 	while ( buffer_ring_get_multi(&g_free_buf_pool, &buf, 1, &left) == -1 );
 
 	iface->rx_cfgs[rx_id].mapped_buf = buf;
-	iface->rx_cfgs[rx_id].pcie_eth_if = iface->rx_cfgs[rx_id].pcie_eth_if;
 
 	conf.buffer_base = (uintptr_t) buf->buf_addr;
 	conf.buffer_size = MPPA_PCIE_MULTIBUF_SIZE;
@@ -159,6 +159,7 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
+		  unsigned int c2h_q,
 		  tx_credit_t *tx_credit, odp_rpc_answer_t *answer)
 {
 	int rx_thread_num = if_id / RX_THREAD_COUNT;
@@ -178,6 +179,7 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 
 	iface->ev_mask[rx_mask_off] |= (1ULL << bit_id);
 	iface->rx_cfgs[rx_id].pcie_eth_if = pcie_eth_if;
+	iface->rx_cfgs[rx_id].c2h_q = c2h_q;
 	iface->rx_cfgs[rx_id].broken = 0;
 	iface->rx_cfgs[rx_id].tx_credit = tx_credit;
 

@@ -49,6 +49,54 @@ struct mpodp_cache_entry {
 	u32 addr;
 };
 
+struct mpodp_txq {
+	int id;
+
+	/* Pointer to the netdev associated txq */
+	struct netdev_queue *txq;
+
+	struct mpodp_tx *ring;
+	/* Position of the latest complete Tx buffer.
+	 * same as tail in MPPA Tx ring buffer
+	 * Range [0 .. tx_size [ */
+	atomic_t done;
+
+	/* Position of the latest submited desc
+	 * Range [0 .. tx_size [ */
+	atomic_t submitted;
+
+	/* Current idx in the autoloop MPPA RB */
+	atomic_t autoloop_cur;
+
+	/* Current Tx head on the MPPA (equals number of targets) */
+	atomic_t head;
+	/* Host mapped addres to reload tx_head from the MPPA */
+	u8 __iomem *head_addr;
+
+	/* Size of the Tx RB on the MPPA */
+	int mppa_size;
+	/* Number of descriptors on the host */
+	int size;
+
+	/* Amount of Tx cached Host side in autoloop mode. Size = tx_size */
+	int cached_head;
+	/* Cached adresses from the MPPA side. Size = tx_mppa_size */
+	struct mpodp_cache_entry *cache;
+};
+
+struct mpodp_rxq {
+	int id;
+	struct mpodp_rx *ring;
+	int used;
+	int avail;
+	int tail;
+	u8 __iomem *tail_addr;
+	int head;
+	u8 __iomem *head_addr;
+	int size;
+	struct mpodp_c2h_entry *mppa_entries;
+};
+
 struct mpodp_if_priv {
 	struct napi_struct napi;
 
@@ -66,50 +114,22 @@ struct mpodp_if_priv {
 	u8 __iomem *interrupt_status_addr;
 
 	/* TX ring */
-	struct dma_chan *tx_chan[MPODP_NOC_CHAN_COUNT + 1];
+	spinlock_t tx_lock[MPODP_NOC_CHAN_COUNT];
+	struct dma_chan *tx_chan[MPODP_NOC_CHAN_COUNT];
 	struct mppa_pcie_dma_slave_config tx_config[MPODP_NOC_CHAN_COUNT];
-	struct mpodp_tx *tx_ring;
+	struct mpodp_txq txqs[MPODP_MAX_TX_QUEUES];
+	int n_txqs;
 
-	/* Position of the latest complete Tx buffer.
-	 * same as tail in MPPA Tx ring buffer
-	 * Range [0 .. tx_size [ */
-	atomic_t tx_done;
-
-	/* Position of the latest submited desc
-	 * Range [0 .. tx_size [ */
-	atomic_t tx_submitted;
-
-	atomic_t tx_head;
-	u8 __iomem *tx_head_addr;
-
-	/* Size of the Tx RB on the MPPA */
-	int tx_mppa_size;
-	/* Number of descriptors on the host */
-	int tx_size;
 	struct timer_list tx_timer;	/* checks Tx queues */
 	struct mppa_pcie_time *tx_time;
 	uint64_t packet_id;
 
-	/* Current idx in the autoloop MPPA RB */
-	atomic_t tx_autoloop_cur;
-
-	/* Amount of Tx cached Host side in autoloop mode. Size = tx_size */
-	int tx_cached_head;
-	/* Cached adresses from the MPPA side. Size = tx_mppa_size */
-	struct mpodp_cache_entry *tx_cache;
-
 	/* RX ring */
 	struct dma_chan *rx_chan;
 	struct mppa_pcie_dma_slave_config rx_config;
-	struct mpodp_rx *rx_ring;
-	int rx_used;
-	int rx_avail;
-	int rx_tail;
-	u8 __iomem *rx_tail_addr;
-	int rx_head;
-	u8 __iomem *rx_head_addr;
-	int rx_size;
-	struct mpodp_c2h_ring_buff_entry *rx_mppa_entries;
+	struct mpodp_rxq rxqs[MPODP_MAX_RX_QUEUES];
+	int n_rxqs;
+
 	struct timer_list rx_timer;	/* checks Tx queues */
 
 };
@@ -128,12 +148,18 @@ struct mpodp_pdata_priv {
 
 netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 			     struct net_device *netdev);
+u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
+#if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 13, 0))
+		       , void *accel_priv, select_queue_fallback_t fallback
+#endif
+);
+
 void mpodp_tx_timeout(struct net_device *netdev);
 void mpodp_tx_update_cache(struct mpodp_if_priv *priv);
 void mpodp_tx_timer_cb(unsigned long data);
 int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget);
 
-int mpodp_start_rx(struct mpodp_if_priv *priv);
-int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget);
+int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq);
+int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq, int budget);
 
 #endif

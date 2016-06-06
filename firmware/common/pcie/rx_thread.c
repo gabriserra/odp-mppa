@@ -4,7 +4,7 @@
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"
-#include "noc2pci.h"
+#include "internal/noc2pci.h"
 
 #include "internal/debug.h"
 
@@ -20,6 +20,7 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 	int ret;
 	uint16_t events;
 	uint16_t pcie_eth_if = iface->rx_cfgs[rx_id].pcie_eth_if;
+	uint16_t c2h_q = iface->rx_cfgs[rx_id].c2h_q;
 	typeof(mppa_dnoc[iface->iface_id]->rx_queues[0]) * const rx_queue =
 		&mppa_dnoc[iface->iface_id]->rx_queues[rx_id];
 	tx_credit_t *tx_credit = iface->rx_cfgs[rx_id].tx_credit;
@@ -39,7 +40,7 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		iface->rx_cfgs[rx_id].mapped_buf = new_buf;
 		dbg_printf("Adding buf to eth if %d\n", pcie_eth_if);
 		/* Add previous buffer to full list */
-		buffer_ring_push_multi(&g_full_buf_pool[pcie_eth_if], &old_buf, 1, &left);
+		buffer_ring_push_multi(&g_full_buf_pool[pcie_eth_if][c2h_q], &old_buf, 1, &left);
 
 		dbg_printf("Reloading rx %d of if %d with buffer %p\n",
 				rx_id, iface->iface_id, new_buf);

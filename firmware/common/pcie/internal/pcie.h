@@ -8,6 +8,7 @@
 #include "internal/rpc-server.h"
 #include "ring.h"
 #include "mppapcie_odp.h"
+#include "internal/netdev.h"
 
 #define MPPA_PCIE_USABLE_DNOC_IF	4
 
@@ -32,7 +33,7 @@
 #include "noc2pci.h"
 
 extern buffer_ring_t g_free_buf_pool;
-extern buffer_ring_t g_full_buf_pool[MPODP_MAX_IF_COUNT];
+extern buffer_ring_t g_full_buf_pool[MPODP_MAX_IF_COUNT][MPODP_MAX_RX_QUEUES];
 
 struct mppa_pcie_eth_dnoc_tx_cfg {
 	int opened;
@@ -40,6 +41,7 @@ struct mppa_pcie_eth_dnoc_tx_cfg {
 	unsigned int mtu;
 	volatile void *fifo_addr;
 	unsigned int pcie_eth_if;
+	unsigned int h2c_q;
 };
 
 void
@@ -49,7 +51,20 @@ void
 pcie_start_tx_rm();
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
-		  tx_credit_t *tx_credit, odp_rpc_answer_t *answer);
+		  unsigned c2h_q, tx_credit_t *tx_credit,
+		  odp_rpc_answer_t *answer);
+
+static inline unsigned pcie_cluster_to_h2c_q(unsigned pcie_eth_if_id,
+					     unsigned remoteClus)
+{
+	return remoteClus % eth_control.configs[pcie_eth_if_id].n_txqs;
+}
+
+static inline unsigned pcie_cluster_to_c2h_q(unsigned pcie_eth_if_id,
+					     unsigned remoteClus)
+{
+	return remoteClus % eth_control.configs[pcie_eth_if_id].n_rxqs;
+}
 
 static inline
 int no_printf(__attribute__((unused)) const char *fmt , ...)
