@@ -38,7 +38,8 @@ repo = Git.new(odp_clone,workspace)
 local_valid = options["local-valid"]
 
 clean = Target.new("clean", repo, [])
-build = Target.new("build", repo, [])
+changelog = Target.new("changelog", repo, [])
+build = Target.new("build", repo, [changelog])
 install = Target.new("install", repo, [build])
 valid = ParallelTarget.new("valid", repo, [install])
 valid_packages = ParallelTarget.new("valid-packages", repo, [])
@@ -52,7 +53,7 @@ long = Target.new("long", repo, [])
 dkms = Target.new("dkms", repo, [])
 package = Target.new("package", repo, [install, apps, long_build, dkms])
 
-b = Builder.new("odp", options, [clean, build, valid, valid_packages,
+b = Builder.new("odp", options, [clean, changelog, build, valid, valid_packages,
                                  long_build, long, apps, dkms, package, install])
 
 b.logsession = "odp"
@@ -114,6 +115,20 @@ else
     artifacts = File.join(workspace,"artifacts")
 end
 mkdir_p artifacts unless File.exists?(artifacts)
+
+b.target("changelog") do
+    b.logtitle = "Report for odp changelog"
+    cd odp_path
+    ref_commit = ENV["INTEGRATION_BRANCH"]
+    if(ref_commit == nil || ref_commit == "")
+        # Do not know what is the source... Try HEAD^
+        ref_commit = "HEAD^"
+    else
+	ref_commit = "origin/#{ref_commit}"
+    end
+    b.run("./ls_modules.sh #{ref_commit} HEAD | ./ansi2html.sh > #{artifacts}/ls_modules.html")
+end
+
 
 b.target("build") do
     b.logtitle = "Report for odp build."
