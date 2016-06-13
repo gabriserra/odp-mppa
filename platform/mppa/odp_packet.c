@@ -67,6 +67,9 @@ void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 	len = sizeof(odp_packet_hdr_t) - start_offset;
 	memset(start, 0, len);
 
+	memset(pkt_hdr->sub_packets, 0,
+	       sizeof(odp_packet_hdr_t*) * _ODP_MAX_SUBPACKETS);
+
 	/* Set metadata items that initialize to non-zero values */
 	pkt_hdr->l2_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->l3_offset = ODP_PACKET_OFFSET_INVALID;
@@ -174,6 +177,44 @@ int odp_packet_reset(odp_packet_t pkt, uint32_t len)
  * ********************************************************
  *
  */
+
+int odp_packet_is_segmented(odp_packet_t pkt)
+{
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	return pkt_hdr->sub_packets[0] != NULL;
+}
+
+int odp_packet_num_segs(odp_packet_t pkt)
+{
+	int i;
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+
+	for (i = 0; i < _ODP_MAX_SUBPACKETS; ++i) {
+		if (!pkt_hdr->sub_packets[i])
+			return i + 1;
+	}
+	return 1 ;
+}
+
+int _odp_packet_fragment(odp_packet_t pkt,
+			 odp_packet_t sub_pkts[_ODP_MAX_SUBPACKETS + 1])
+{
+	int i, count = 1;
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	sub_pkts[0] = pkt;
+
+	for (i = 0; i < _ODP_MAX_SUBPACKETS; ++i) {
+		if(!pkt_hdr->sub_packets[i])
+			break;
+
+		sub_pkts[count++] = pkt_hdr->sub_packets[i];
+	}
+
+	memset(pkt_hdr->sub_packets, 0,
+	       sizeof(odp_packet_hdr_t*) * _ODP_MAX_SUBPACKETS);
+
+	return count;
+}
 
 void *odp_packet_head(odp_packet_t pkt)
 {

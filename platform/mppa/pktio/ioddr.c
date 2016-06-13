@@ -1,0 +1,312 @@
+/* Copyright (c) 2013, Linaro Limited
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier:     BSD-3-Clause
+ */
+#include <odp_packet_io_internal.h>
+#include <odp/thread.h>
+#include <odp/cpumask.h>
+#include <HAL/hal/hal.h>
+#include <odp/errno.h>
+#include <errno.h>
+#include <odp/rpc/api.h>
+
+#ifdef K1_NODEOS
+#include <pthread.h>
+#else
+#include <utask.h>
+#endif
+
+#include <odp_classification_internal.h>
+#include "odp_pool_internal.h"
+#include "odp_rx_internal.h"
+#include "odp_tx_uc_internal.h"
+
+#define MAX_IODDR_SLOTS 2
+
+#define N_RX_P_IODDR 10
+#define NOC_IODDR_UC_COUNT 0
+
+#include <mppa_noc.h>
+#include <mppa_routing.h>
+
+/**
+ * #############################
+ * PKTIO Interface
+ * #############################
+ */
+static uint8_t ioddr_mac[ETH_ALEN] =  { 0xde, 0xad, 0xbe, 0xbe, 0x00 };
+
+static int ioddr_init(void)
+{
+	if (rx_thread_init())
+		return 1;
+
+	return 0;
+}
+
+static int ioddr_destroy(void)
+{
+	/* Last pktio to close should work. Expect an err code for others */
+	rx_thread_destroy();
+	return 0;
+}
+
+
+static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
+		    const char *devname, odp_pool_t pool)
+{
+	int ret = 0;
+	int nRx = N_RX_P_IODDR;
+	int min_rx = -1;
+	int max_rx = -1;
+	int slot_id;
+	int rr_policy = -1;
+	int n_fragments = 1;
+
+	/*
+	 * Check device name and extract slot/port
+	 */
+	const char* pptr = devname;
+	char * eptr;
+
+	if (strncmp(pptr, "ioddr", strlen("ioddr")))
+		return -1;
+	pptr += strlen("ioddr");
+	slot_id = strtoul(pptr, &eptr, 10);
+	if (eptr == pptr || slot_id < 0 || slot_id >= MAX_IODDR_SLOTS) {
+		ODP_ERR("Invalid ioddr name %s\n", devname);
+		return -1;
+	}
+	pptr = eptr;
+
+	while (*pptr == ':') {
+		/* Parse arguments */
+		pptr++;
+		if (!strncmp(pptr, "min_rx=", strlen("min_rx="))){
+			pptr += strlen("min_rx=");
+			min_rx = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid min_rx %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "max_rx=", strlen("max_rx="))){
+			pptr += strlen("max_rx=");
+			max_rx = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid max_rx %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "rrpolicy=", strlen("rrpolicy="))){
+			pptr += strlen("rrpolicy=");
+			rr_policy = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "nfragments=", strlen("nfragments="))){
+			pptr += strlen("nfragments=");
+			n_fragments = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid nfragments %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else {
+			/* Unknown parameter */
+			ODP_ERR("Invalid option %s\n", pptr);
+			return -1;
+		}
+	}
+
+	if (*pptr != 0) {
+		/* Garbage at the end of the name... */
+		ODP_ERR("Invalid option %s\n", pptr);
+		return -1;
+	}
+
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+	/*
+	 * Init ioddr status
+	 */
+	ioddr->slot_id = slot_id;
+	ioddr->pool = pool;
+	ioddr->n_fragments = n_fragments;
+	ioddr->tx_config.nofree = 0;
+	ioddr->tx_config.add_end_marker = 0;
+	if (min_rx == -1 || max_rx == -1) {
+		ODP_ERR("min_rx and max_rx options must be specified\n");
+		return -1;
+	}
+
+	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
+		/* Setup Rx threads */
+		ioddr->rx_config.dma_if = 0;
+		ioddr->rx_config.pool = pool;
+		ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
+		ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
+		nRx = max_rx - min_rx + 1;
+		ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy, min_rx, max_rx);
+		if(ret < 0)
+			return -1;
+		else
+			ret = 0;
+	}
+
+	return ret;
+}
+
+static int ioddr_close(pktio_entry_t * const pktio_entry)
+{
+
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+
+	/* Push Context to handling threads */
+	rx_thread_link_close(ioddr->rx_config.pktio_id);
+
+	return 0;
+}
+
+
+static int ioddr_start(pktio_entry_t * const pktio_entry ODP_UNUSED)
+{
+	return 0;
+}
+
+static int ioddr_stop(pktio_entry_t * const pktio_entry ODP_UNUSED)
+{
+	return 0;
+}
+
+static int ioddr_mac_addr_get(pktio_entry_t *pktio_entry,
+			    void *mac_addr)
+{
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+
+	memcpy(mac_addr,ioddr_mac, ETH_ALEN);
+	((uint8_t*)mac_addr)[ETH_ALEN - 1 ] = ioddr->slot_id;
+	return ETH_ALEN;
+}
+
+
+static void _ioddr_compute_pkt_size(odp_packet_t pkt)
+{
+	odp_packet_hdr_t *pkt_hdr = odp_packet_hdr(pkt);
+	uint8_t * const base_addr =
+		((uint8_t *)pkt_hdr->buf_hdr.addr) +
+		pkt_hdr->headroom;
+
+	INVALIDATE(pkt_hdr);
+	packet_parse_reset(pkt_hdr);
+
+	union mppa_ethernet_header_info_t info;
+	uint8_t * const hdr_addr = base_addr -
+		sizeof(mppa_ethernet_header_t);
+	mppa_ethernet_header_t * const header =
+		(mppa_ethernet_header_t *)hdr_addr;
+
+	info.dword = LOAD_U64(header->info.dword);
+	const unsigned frame_len =
+		info._.pkt_size - sizeof(mppa_ethernet_header_t);
+	pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
+	packet_parse_l2(pkt_hdr);
+}
+
+static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
+		    unsigned len)
+{
+	int total_packet = 0, n_packet;
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+	const int frag_per_pkt = ioddr->n_fragments;;
+	unsigned wanted_segs = len * frag_per_pkt;
+	odp_packet_t tmp_table[wanted_segs];
+
+	do {
+		n_packet = odp_buffer_ring_get_multi(ioddr->rx_config.ring,
+						     (odp_buffer_hdr_t **)(&tmp_table[total_packet]),
+						     wanted_segs, NULL);
+		wanted_segs -= n_packet;
+		total_packet += n_packet;
+	} while(total_packet % ioddr->n_fragments != 0);
+
+	for (n_packet = 0; n_packet < total_packet / frag_per_pkt; ++n_packet) {
+		odp_packet_t top_pkt = tmp_table[n_packet * frag_per_pkt];
+		odp_packet_hdr_t *top_pkt_hdr = odp_packet_hdr(top_pkt);
+
+		pkt_table[n_packet] = top_pkt;
+		_ioddr_compute_pkt_size(top_pkt);
+
+		for (int j = 1; j < frag_per_pkt; ++j) {
+			odp_packet_t pkt = tmp_table[n_packet * frag_per_pkt + j];
+
+			top_pkt_hdr->sub_packets[j - 1] = pkt;
+			_ioddr_compute_pkt_size(pkt);
+		}
+	}
+
+	if (n_packet && pktio_cls_enabled(pktio_entry)) {
+		int defq_pkts = 0;
+		for (int i = 0; i < n_packet; ++i) {
+			if (0 > _odp_packet_classifier(pktio_entry, pkt_table[i])) {
+				pkt_table[defq_pkts] = pkt_table[i];
+			}
+		}
+		n_packet = defq_pkts;
+	}
+
+	return n_packet;
+}
+
+static int ioddr_send(pktio_entry_t *pktio_entry ODP_UNUSED,
+		      odp_packet_t pkt_table[] ODP_UNUSED,
+		      unsigned len ODP_UNUSED)
+{
+	return 0;
+}
+
+static int ioddr_promisc_mode_set(pktio_entry_t *const pktio_entry,
+				odp_bool_t enable)
+{
+	pktio_entry->s.pkt_ioddr.promisc = enable;
+	return 0;
+}
+
+static int ioddr_promisc_mode(pktio_entry_t *const pktio_entry){
+	return 	pktio_entry->s.pkt_ioddr.promisc;
+}
+
+static int ioddr_mtu_get(pktio_entry_t *const pktio_entry) {
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+	return ioddr->mtu;
+}
+
+static int ioddr_stats(pktio_entry_t *const pktio_entry,
+		     _odp_pktio_stats_t *stats)
+{
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+
+	memset(stats, 0, sizeof(*stats));
+	if (rx_thread_fetch_stats(ioddr->rx_config.pktio_id,
+				  &stats->in_dropped, &stats->in_discards))
+		return -1;
+	return 0;
+}
+
+const pktio_if_ops_t ioddr_pktio_ops = {
+	.init = ioddr_init,
+	.term = ioddr_destroy,
+	.open = ioddr_open,
+	.close = ioddr_close,
+	.start = ioddr_start,
+	.stop = ioddr_stop,
+	.stats = ioddr_stats,
+	.recv = ioddr_recv,
+	.send = ioddr_send,
+	.mtu_get = ioddr_mtu_get,
+	.promisc_mode_set = ioddr_promisc_mode_set,
+	.promisc_mode_get = ioddr_promisc_mode,
+	.mac_get = ioddr_mac_addr_get,
+};

@@ -244,11 +244,12 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
 		pcie->rx_config.dma_if = 0;
 		pcie->rx_config.pool = pool;
-		pcie->rx_config.pktio_id = slot_id * MAX_PCIE_INTERFACES + port_id +
+		pcie->rx_config.pktio_id = RX_PCIE_IF_BASE +
+			slot_id * MAX_PCIE_INTERFACES + port_id +
 			MAX_RX_ETH_IF;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
+		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy, -1, -1);
 	}
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
