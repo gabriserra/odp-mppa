@@ -7,6 +7,9 @@ import itertools
 import re
 import subprocess
 
+YES = ['yes', 'Yes', 'YES', 'y', 'Y', 'true', 'True', 'TRUE', 't', 'T']
+NO  = ['no', 'No', 'NO', 'n', 'N', 'false', 'False', 'FALSE', 'f', 'F']
+
 quiet = False
 
 def printq(msg, end = '\n', cmnt = True):
@@ -89,10 +92,10 @@ def build_command(kelf_file_name, arg_names, arg_values):
         if len(n) == 1:
             arg_prefix = '-'
         arg_str = ''
-        if v in ['yes', 'Yes', 'YES', 'y', 'Y', 'true', 'True', 'TRUE', 't', 'T']:
+        if v in YES:
             arg_str = arg_prefix + n
             command.append(arg_str)
-        elif v in ['no', 'No', 'NO', 'n', 'N', 'false', 'False', 'FALSE', 'f', 'F']:
+        elif v in NO:
             command.append(arg_str)
             continue
         else:
@@ -101,27 +104,21 @@ def build_command(kelf_file_name, arg_names, arg_values):
             command.append(str(v))
     return command
 
-# unused
-def build_regex_map(regex_args):
-    regex_map = {}
-    for s in regex_args:
-        l = s.split('::')
-        len_l = len(l)
 
-        if len_l % 2 != 0:
-            raise 'Number of regex doesn\'t match number of variables'
-            
-        var_start_index = len_l / 2
-        for i in range(var_start_index):
-            v = l[var_start_index + i]
-            e = l[i]
-            if v in regex_map:
-                regex_map[v].append(e)
-            else:
-                regex_map[v] = [e]
-    return regex_map
+def get_test_name_with_args(kelf_file_name, arg_names, arg_values):
+    t = kelf_file_name.split('/')[-1]
+    ret = t[: t.rfind('.')]
+    for i in range(len(arg_values)):
+       v = arg_values[i]
+       if v in YES:
+            ret = ret + '_' + arg_names[i]
+            continue
+       if v in NO:
+            continue
+       ret = ret + '_' + arg_names[i] + ':' + str(v)
+    return ret
 
-
+        
 def main():
     parser = create_parser()
     script_args = parser.parse_args()
@@ -160,11 +157,11 @@ def main():
             compiled_exp = re.compile(exp)
             match = compiled_exp.search(str(stdoutdata))
             if match:
-                for i in range(1, compiled_exp.groups + 1):
-                    metric = l[i]
-                    matched_results[metric] = match.group(i)
-        
-        test_name = script_args.kelf.split('/')[-1][:-5]
+                for j in range(1, compiled_exp.groups + 1):
+                    metric = l[j]
+                    matched_results[metric] = match.group(j)
+
+        test_name = get_test_name_with_args(script_args.kelf, kelf_args_matrix.keys(), permutations[i])
         for metric in matched_results:
             print(metric + ' ' + test_name + ' ' + matched_results[metric])
         
