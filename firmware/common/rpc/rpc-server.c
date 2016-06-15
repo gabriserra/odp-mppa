@@ -20,13 +20,19 @@ int __n_rpc_handlers;
 static uint64_t __rpc_ev_masks[BSP_NB_DMA_IO_MAX][4];
 static uint64_t __rpc_fair_masks[BSP_NB_DMA_IO_MAX][4];
 
-static struct {
+struct rpc_clus_priv {
 	char    recv_buf[RPC_PKT_SIZE];
-} g_clus_priv[RPC_MAX_CLIENTS]
-#ifndef K1B_EXPLORER
- __attribute__ ((aligned(64), section(".upper_internal_memory")))
+};
+
+#if defined(LINUX_FIRMWARE)
+static struct rpc_clus_priv *g_clus_priv;
+#else
+static struct rpc_clus_priv g_clus_priv[RPC_MAX_CLIENTS]  __attribute__ ((aligned(64)))
+#if !defined(K1B_EXPLORER)
+__attribute__((section(".upper_internal_memory")))
 #endif
 ;
+#endif
 
 static inline int rxToMsg(unsigned ifId, unsigned tag,
 			   odp_rpc_t **msg, uint8_t **payload)
@@ -199,6 +205,7 @@ void  __attribute__ ((constructor)) __bas_rpc_constructor()
 
 /** Boot ack */
 static char rpc_server_stack[8192] __attribute__ ((aligned(64), section(".upper_internal_memory")));
+
 int odp_rpc_server_thread()
 {
 	if (__k1_get_cluster_id() != 160 &&
@@ -239,9 +246,30 @@ int odp_rpc_server_thread()
 	return 0;
 }
 
+#ifdef LINUX_FIRMWARE
+void  __attribute__ ((constructor (102))) __rpc_constructor()
+{
+	int dma;
+	int i;
+	for (dma = 0; dma < 4; ++dma) {
+		for (i = 0; i < UNUSABLE_TX; ++i) {
+			mppa_noc_dnoc_tx_alloc(dma, i);
+		}
+		for (i = 0; i < UNUSABLE_RX; ++i) {
+			mppa_noc_dnoc_rx_alloc(dma, i);
+		}
+	}
+}
+#endif
 int odp_rpc_server_start(void)
 {
 	int i;
+
+#ifdef LINUX_FIRMWARE
+	g_clus_priv = malloc(sizeof(*g_clus_priv) * RPC_MAX_CLIENTS);
+	if (g_clus_priv == NULL)
+		return -1;
+#endif
 
 	for (i = 0; i < RPC_MAX_CLIENTS; ++i) {
 		int ret = cluster_init_dnoc_rx(i);

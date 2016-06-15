@@ -144,18 +144,32 @@ SECTIONS
   /* TLS support */
   INCLUDE tls.ld 
 
+   . = 0x3F0000;
   .heap_start ALIGN(8):
   {
     _heap_start = ABSOLUTE(.);
-  } > internal_mem
+  } > private_smem
 
-  . = DEBUG_BASE;
-
+  . += 0x10000;
   .heap_end ALIGN(8):
   {
     _heap_end = ABSOLUTE(.);
     _debug_start = ABSOLUTE(.);
-  } > internal_mem
+  } > private_smem
+
+
+   . = ABSOLUTE(RamBase);
+  .ddr_start ALIGN(8):
+  {
+    _ddr_start = ABSOLUTE(.);
+  } > ddr
+
+  . += RamSize;
+  .ddr_end ALIGN(8):
+  {
+    _ddr_end = ABSOLUTE(.);
+  } > ddr
+
 
    /* DWARF2 debugging sections */
   .debug_info       0 : { *(.debug_info) }
