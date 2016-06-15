@@ -125,10 +125,11 @@ int main(int argc, char* argv[])
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i;
 	}
 
-	ret = netdev_init(n_if, if_cfgs);
+	netdev_init();
+	ret = netdev_configure(n_if, if_cfgs);
 	assert(ret == 0);
-	
-	ret = netdev_start();
+
+	ret = pcie_start();
 	assert(ret == 0);
 
 	while(1) {

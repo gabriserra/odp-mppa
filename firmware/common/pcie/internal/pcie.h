@@ -57,13 +57,13 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 static inline unsigned pcie_cluster_to_h2c_q(unsigned pcie_eth_if_id,
 					     unsigned remoteClus)
 {
-	return remoteClus % eth_control.configs[pcie_eth_if_id].n_txqs;
+	return remoteClus % eth_ctrl->configs[pcie_eth_if_id].n_txqs;
 }
 
 static inline unsigned pcie_cluster_to_c2h_q(unsigned pcie_eth_if_id,
 					     unsigned remoteClus)
 {
-	return remoteClus % eth_control.configs[pcie_eth_if_id].n_rxqs;
+	return remoteClus % eth_ctrl->configs[pcie_eth_if_id].n_rxqs;
 }
 
 static inline

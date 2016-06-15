@@ -74,8 +74,8 @@ static void mppa_pcie_pcie_tx_sender()
 	unsigned int i, j;
 
 	while(1) {
-		for (i = 0; i < eth_control.if_count; i++)
-			for (j = 0; j < eth_control.configs[i].n_rxqs; ++j)
+		for (i = 0; i < eth_ctrl->if_count; i++)
+			for (j = 0; j < eth_ctrl->configs[i].n_rxqs; ++j)
 				poll_noc_rx_buffer(i, j);
 	}
 }

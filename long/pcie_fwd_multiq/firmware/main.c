@@ -61,10 +61,15 @@ int main(int argc, char *const argv[])
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((__k1_get_cluster_id() - 128) << 1);
 	}
 
-	netdev_init(N_PCIE_IF, if_cfgs);
+	netdev_init();
+	ret = netdev_configure(N_PCIE_IF, if_cfgs);
+	if (ret != 0) {
+		fprintf(stderr, "Failed to configure PCIe eth interface\n");
+		exit(1);
+	}
 	ret = pcie_start();
 	if (ret != 0) {
-		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
+		fprintf(stderr, "Failed to start PCIe eth interface\n");
 		exit(1);
 	}
 	ret = odp_rpc_server_start();

@@ -22,7 +22,9 @@ typedef struct {
 	uint32_t n_h2c_q;
 } eth_if_cfg_t;
 
-int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]);
-int netdev_init_interface(const eth_if_cfg_t *cfg);
+int netdev_init(void);
+int netdev_configure(uint8_t n_if, const eth_if_cfg_t cfg[n_if]);
+int netdev_configure_interface(const eth_if_cfg_t *cfg);
+int netdev_start();
 
 #endif /* NETDEV__H */

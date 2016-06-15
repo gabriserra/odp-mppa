@@ -42,8 +42,8 @@ static int pcie_init_buff_pools()
 	unsigned i, j;
 	uint32_t buf_left;
 	int n_pools = 1;
-	for (i = 0; i < eth_control.if_count; ++i) {
-		n_pools += eth_control.configs[i].n_rxqs;
+	for (i = 0; i < eth_ctrl->if_count; ++i) {
+		n_pools += eth_ctrl->configs[i].n_rxqs;
 	}
 	buf_pool = calloc(MPPA_PCIE_MULTIBUF_COUNT * n_pools,
 			  sizeof(mppa_pcie_noc_rx_buf_t *));
@@ -53,8 +53,8 @@ static int pcie_init_buff_pools()
 	}
 	buffer_ring_init(&g_free_buf_pool, buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
 
-	for (i = 0; i < eth_control.if_count; i++) {
-		for (j = 0; j < eth_control.configs[i].n_rxqs; ++j) {
+	for (i = 0; i < eth_ctrl->if_count; i++) {
+		for (j = 0; j < eth_ctrl->configs[i].n_rxqs; ++j) {
 			buf_pool += MPPA_PCIE_MULTIBUF_COUNT;
 			buffer_ring_init(&g_full_buf_pool[i][j], buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
 		}
@@ -81,7 +81,7 @@ int pcie_start()
 #if defined(MAGIC_SCALL)
 	return 0;
 #endif
-	if (!eth_control.if_count)
+	if (!eth_ctrl->if_count)
 		return -1;
 
 	for (int i = 0; i < BSP_NB_DMA_IO_MAX; i++) {
@@ -100,6 +100,9 @@ int pcie_init(int if_count)
 #if defined(MAGIC_SCALL)
 	return 0;
 #endif
+
+	netdev_init();
+
 	if (if_count > MPPA_PCIE_ETH_IF_MAX)
 		return 1;
 
@@ -115,7 +118,7 @@ int pcie_init(int if_count)
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((mppa_rpc_odp_get_cluster_id(0) - 128) << 1);
 	}
 
-	netdev_init(if_count, if_cfgs);
+	netdev_configure(if_count, if_cfgs);
 	__k1_mb();
 
 	return pcie_start();
