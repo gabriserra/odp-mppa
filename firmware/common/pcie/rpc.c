@@ -205,7 +205,7 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 	/* FIXME, we send the same MTU as the one received */
 	answer->ack.cmd.pcie_open.mtu = open_cmd.pkt_size;
 	memcpy(answer->ack.cmd.pcie_open.mac,
-	       eth_control.configs[open_cmd.pcie_eth_if_id].mac_addr,
+	       eth_ctrl->configs[open_cmd.pcie_eth_if_id].mac_addr,
 	       MAC_ADDR_LEN);
 
 	return;

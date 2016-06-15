@@ -99,7 +99,7 @@ static void mppa_pcie_pcie_tx_sender()
 	unsigned int i = 0;
 
 	while(1) {
-		for (i = 0; i < *(volatile uint32_t*)&(eth_control.if_count); i++)
+		for (i = 0; i < *(volatile uint32_t*)&(eth_ctrl->if_count); i++)
 			poll_noc_rx_buffer(i);
 	}
 }

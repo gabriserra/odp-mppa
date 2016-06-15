@@ -93,7 +93,7 @@ int pcie_init(int if_count)
 
 	netdev_init(if_count, if_cfgs);
 	for (int i = 0; i < if_count; ++i){
-		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_control.configs[i].c2h_ring_buf_desc_addr;
+		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_ctrl->configs[i].c2h_ring_buf_desc_addr;
 	}
 
 	__k1_mb();

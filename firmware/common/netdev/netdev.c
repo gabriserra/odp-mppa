@@ -13,13 +13,13 @@
 #include "netdev.h"
 #include "internal/cache.h"
 
-#define DDR_BUFFER_BASE_ADDR	0x80000000
-
-static uintptr_t g_current_pkt_addr = DDR_BUFFER_BASE_ADDR;
+extern uint64_t RamBase;
+static uintptr_t g_current_pkt_addr = (uintptr_t)&RamBase;
 
 __attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
+struct mpodp_control *eth_ctrl;
 
 int netdev_c2h_is_full(struct mpodp_if_config *cfg)
 {
@@ -194,7 +194,7 @@ int netdev_init_interface(const eth_if_cfg_t *cfg)
 	if (cfg->if_id >= MPODP_MAX_IF_COUNT)
 		return -1;
 
-	if_cfg = &eth_control.configs[cfg->if_id];
+	if_cfg = &eth_ctrl->configs[cfg->if_id];
 	if_cfg->mtu = cfg->mtu;
 	if_cfg->flags = cfg->flags;
 	if_cfg->interrupt_status = 1;
@@ -222,7 +222,7 @@ int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 		if (ret)
 			return ret;
 	}
-	eth_control.if_count = n_if;
+	eth_ctrl->if_count = n_if;
 
 	return 0;
 }
@@ -230,15 +230,16 @@ int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 int netdev_start()
 {
 	pcie_open();
+	eth_ctrl = &eth_control;
 
 	/* Ensure coherency */
 	__k1_mb();
 	/* Cross fingers for everything to be setup correctly ! */
-	__builtin_k1_swu(&eth_control.magic, MPODP_CONTROL_STRUCT_MAGIC);
+	__builtin_k1_swu(&eth_ctrl->magic, MPODP_CONTROL_STRUCT_MAGIC);
 	/* Ensure coherency */
 	__k1_mb();
 
-	__mppa_pcie_control.services[PCIE_SERVICE_ODP].addr = (unsigned int)&eth_control;
+	__mppa_pcie_control.services[PCIE_SERVICE_ODP].addr = (unsigned int)eth_ctrl;
 	__k1_wmb();
 	__mppa_pcie_control.services[PCIE_SERVICE_ODP].magic = PCIE_SERVICE_MAGIC;
 	__k1_wmb();
