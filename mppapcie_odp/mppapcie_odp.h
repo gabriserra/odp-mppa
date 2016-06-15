@@ -18,7 +18,7 @@
 /**
  * Count of interfaces for one PCIe device
  */
-#define MPODP_MAX_IF_COUNT	                16
+#define MPODP_MAX_IF_COUNT	                2
 
 /**
  * Mac address length

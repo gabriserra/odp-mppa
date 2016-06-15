@@ -4,12 +4,19 @@
 #include <assert.h>
 #include <HAL/hal/hal.h>
 
+#include "pcie.h"
 #include "rpc-server.h"
 
 int main (int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
 {
 
 	int ret;
+
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	if (ret != 0) {
+		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
+		exit(1);
+	}
 
 	ret = odp_rpc_server_start();
 	if (ret) {

@@ -14,7 +14,10 @@
 #include "netdev.h"
 #include "internal/netdev.h"
 
+#ifndef DDR_BASE_ADDR
 #define DDR_BASE_ADDR			0x80000000
+#endif
+
 #define DIRECTORY_SIZE			(32 * 1024 * 1024)
 #define DDR_BUFFER_BASE_ADDR		(DDR_BASE_ADDR + DIRECTORY_SIZE)
 
