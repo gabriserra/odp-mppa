@@ -186,10 +186,18 @@ static int netdev_setup_h2c(struct mpodp_if_config *if_cfg,
 	return 0;
 }
 
-int netdev_init_interface(const eth_if_cfg_t *cfg)
+int netdev_init()
+{
+	eth_ctrl = &eth_control;
+	return 0;
+}
+int netdev_configure_interface(const eth_if_cfg_t *cfg)
 {
 	struct mpodp_if_config *if_cfg;
 	int ret;
+
+	if (!eth_ctrl)
+		return -1;
 
 	if (cfg->if_id >= MPODP_MAX_IF_COUNT)
 		return -1;
@@ -210,15 +218,18 @@ int netdev_init_interface(const eth_if_cfg_t *cfg)
 	return 0;
 }
 
-int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
+int netdev_configure(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 	uint8_t i;
 	int ret;
+
+	if (!eth_ctrl)
+		return -1;
 
 	if (n_if > MPODP_MAX_IF_COUNT)
 		return -1;
 
 	for (i = 0; i < n_if; ++i) {
-		ret = netdev_init_interface(&cfg[i]);
+		ret = netdev_configure_interface(&cfg[i]);
 		if (ret)
 			return ret;
 	}
@@ -229,8 +240,10 @@ int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 
 int netdev_start()
 {
+	if (!eth_ctrl)
+		return -1;
+
 	pcie_open();
-	eth_ctrl = &eth_control;
 
 	/* Ensure coherency */
 	__k1_mb();
@@ -256,4 +269,3 @@ int netdev_start()
 #endif
 	return 0;
 }
-

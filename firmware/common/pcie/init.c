@@ -77,6 +77,9 @@ int pcie_init(int if_count)
 #if defined(MAGIC_SCALL)
 	return 0;
 #endif
+
+	netdev_init();
+
 	if (if_count > MPPA_PCIE_ETH_IF_MAX)
 		return 1;
 
@@ -91,7 +94,7 @@ int pcie_init(int if_count)
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((odp_rpc_get_cluster_id(0) - 128) << 1);
 	}
 
-	netdev_init(if_count, if_cfgs);
+	netdev_configure(if_count, if_cfgs);
 	for (int i = 0; i < if_count; ++i){
 		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_ctrl->configs[i].c2h_ring_buf_desc_addr;
 	}
