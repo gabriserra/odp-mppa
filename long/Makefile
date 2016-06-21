@@ -7,6 +7,7 @@ ODP_SRC_DIR ?= $(LONG_DIR)/..
 ODP_ARCH ?= k1b-kalray-nodeos_developer
 ODP_TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
 include $(ODP_TOOLCHAIN_DIR)/share/odp/build/mk/platforms.inc
+PERF_DIR ?= $(ODP_SRC_DIR)/perf_files/
 
 INCLUDE_DIR=$($(ODP_ARCH)_INC_DIR)
 # Kalray internal system name
@@ -73,8 +74,10 @@ build: all
 install: all
 		 @if [ "$(LONT_DIR)" == "" ]; then echo "ERROR: LONT_DIR" not set; exit 1; fi
 		 mkdir -p $(LONT_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME)
-		 install $(addprefix $(DIR)/,$($(TEST_NAME)-scripts)) $(addprefix output/bin/, $($(TEST_NAME)-multibinary)) $($(TEST_NAME)-extras) $(LONT_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME)
-		 k1-multibin-util -f $(LONT_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME)/$($(TEST_NAME)-multibinary) -a --foreach="k1-strip --strip-debug {}"
+		 @if [ "$(NO_INSTALL_BINARY)" != "1" ]; then \
+		 install $(addprefix $(DIR)/,$($(TEST_NAME)-scripts)) $(addprefix output/bin/, $($(TEST_NAME)-multibinary)) $($(TEST_NAME)-extras) $(LONT_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME); \
+		 k1-multibin-util -f $(LONT_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME)/$($(TEST_NAME)-multibinary) -a --foreach="k1-strip --strip-debug {}"; \
+		 fi
 		 if [ -e output/bin/CTestTestfile.cmake ]; then \
 			install $(addprefix output/bin/, CTestTestfile.cmake DartConfiguration.tcl) $($(TEST_NAME)-extras) $(LONT_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME); \
 		 else \
@@ -84,7 +87,3 @@ install: all
 
 valid: install
 	cd output/bin && ctest -L $(VALID_TYPE)
-
-
-
-
