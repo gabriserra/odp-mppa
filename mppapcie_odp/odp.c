@@ -715,6 +715,8 @@ static int mpodp_remove_device(struct mppa_pcie_device *pdata)
 
 	mpodp_disable(netdev, pdata, _MPODP_IF_STATE_REMOVING);
 
+	cancel_work_sync(&netdev->enable);
+
 	dev_dbg(&netdev->pdev->dev, "Removing the associated netdev\n");
 	free_irq(mppa_pcie_get_irq(pdata, MPPA_PCIE_IRQ_USER_IT, 0),
 		 netdev);
