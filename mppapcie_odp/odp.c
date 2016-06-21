@@ -750,15 +750,17 @@ static struct notifier_block mpodp_notifier = {
 
 static int mpodp_init(void)
 {
-	printk(KERN_INFO "Loading PCIe ethernet driver\n");
+	printk(KERN_INFO "mppapcie_odp: loading PCIe ethernet driver\n");
 	mppa_pcie_register_notifier(&mpodp_notifier);
-
+	printk(KERN_DEBUG "mppapcie_odp: PCIe ethernet driver loaded\n");
 	return 0;
 }
 
 static void mpodp_exit(void)
 {
+	printk(KERN_INFO "mppapcie_odp: unloading PCIe ethernet driver\n");
 	mppa_pcie_unregister_notifier(&mpodp_notifier);
+	printk(KERN_DEBUG "mppapcie_odp: PCIe ethernet driver unloaded\n");
 }
 
 module_init(mpodp_init);
