@@ -47,7 +47,8 @@ repo = Git.new(odp_clone,workspace)
 local_valid = options["local-valid"]
 
 clean = Target.new("clean", repo, [])
-build = Target.new("build", repo, [])
+changelog = Target.new("changelog", repo, [])
+build = Target.new("build", repo, [changelog])
 install = Target.new("install", repo, [build])
 report_perf = Target.new("report-perf", repo, [])
 valid = ParallelTarget.new("valid", repo, [install])
@@ -62,9 +63,8 @@ long = Target.new("long", repo, [])
 dkms = Target.new("dkms", repo, [])
 package = Target.new("package", repo, [install, apps, long_build, dkms])
 
-#report_perf = Target.new("report_perf", repo, [long])
 
-b = Builder.new("odp", options, [clean, build, valid, valid_packages,
+b = Builder.new("odp", options, [clean, changelog, build, valid, valid_packages,
                                  long_build, long, apps, dkms, package, install, report_perf])
 
 b.logsession = "odp"
@@ -86,8 +86,11 @@ if ENV["label"].to_s() != "" then
         valid_configs = [ "k1b-kalray-nodeos_konic80", "k1b-kalray-mos_konic80" ]
         valid_type = "jtag"
     when /MPPA_EMB01b_centos7-with-eth-loopback/
-        valid_configs = [ "k1b-kalray-nodeos_emb01", "k1b-kalray-mos_emb01" ]
+        valid_configs = [ "k1b-kalray-mos_emb01" ]
         valid_type = "remote"
+    when /MPPA_AB04_Developers-with-loopback/
+	b.run("	echo 'SKIP'");
+	b.log.finish(b.current_target)
     when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
         # Validate nothing.
         valid_configs = [ ]
@@ -123,6 +126,20 @@ else
     artifacts = File.join(workspace,"artifacts")
 end
 mkdir_p artifacts unless File.exists?(artifacts)
+
+b.target("changelog") do
+    b.logtitle = "Report for odp changelog"
+    cd odp_path
+    ref_commit = ENV["INTEGRATION_BRANCH"]
+    if(ref_commit == nil || ref_commit == "")
+        # Do not know what is the source... Try HEAD^
+        ref_commit = "HEAD^"
+    else
+	ref_commit = "origin/#{ref_commit}"
+    end
+    b.run("./ls_modules.sh #{ref_commit} HEAD | ./ansi2html.sh > #{artifacts}/ls_modules.html")
+end
+
 
 b.target("build") do
     b.logtitle = "Report for odp build."

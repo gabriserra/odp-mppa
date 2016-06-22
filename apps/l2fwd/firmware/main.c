@@ -5,6 +5,8 @@
 #include <HAL/hal/hal.h>
 #include <unistd.h>
 
+
+#include "pcie.h"
 #include "rpc-server.h"
 #include "boot.h"
 
@@ -40,11 +42,19 @@ int main(int argc, char *const argv[])
 		n_clusters = 16;
 	}
 
+
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	if (ret != 0) {
+		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
+		exit(1);
+	}
+
 	ret = odp_rpc_server_start();
 	if (ret) {
 		fprintf(stderr, "[RPC] Error: Failed to start server\n");
 		exit(EXIT_FAILURE);
 	}
+
 	if ( __k1_get_cluster_id() == 128 ) {
 		printf("Spawning clusters\n");
 		{

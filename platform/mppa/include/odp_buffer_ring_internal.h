@@ -49,10 +49,9 @@ int odp_buffer_ring_get_multi(odp_buffer_ring_t *ring,
 void odp_buffer_ring_push_multi(odp_buffer_ring_t *ring,
 				odp_buffer_hdr_t *buffers[],
 				unsigned n_buffers, uint32_t *left);
-unsigned odp_buffer_ring_push_sort_list(odp_buffer_ring_t *ring,
-										odp_buffer_hdr_t **head,
-										odp_buffer_hdr_t ***tail,
-										unsigned n_buffers);
+unsigned odp_buffer_ring_push_list(odp_buffer_ring_t *ring,
+				   odp_buffer_hdr_t **head,
+				   unsigned n_buffers);
 
 static inline uint32_t odp_buffer_ring_get_count(odp_buffer_ring_t *ring)
 {

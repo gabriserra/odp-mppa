@@ -21,9 +21,15 @@ for {set i 0} {$i < 8} {incr i} {
 	source ucode_pcie_main.tcl
 }
 
-
+dma_label end_of_data
 dma_goto high_speed_loop
 dma_send_eot 0
+dma_send_event
+dma_wait_token
+dma_write_bundle
+
+dma_label no_data
+dma_goto high_speed_loop
 dma_send_event
 dma_wait_token
 dma_write_bundle

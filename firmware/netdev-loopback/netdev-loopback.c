@@ -4,11 +4,14 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <getopt.h>
+#include "unistd.h"
 
 #include <mppa/osconfig.h>
 #include <HAL/hal/hal.h>
 
+#include "mppa_pcie_netdev.h"
 #include "netdev.h"
+#include "internal/netdev.h"
 
 #define IF_COUNT		8
 #define RING_BUFFER_ENTRIES	32
@@ -16,6 +19,9 @@
 /**
  * Transfer all packet received on host tx to host rx
  */
+
+static uint64_t packet_nb[IF_COUNT] = {0};
+
 void main_loop(int n_if, int drop_all)
 {
 	int i;
@@ -27,6 +33,16 @@ void main_loop(int n_if, int drop_all)
 		if (dst_if >= n_if)
 			dst_if -= n_if;
 
+		uint64_t now = __k1_read_dsu_timestamp();
+		static uint64_t last_stat = 0;
+		if ( ( now - last_stat ) > (uint64_t)__bsp_frequency ) {
+			last_stat = __k1_read_dsu_timestamp();
+			printf("packets: ");
+			for ( int if_id = 0; if_id < n_if; ++ if_id ) {
+				printf("if[%d] %llu ", if_id, packet_nb[if_id]);
+			}
+			printf("\n");
+		}
 		struct mppa_pcie_eth_if_config * src_cfg = netdev_get_eth_if_config(src_if);
 		struct mppa_pcie_eth_if_config * dst_cfg = netdev_get_eth_if_config(dst_if);
 		struct mppa_pcie_eth_h2c_ring_buff_entry *src_buf;
@@ -58,6 +74,7 @@ void main_loop(int n_if, int drop_all)
 		pkt.pkt_addr = src_buf->pkt_addr;
 		pkt.data = 0ULL;
 
+		packet_nb[i]++;
 		/* queue it an retreive the previous addr at this slot */
 		struct mppa_pcie_eth_c2h_ring_buff_entry old_pkt;
 		netdev_c2h_enqueue_data(dst_cfg, &pkt, &old_pkt);
@@ -84,7 +101,7 @@ static eth_if_cfg_t if_cfgs[IF_COUNT] = {
 
 int main(int argc, char* argv[])
 {
-	int opt;
+	int opt, ret;
 
 	unsigned n_if = 1;
 	unsigned drop_all = 0;
@@ -108,9 +125,11 @@ int main(int argc, char* argv[])
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i;
 	}
 
-	netdev_init(n_if, if_cfgs);
-	netdev_start();
-
+	ret = netdev_init(n_if, if_cfgs);
+	assert(ret == 0);
+	
+	ret = netdev_start();
+	assert(ret == 0);
 
 	while(1) {
 		main_loop(n_if, drop_all);

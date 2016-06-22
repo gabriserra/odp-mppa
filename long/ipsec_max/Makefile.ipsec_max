@@ -1,0 +1,22 @@
+APP_DIR   := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+TEST_NAME := $(lastword $(subst /, ,$(APP_DIR)))
+
+ODP_TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
+include $(ODP_TOOLCHAIN_DIR)/share/odp/build/apps/Makefile.apps
+
+cflags += -I$(APP_DIR)/ipsec
+cflags += -O2
+
+fast-ipsec-srcs := $(wildcard $(APP_DIR)/ipsec/odp_ipsec_*.[ch]) $(APP_DIR)/odp_ipsec.c
+fast-ipsec-nameinmpk := odp_ipsec.kelf
+cluster-bin += fast-ipsec
+
+$(TEST_NAME)-objs += fast-ipsec
+mppa-bin += $(TEST_NAME)
+
+$(TEST_NAME)-sim-cmd := $(IOPCIE_NAME) -c $(TEST_NAME) -c $(TEST_NAME) -c $(TEST_NAME) -c $(TEST_NAME)
+$(TEST_NAME)-multibinary := $(TEST_NAME).mpk
+mppa-tests += $(TEST_NAME)
+$(TEST_NAME)-scripts := run.sh
+
+include $(K1_TOOLCHAIN_DIR)/share/make/Makefile.kalray

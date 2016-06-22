@@ -31,11 +31,13 @@ _ODP_STATIC_ASSERT(MAX_PCIE_INTERFACES * MAX_PCIE_SLOTS <= MAX_RX_PCIE_IF,
 
 #define N_RX_P_PCIE 12
 
+#define NOC_CLUS_IFACE_ID       0
 #define NOC_PCIE_UC_COUNT	2
 #define DNOC_CLUS_IFACE_ID	0
 
 #define PKTIO_PKT_MTU	1500
 
+#include <mppa_bsp.h>
 #include <mppa_noc.h>
 #include <mppa_routing.h>
 
@@ -52,6 +54,30 @@ static inline tx_uc_ctx_t *pcie_get_ctx(const pkt_pcie_t *pcie)
 	const unsigned int tx_index =
 		pcie->tx_config.config._.first_dir % NOC_PCIE_UC_COUNT;
 	return &g_pcie_tx_uc_ctx[tx_index];
+}
+
+static int pcie_init_cnoc_rx(void)
+{
+	mppa_cnoc_mailbox_notif_t notif = {0};
+	mppa_noc_ret_t ret;
+	mppa_noc_cnoc_rx_configuration_t conf = {0};
+	unsigned rx_id;
+
+	conf.mode = MPPA_NOC_CNOC_RX_MAILBOX;
+	conf.init_value = 0;
+
+	/* CNoC */
+	ret = mppa_noc_cnoc_rx_alloc_auto(NOC_CLUS_IFACE_ID, &rx_id,
+					  MPPA_NOC_BLOCKING);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return -1;
+
+	ret = mppa_noc_cnoc_rx_configure(NOC_CLUS_IFACE_ID, rx_id,
+					 conf, &notif);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return -1;
+
+	return rx_id;
 }
 
 static int pcie_init(void)
@@ -85,6 +111,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 			.pkt_size = PKTIO_PKT_MTU,
 			.min_rx = pcie->rx_config.min_port,
 			.max_rx = pcie->rx_config.max_port,
+			.cnoc_rx = pcie->cnoc_rx,
 		}
 	};
 	odp_rpc_t cmd = {
@@ -115,6 +142,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	pcie->tx_if = ack.cmd.pcie_open.tx_if;
 	pcie->min_tx_tag = ack.cmd.pcie_open.min_tx_tag;
 	pcie->max_tx_tag = ack.cmd.pcie_open.max_tx_tag;
+	pcie->nb_tx_tags = ack.cmd.pcie_open.max_tx_tag - ack.cmd.pcie_open.min_tx_tag + 1;
 	memcpy(pcie->mac_addr, ack.cmd.pcie_open.mac, ETH_ALEN);
 	pcie->mtu = ack.cmd.pcie_open.mtu;
 
@@ -223,6 +251,11 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
 	}
 
+	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
+	assert(ret >= 0);
+	pcie->pkt_count = 0;
+	__k1_wmb();
+
 	ret = pcie_rpc_send_pcie_open(pcie);
 
 	if (pktio_entry->s.param.out_mode != ODP_PKTOUT_MODE_DISABLED) {
@@ -248,7 +281,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pcie->tx_config.config._.bw_slow_delay     = 0x00;
 
 		pcie->tx_config.header._.multicast = 0;
-		pcie->tx_config.header._.tag = pcie->min_tx_tag;
+		pcie->tx_config.header._.tag = pcie->max_tx_tag;
 		pcie->tx_config.header._.valid = 1;
 	}
 
@@ -367,12 +400,45 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 	tx_uc_ctx_t *ctx = pcie_get_ctx(pcie);
 
-	pcie->tx_config.header._.tag += 1;
-	if ( pcie->tx_config.header._.tag > pcie->max_tx_tag )
-		pcie->tx_config.header._.tag = pcie->min_tx_tag;
+	odp_spinlock_lock(&pcie->wlock);
+	INVALIDATE(pcie);
 
-	return tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
-					  pkt_table, len, PKTIO_PKT_MTU);
+	uint64_t credit = mppa_noc_cnoc_rx_get_value(0, pcie->cnoc_rx) -
+		pcie->pkt_count;
+
+	if (credit * MAX_PKT_PER_UC  < len)
+		len = credit * MAX_PKT_PER_UC ;
+
+	int sent = 0;
+	int uc_sent = 0;
+
+	while (len > 0) {
+		int count = len > MAX_PKT_PER_UC ? MAX_PKT_PER_UC : len;
+		int ret = tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
+						     pkt_table, count, pcie->mtu);
+		if (ret < 0){
+			if (sent) {
+				__odp_errno = 0;
+				break;
+			}
+			odp_spinlock_unlock(&pcie->wlock);
+			return ret;
+		}
+
+		len -= count;
+
+		pcie->tx_config.header._.tag += 1;
+		if (pcie->tx_config.header._.tag > pcie->max_tx_tag)
+			pcie->tx_config.header._.tag = pcie->min_tx_tag;
+
+		sent += ret;
+		uc_sent += 1;
+	}
+
+	pcie->pkt_count += uc_sent;
+	odp_spinlock_unlock(&pcie->wlock);
+
+	return sent;
 }
 
 static int pcie_promisc_mode_set(pktio_entry_t *const pktio_entry ODP_UNUSED,

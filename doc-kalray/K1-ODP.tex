@@ -71,7 +71,7 @@ The K1-ODP files will be installed under the
 \texttt{/usr/local/k1tools} directory.
 
 \section{What's new}
-\subsection{K1-ODP 0.4}
+\subsection{K1-ODP 1.6.k4}
 \begin{itemize}
 \item[-]{New firmware system}
 \item[-]{Remove synchronisation barrier at cluster
@@ -105,6 +105,14 @@ parse arguments.
 Firmware build system has been changed to inherit compilation flags
 from the \texttt{platforms.inc} file already used for building ODP
 applications and now use the same board names.
+
+\subsubsection{Bug Fixes}
+\begin{itemize}
+\item[-]{Fix issues with packet ordering}
+\item[-]{Fix cache coherency issue when parsing received packets}
+\item[-]{Fix potential buffer overflow when pool packets are allocated
+requesting less than 64B}
+\end{itemize}
 
 \subsection{K1-ODP 0.3.3}
 
