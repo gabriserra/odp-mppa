@@ -120,6 +120,10 @@ def get_test_name_with_args(kelf_file_name, arg_names, arg_values):
        if v in NO:
             continue
        ret = ret + '_' + arg_names[i] + ':' + str(v)
+    if 'mos' in kelf_file_name:
+        ret = ret + '_mos'
+    if 'nodeos' in kelf_file_name:
+        ret = ret + '_nodeos'
     return ret
 
 

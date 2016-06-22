@@ -10,7 +10,7 @@ APP_NAME = "ODP-perf"
 
 options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path to a valid compiler prefix."],
                         "artifacts"     => {"type" => "string", "default" => "", "help" => "Artifacts path given by Jenkins"},
-                        "local-run"     => {"type" => "string", "default" => "false", "help" => "Run target locally"},
+                        "local-run"     => {"type" => "string", "default" => "0", "help" => "Run target locally"},
                         "debug"         => {"type" => "boolean", "default" => false, "help" => "Debug mode." },
                         "list-configs"  => {"type" => "boolean", "default" => false, "help" => "List all targets" },
                         "configs"       => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
@@ -143,8 +143,6 @@ b.target("valid") do
         fName=File.dirname(options['logfile']) + "/" + "automake-tests.xml"
         b.valid(:cmd => "make junits CONFIGS='#{valid_configs.join(" ")}' JUNIT_FILE=#{fName}")
     end
-
-    #b.report_perf_files("ODP-perf", ["#{odp_perf_files_path}"])
 end
 
 
@@ -165,11 +163,11 @@ b.target("long") do
 
         testEnv = $env.merge({ :test_name => "long-#{conf}"})
 
-        if local_run then
+        if local_run == "1" then
             cd File.join(odp_path, "install/local/k1tools/share/odp/long", board, platform)
             ENV["LOCAL_RUN"] = "1"
         else
-            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/long/", board, platform, "test/performance/")
+            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/long/", board, platform)
         end
         
         b.ctest( {
@@ -178,8 +176,8 @@ b.target("long") do
                      :success_msg => "Successfully validated #{conf}",
                      :env => testEnv,
                  })
-        b.run(:cmd => "ctest -L hw -VV")
     }
+    b.report_perf_files("ODP-perf", ["#{odp_perf_files_path}"])
 end
 
 
@@ -374,10 +372,9 @@ b.target("report-perf") do
     raise "artifacts option not set" if (options["artifacts"].empty?)
     artifacts = File.expand_path(options["artifacts"])
 
-    #cd ".metabuild"
-    cd odp_path
-    if File.exists?("perf_files") then
-        cd "perf_files"
+    cd ".metabuild"
+    if File.exists?(odp_perf_files_path) then
+        cd odp_perf_files_path
         b.run("tar -cvf perffiles.tar *.perf")
         b.run("mv perffiles.tar #{artifacts}")
     end

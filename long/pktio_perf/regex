@@ -1,1 +1,1 @@
-Maximum packet rate: (\d+) PPS::pps
+Maximum packet rate: (\d+) PPS \((\d+) Mbps\)::PPS::MBPS
