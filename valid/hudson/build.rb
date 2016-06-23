@@ -154,7 +154,7 @@ b.target("valid") do
     b.valid(:cmd => "make valid CONFIGS='#{valid_configs.join(" ")}'")
 
     b.valid(:cmd => "mkdir -p perf_files")
-    b.valid(:cmd => "mkdir -p artifact_files")
+    #b.valid(:cmd => "mkdir -p artifact_files")
 
     if options['logtype'] == :junit then
         fName=File.dirname(options['logfile']) + "/" + "automake-tests.xml"
