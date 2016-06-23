@@ -88,6 +88,7 @@ int ethtool_open_cluster(unsigned remoteClus, unsigned if_id,
 int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   int nocIf, int externalAddress,
 			   int min_rx, int max_rx,
+			   int min_payload, int max_payload,
 			   odp_rpc_answer_t *answer)
 {
 	int ret;
@@ -124,8 +125,8 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 	config._.write_user_en = 1;
 	config._.decounter_id = 0;
 	config._.decounted = 0;
-	config._.payload_min = 1;
-	config._.payload_max = 32;
+	config._.payload_min = min_payload ? : 1;
+	config._.payload_max = max_payload ? : 32;
 	config._.bw_current_credit = 0xff;
 	config._.bw_max_credit     = 0xff;
 	config._.bw_fast_delay     = 0x00;

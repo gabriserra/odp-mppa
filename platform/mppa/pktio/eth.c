@@ -88,6 +88,8 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 			.tx_enabled = 1,
 			.nb_rules = nb_rules,
 			.verbose = eth->verbose,
+			.min_payload = eth->min_payload,
+			.max_payload = eth->max_payload,
 		}
 	};
 	if (params) {
@@ -328,6 +330,8 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int nofree = 0;
 	int jumbo = 0;
 	int verbose = 0;
+	int min_payload = 0;
+	int max_payload = 0;
 
 	pkt_rule_t *rules = NULL;
 	int nb_rules = 0;
@@ -409,6 +413,22 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		} else if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
 			nofree = 1;
+		} else if (!strncmp(pptr, "min_payload=", strlen("min_payload="))){
+			pptr += strlen("min_payload=");
+			min_payload = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid min_payload %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "max_payload=", strlen("max_payload="))){
+			pptr += strlen("max_payload=");
+			max_payload = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid max_payload %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -438,6 +458,8 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	eth->loopback = loopback;
 	eth->jumbo = jumbo;
 	eth->verbose = verbose;
+	eth->min_payload = min_payload;
+	eth->max_payload = max_payload;
 	eth->tx_config.nofree = nofree;
 	eth->tx_config.add_end_marker = 0;
 

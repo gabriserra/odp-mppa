@@ -4,7 +4,7 @@
 #include <odp/rpc/defines.h>
 
 /** Version of the ETH CoS */
-#define ODP_RPC_ETH_VERSION 0x3
+#define ODP_RPC_ETH_VERSION 0x4
 
 /** Length of a mac address */
 #define ETH_ALEN 6
@@ -51,6 +51,8 @@ typedef union {
 		uint8_t nb_rules : 4;    /**< Number of rule to the has policy.
 					  *   Rules are provided in the payload */
 		uint8_t verbose :1;      /**< Make firmware verbose when opening a lane */
+		uint8_t min_payload: 6;  /**< Minimum payload for NoC packet. 0 = default */
+		uint8_t max_payload: 6;  /**< Maximum payload for NoC packet. 0 = default */
 	};
 	odp_rpc_inl_data_t inl_data;
 } odp_rpc_cmd_eth_open_t;

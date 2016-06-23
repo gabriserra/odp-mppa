@@ -48,22 +48,20 @@ int main(int argc, char *const argv[])
 		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
 		exit(1);
 	}
-
 	ret = odp_rpc_server_start();
 	if (ret) {
 		fprintf(stderr, "[RPC] Error: Failed to start server\n");
 		exit(EXIT_FAILURE);
 	}
-
 	if ( __k1_get_cluster_id() == 128 ) {
 		printf("Spawning clusters\n");
 		{
 			static char const * _argv[] = {
 				"odp_l2fwd.kelf",
-				"-i", "e0:tags=120:min_payload=48:max_payload=48,e1:tags=120:min_payload=48:max_payload=48",
+				"-i", "p0p0:tags=120,p1p0:tags=120",
 				"-m", "0",
 				"-s", "0",
-				"-c", "8", NULL
+				"-c", "10", NULL
 			};
 
 			while(clusters) {

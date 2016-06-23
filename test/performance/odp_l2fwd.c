@@ -33,17 +33,17 @@
 /** @def SHM_PKT_POOL_SIZE
  * @brief Size of the shared memory block
  */
-#define SHM_PKT_POOL_SIZE      (400*2048)
+#define SHM_PKT_POOL_SIZE      (128*512*7)
 
 /** @def SHM_PKT_POOL_BUF_SIZE
  * @brief Buffer size of the packet pool buffer
  */
-#define SHM_PKT_POOL_BUF_SIZE  1856
+#define SHM_PKT_POOL_BUF_SIZE  128
 
 /** @def MAX_PKT_BURST
  * @brief Maximum number of packet in a burst
  */
-#define MAX_PKT_BURST          32
+#define MAX_PKT_BURST          16
 
 /**
  * Packet input mode
@@ -72,6 +72,7 @@ typedef struct {
 	int dst_change;		/**< Change destination eth addresses */
 	int src_change;		/**< Change source eth addresses */
 	int error_check;        /**< Check packet errors */
+	int pktio_stats;        /**< Show pktio stats before exit */
 } appl_args_t;
 
 static int exit_threads;	/**< Break workers loop if set to 1 */
@@ -430,20 +431,30 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 	/* Wait for all threads to be ready*/
 	odp_barrier_wait(&barrier);
 
+#ifdef __K1__
+	uint64_t ts1 = 0, ts2 = 0;
+#endif
 	do {
 		pkts = 0;
 		rx_drops = 0;
 		tx_drops = 0;
 
 		sleep(timeout);
-
+#ifdef __K1__
+		ts2 = __k1_read_dsu_timestamp();
+#endif
 		for (i = 0; i < num_workers; i++) {
 			pkts += LOAD_U64(thr_stats[i].s.packets);
 			rx_drops += LOAD_U64(thr_stats[i].s.rx_drops);
 			tx_drops += LOAD_U64(thr_stats[i].s.tx_drops);
 		}
 		if (stats_enabled) {
+#ifdef __K1__
+			float real_pps = (pkts - pkts_prev) / ((float)(ts2-ts1)*(1.0f/__bsp_frequency));
+			pps = (uint64_t)real_pps;
+#else
 			pps = (pkts - pkts_prev) / timeout;
+#endif
 			if (pps > maximum_pps)
 				maximum_pps = pps;
 			printf("%" PRIu64 " pps, %" PRIu64 " max pps, ",  pps,
@@ -455,6 +466,9 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 			pkts_prev = pkts;
 		}
 		elapsed += timeout;
+#ifdef __K1__
+		ts1 = ts2;
+#endif
 	} while (loop_forever || (elapsed < duration));
 
 	if (stats_enabled)
@@ -483,8 +497,13 @@ int main(int argc, char *argv[])
 	int ret;
 	stats_t *stats;
 
+#ifdef __K1__
+	odp_platform_init_t platform_params = { .n_rx_thr = 6 };
+#else
+	odp_platform_init_t platform_params;
+#endif
 	/* Init ODP before calling anything else */
-	if (odp_init_global(NULL, NULL)) {
+	if (odp_init_global(NULL, &platform_params)) {
 		LOG_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -617,7 +636,16 @@ int main(int argc, char *argv[])
 	ret = print_speed_stats(num_workers, stats, gbl_args->appl.time,
 				gbl_args->appl.accuracy);
 	exit_threads = 1;
-
+#ifdef __K1__
+	if (gbl_args->appl.pktio_stats) {
+		for (i = 0; i < gbl_args->appl.if_count; ++i) {
+			_odp_pktio_stats_t pktio_stats;
+			pktio = gbl_args->pktios[i];
+			_odp_pktio_stats(pktio, &pktio_stats);
+			_odp_pktio_stats_print(pktio, &pktio_stats);
+		}
+	}
+#endif
 	/* Master thread waits for other threads to exit */
 	odph_linux_pthread_join(thread_tbl, num_workers);
 
@@ -712,6 +740,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{"dst_change", required_argument, NULL, 'd'},
 		{"src_change", required_argument, NULL, 's'},
 		{"error_check", required_argument, NULL, 'e'},
+		{"pktio_stats", no_argument, NULL, 'S'},
 		{"help", no_argument, NULL, 'h'},
 		{NULL, 0, NULL, 0}
 	};
@@ -720,9 +749,10 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	appl_args->accuracy = 1; /* get and print pps stats second */
 	appl_args->src_change = 1; /* change eth src address by default */
 	appl_args->error_check = 0; /* don't check packet errors by default */
+	appl_args->pktio_stats = 0;
 
 	while (1) {
-		opt = getopt_long(argc, argv, "+c:+t:+a:i:m:d:s:e:h",
+		opt = getopt_long(argc, argv, "+c:+t:+a:i:m:d:Ss:e:h",
 				  longopts, &long_index);
 
 		if (opt == -1)
@@ -792,6 +822,9 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		case 'd':
 			appl_args->dst_change = atoi(optarg);
 			break;
+		case 'S':
+			appl_args->pktio_stats = 1;
+			break;
 		case 's':
 			appl_args->src_change = atoi(optarg);
 			break;
@@ -818,7 +851,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 /**
  * Print system and application info
  */
-static void print_info(char *progname, appl_args_t *appl_args)
+static void print_info (char *progname, appl_args_t *appl_args)
 {
 	int i;
 
@@ -887,6 +920,7 @@ static void usage(char *progname)
 	       "                    1: Change packets' src eth addresses (default)\n"
 	       "  -e, --error_check 0: Don't check packet errors (default)\n"
 	       "                    1: Check packet errors\n"
+	       "  -S, --pktio_stats  : Display pktio statistics before exiting\n"
 	       "  -h, --help           Display help and exit.\n\n"
 	       " environment variables: ODP_PKTIO_DISABLE_NETMAP\n"
 	       "                        ODP_PKTIO_DISABLE_SOCKET_MMAP\n"

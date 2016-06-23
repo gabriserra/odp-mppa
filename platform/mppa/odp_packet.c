@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include "odp_rx_internal.h"
 
 /*
  *
@@ -85,8 +86,14 @@ void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 	pkt_hdr->headroom  = pool->s.headroom;
 	pkt_hdr->tailroom  = pool->s.seg_size -
 		(pool->s.headroom + size);
-}
 
+	/* Force MPPA header to 0 to detect spurious EOT */
+	mppa_ethernet_header_t *header;
+	header = (mppa_ethernet_header_t*)
+		(((uint8_t *)pkt_hdr->buf_hdr.addr) +
+		 pkt_hdr->headroom - sizeof(*header));
+	memset(header, 0, sizeof(*header));
+}
 odp_packet_t odp_packet_alloc(odp_pool_t pool_hdl, uint32_t len)
 {
 	pool_entry_t *pool = odp_pool_to_entry(pool_hdl);

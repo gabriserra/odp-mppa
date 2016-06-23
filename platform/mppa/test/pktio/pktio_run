@@ -41,7 +41,7 @@ run_test()
 			IFLIST="$IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
 			;;
 		"konic80")
-			IFLIST="e0 e1 -- e1 e0 -- e0:jumbo e1:jumbo -- e1:jumbo e0:jumbo -- $IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
+			IFLIST="e0 e1 -- e1:min_payload=48:max_payload=48 e0 -- e0:jumbo e1:jumbo -- e1:jumbo e0:jumbo -- $IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
 			;;
 		"emb01")
 			IFLIST="e0p0 e0p1 -- e0p1 e0p0 -- e0p0:jumbo e0p1:jumbo -- e0p1:jumbo e0p0:jumbo -- $IO0_LOOPS -- $IO1_LOOPS -- $COMMON"
@@ -65,7 +65,11 @@ run_test()
 
 	${TARGET_RUNNER} $(which pktio${EXEEXT}) ${IFLIST}
 	if [ $? -ne 0 ]; then
+	    echo "Trying once more just in case"
+	    ${TARGET_RUNNER} $(which pktio${EXEEXT}) ${IFLIST}
+	    if [ $? -ne 0 ]; then
 		ret=1
+	    fi
 	fi
 
 	if [ $ret -ne 0 ]; then

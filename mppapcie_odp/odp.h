@@ -21,6 +21,7 @@ enum _mpodp_if_state {
 	_MPODP_IF_STATE_ENABLING = 1,
 	_MPODP_IF_STATE_ENABLED = 2,
 	_MPODP_IF_STATE_DISABLING = 3,
+	_MPODP_IF_STATE_REMOVING = 4,
 };
 
 struct mpodp_tx {
@@ -73,7 +74,6 @@ struct mpodp_if_priv {
 	 * same as tail in MPPA Tx ring buffer
 	 * Range [0 .. tx_size [ */
 	atomic_t tx_done;
-	u8 __iomem *tx_tail_addr;
 
 	/* Position of the latest submited desc
 	 * Range [0 .. tx_size [ */
