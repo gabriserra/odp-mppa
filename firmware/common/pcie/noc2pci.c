@@ -164,9 +164,11 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 	int rx_thread_num = if_id / RX_THREAD_COUNT;
 	int th_iface_id = if_id % IF_PER_THREAD;
 	int rx_mask_off;
+	int bit_id = 0;
 	rx_iface_t *iface;
 
 	rx_mask_off = rx_id / (sizeof(iface->ev_mask[0]) * 8);
+	bit_id =  rx_id % (sizeof(iface->ev_mask[0]) * 8);
 	iface = &g_rx_threads[rx_thread_num].iface[th_iface_id];
 
 	if (pcie_configure_rx(iface, if_id, rx_id)) {
@@ -174,7 +176,7 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 		return -1;
 	}
 
-	iface->ev_mask[rx_mask_off] |= (1 << rx_id);
+	iface->ev_mask[rx_mask_off] |= (1ULL << bit_id);
 	iface->rx_cfgs[rx_id].pcie_eth_if = pcie_eth_if;
 	iface->rx_cfgs[rx_id].broken = 0;
 	iface->rx_cfgs[rx_id].tx_credit = tx_credit;
