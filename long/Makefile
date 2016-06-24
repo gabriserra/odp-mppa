@@ -7,7 +7,6 @@ ODP_SRC_DIR ?= $(LONG_DIR)/..
 ODP_ARCH ?= k1b-kalray-nodeos_developer
 ODP_TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
 include $(ODP_TOOLCHAIN_DIR)/share/odp/build/mk/platforms.inc
-PERF_DIR ?= $(ODP_SRC_DIR)/perf_files/
 
 INCLUDE_DIR=$($(ODP_ARCH)_INC_DIR)
 # Kalray internal system name

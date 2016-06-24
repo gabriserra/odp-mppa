@@ -93,7 +93,7 @@ extra-clean:
 extra-configure:
 extra-build:
 extra-valid:
-extra-install: $(K1ST_DIR)/lib64/libodp_syscall.so $(K1ST_DIR)/share/odp/build/mk/platforms.inc $(K1ST_DIR)/share/odp/build/apps/Makefile.apps $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh template-install
+extra-install: $(K1ST_DIR)/lib64/libodp_syscall.so $(K1ST_DIR)/share/odp/build/mk/platforms.inc $(K1ST_DIR)/share/odp/build/apps/Makefile.apps $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh template-install $(K1ST_DIR)/share/odp/perf/run_single $(K1ST_DIR)/share/odp/perf/pktio_perf/regex $(K1ST_DIR)/share/odp/perf/atomic_perf/regex
 extra-long:
 
 $(K1ST_DIR)/lib64/libodp_syscall.so: $(TOP_DIR)/syscall/run.sh
@@ -110,6 +110,16 @@ $(patsubst apps/skel/%, $(K1ST_DIR)/share/odp/skel/%, $(TEMPLATE_FILES)): $(K1ST
 	install -D $< $@
 $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh: ktest-wrapper.sh
 	install -D $< $@
+
+$(K1ST_DIR)/share/odp/perf/run_single: perf/run_single
+	install -D $< $@
+
+$(K1ST_DIR)/share/odp/perf/pktio_perf/regex: perf/pktio_perf/regex
+	install -D $< $@
+
+$(K1ST_DIR)/share/odp/perf/atomic_perf/regex: perf/atomic_perf/regex
+	install -D $< $@
+
 #
 # Generate rule wrappers that pull all CONFIGS for a given (firmware/Arch componen)|RULE
 #
