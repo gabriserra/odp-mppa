@@ -195,9 +195,8 @@ long-$(1)-$(2)-install: long-$(1)-$(2)-build
 	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
 
-long-$(1)-$(2)-valid: long-$(1)-$(2)-build extra-install
-	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile valid \
-	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
+long-$(1)-$(2)-valid: long-$(1)-$(2)-install extra-install
+	cd $(LONT_DIR)/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && ctest -L $($(1)_VALID_TYPE)
 
 long-$(1)-$(2)-build: long-$(1)-$(2)-configure
 	mkdir -p $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
