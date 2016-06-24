@@ -4,28 +4,32 @@ from __future__ import print_function
 
 import argparse
 import itertools
+import os
 import re
 import subprocess
+import sys
+import time
 
 YES = ['yes', 'Yes', 'YES', 'y', 'Y', 'true', 'True', 'TRUE', 't', 'T']
 NO  = ['no', 'No', 'NO', 'n', 'N', 'false', 'False', 'FALSE', 'f', 'F']
 
 quiet = False
+suppress_comments = False
 
-def printq(msg, end = '\n', cmnt = True):
+def printq(msg, end = '\n'):
     if not quiet:
-        m = msg
-        if cmnt:
-            m = '# ' + msg
-        print(m, end = end)
+        print(msg, end = end)
 
 
 def create_parser():
     parser = argparse.ArgumentParser(prefix_chars = '-')
     parser.add_argument('kelf')
     parser.add_argument('--args', '-a', nargs = '*', default = [])
-    parser.add_argument('--quiet', '-q', action = 'store_true')
+    parser.add_argument('--suppress-comments', '-sc', action = 'store_true')
     parser.add_argument('--regex', '-r', action = 'append', default = [])
+    parser.add_argument('--perf-file')
+    parser.add_argument('--regex-file')
+    parser.add_argument('--quiet', '-q', action = 'store_true')
     return parser
 
 
@@ -116,55 +120,99 @@ def get_test_name_with_args(kelf_file_name, arg_names, arg_values):
        if v in NO:
             continue
        ret = ret + '_' + arg_names[i] + ':' + str(v)
+    if 'mos' in kelf_file_name:
+        ret = ret + '_mos'
+    if 'nodeos' in kelf_file_name:
+        ret = ret + '_nodeos'
     return ret
 
-        
+
+def open_perff(perff_name):
+    dir = os.path.dirname(perff_name)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    try:
+        f = open(perff_name, 'a')
+        return f
+    except:
+        return None
+
+def get_regex_from_file(regexf_name, store_in):
+    try:
+        regex_file = open(regexf_name, 'r')
+        store_in.extend(regex_file.read().splitlines())
+    except:
+        pass 
+
+
 def main():
     parser = create_parser()
     script_args = parser.parse_args()
-    global quiet
-    quiet = script_args.quiet
+
+    global suppress_comments
+    suppress_comments = script_args.suppress_comments
     kelf_args_matrix = parse_kelf_args(script_args.args)
     permutations = permute_args(kelf_args_matrix)
     regex_args = script_args.regex
 
+    perf_file_name = script_args.perf_file
+    regex_file_name = script_args.regex_file
+
+    global quiet
+    quiet = script_args.quiet
+
     for i in range(len(permutations)):
         command = build_command(script_args.kelf, kelf_args_matrix.keys(), permutations[i])
-        printq('-' * 80)
-        printq('Running test: ' + ' '.join(command))
-        printq('-' * 80)
-        job = subprocess.Popen(command, stdout = subprocess.PIPE)
-
+        printq('#' + '-' * 80)
+        printq('# Running test: ' + ' '.join(command))
+        printq('#' + '-' * 80)
         stdoutdata = ''
+
+        job = subprocess.Popen(command, stdout = subprocess.PIPE)
         try:
             while True:
                 line = job.stdout.readline()
                 if line:
+                    line = '# ' + line 
                     stdoutdata = stdoutdata + line
                     printq(line, end = '')
                 else:
                     break
-        except KeyboardInterrupt:
-            # Subprocess stays alive when script is interrupted!
+        except:
             job.terminate()
-            break
+            job.wait()
+            sys.exit(job.returncode)
+        
         job.wait()
+        if job.returncode != 0:
+            sys.exit(job.returncode)
 
+        get_regex_from_file(regex_file_name, regex_args)
+        
         matched_results = {}
         for r in regex_args:
             l = r.split('::')
             exp = l[0]
             compiled_exp = re.compile(exp)
-            match = compiled_exp.search(str(stdoutdata))
+            match = compiled_exp.search(stdoutdata)
             if match:
                 for j in range(1, compiled_exp.groups + 1):
                     metric = l[j]
                     matched_results[metric] = match.group(j)
 
         test_name = get_test_name_with_args(script_args.kelf, kelf_args_matrix.keys(), permutations[i])
+
+        f = None
+        if perf_file_name is not None:
+            f = open_perff(perf_file_name)
+            if f is not None:
+                f.write(stdoutdata)
+        
         for metric in matched_results:
             print(metric + ' ' + test_name + ' ' + matched_results[metric])
-        
+            if f is not None:
+                f.write(metric + ' ' + test_name + ' ' + matched_results[metric] + '\n') 
+
 
 if __name__ == '__main__':
     main()

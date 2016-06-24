@@ -6,7 +6,11 @@ require 'metabuild'
 include Metabuild
 CONFIGS = `make list-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
 
+APP_NAME = "ODP-perf"
+
 options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path to a valid compiler prefix."],
+                        "artifacts"     => {"type" => "string", "default" => "", "help" => "Artifacts path given by Jenkins"},
+                        "local-run"     => {"type" => "string", "default" => "0", "help" => "Run target locally"},
                         "debug"         => {"type" => "boolean", "default" => false, "help" => "Debug mode." },
                         "list-configs"  => {"type" => "boolean", "default" => false, "help" => "List all targets" },
                         "configs"       => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
@@ -24,7 +28,12 @@ workspace  = options["workspace"]
 odp_clone  = options['clone']
 jobs = options['jobs']
 
+local_run = options["local-run"]
+
 odp_path   = File.join(workspace,odp_clone)
+
+odp_perf_files_path = "#{odp_path}/perf_files"
+odp_artifact_files_path = "#{odp_path}/artifact_files"
 
 k1tools = options["k1tools"]
 
@@ -41,6 +50,7 @@ clean = Target.new("clean", repo, [])
 changelog = Target.new("changelog", repo, [])
 build = Target.new("build", repo, [changelog])
 install = Target.new("install", repo, [build])
+report_perf = Target.new("report-perf", repo, [])
 valid = ParallelTarget.new("valid", repo, [install])
 valid_packages = ParallelTarget.new("valid-packages", repo, [])
 
@@ -53,8 +63,9 @@ long = Target.new("long", repo, [])
 dkms = Target.new("dkms", repo, [])
 package = Target.new("package", repo, [install, apps, long_build, dkms])
 
+
 b = Builder.new("odp", options, [clean, changelog, build, valid, valid_packages,
-                                 long_build, long, apps, dkms, package, install])
+                                 long_build, long, apps, dkms, package, install, report_perf])
 
 b.logsession = "odp"
 
@@ -142,6 +153,9 @@ b.target("valid") do
 
     b.valid(:cmd => "make valid CONFIGS='#{valid_configs.join(" ")}'")
 
+    b.valid(:cmd => "mkdir -p perf_files")
+    #b.valid(:cmd => "mkdir -p artifact_files")
+
     if options['logtype'] == :junit then
         fName=File.dirname(options['logfile']) + "/" + "automake-tests.xml"
         b.valid(:cmd => "make junits CONFIGS='#{valid_configs.join(" ")}' JUNIT_FILE=#{fName}")
@@ -166,7 +180,13 @@ b.target("long") do
 
         testEnv = $env.merge({ :test_name => "long-#{conf}"})
 
-        cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/long/", board, platform)
+        if local_run == "1" then
+            cd File.join(odp_path, "install/local/k1tools/share/odp/long", board, platform)
+            ENV["LOCAL_RUN"] = "1"
+        else
+            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/long/", board, platform)
+        end
+        
         b.ctest( {
                      :ctest_args => "-L #{valid_type}",
                      :fail_msg => "Failed to validate #{conf}",
@@ -174,6 +194,7 @@ b.target("long") do
                      :env => testEnv,
                  })
     }
+    b.report_perf_files("ODP-perf", ["#{odp_perf_files_path}"])
 end
 
 
@@ -219,7 +240,7 @@ b.target("package") do
     cd odp_path
 
     b.run(:cmd => "cd install/; tar cf ../odp.tar local/k1tools/lib/ local/k1tools/share/odp/firmware local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ local/k1tools/k1*/include local/k1tools/share/doc/ local/k1tools/lib64", :env => $env)
-    b.run(:cmd => "cd install/; tar cf ../odp-tests.tar local/k1tools/share/odp/tests local/k1tools/share/odp/long", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-tests.tar local/k1tools/share/odp/tests local/k1tools/share/odp/long local/k1tools/share/odp/perf", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-apps-internal.tar local/k1tools/share/odp/apps", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
 
@@ -364,6 +385,17 @@ b.target("dkms") do
   b.create_dkms_package(src_tar_package,pinfo,["mppapcie_odp"],)
 end
 
+b.target("report-perf") do
+    raise "artifacts option not set" if (options["artifacts"].empty?)
+    artifacts = File.expand_path(options["artifacts"])
+
+    cd ".metabuild"
+    if File.exists?(odp_perf_files_path) then
+        cd odp_perf_files_path
+        b.run("tar -cvf perffiles.tar *.perf")
+        b.run("mv perffiles.tar #{artifacts}")
+    end
+end
+
 
 b.launch
-

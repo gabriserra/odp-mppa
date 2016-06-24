@@ -103,6 +103,8 @@ odp-$(1)-valid: odp-$(1)-build extra-install firmware-install
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/platform/$($(1)_PLATFORM)/test/ check
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/test/performance $($(1)_MAKE_VALID) check
 
+odp-$(1)-perf: odp-$(1)-build extra-install firmware-install
+
 odp-$(1)-clean:
 	rm -Rf $(ODP_$(1)_BUILDDIR)
 
