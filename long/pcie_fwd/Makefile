@@ -22,6 +22,7 @@ ifeq ($(board),$(BOARD_konic80))
 $(TEST_NAME)-hw-cmd := run.sh
 $(TEST_NAME)-labels := jtag
 $(TEST_NAME)-hw-no-remote := 1
+$(TEST_NAME)-hw-timeout := 120
 host-tests += $(TEST_NAME)
 endif
 include $(K1_TOOLCHAIN_DIR)/share/make/Makefile.kalray
