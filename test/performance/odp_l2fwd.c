@@ -33,17 +33,17 @@
 /** @def SHM_PKT_POOL_SIZE
  * @brief Size of the shared memory block
  */
-#define SHM_PKT_POOL_SIZE      (128*512*7)
+#define SHM_PKT_POOL_SIZE      (400*2048)
 
 /** @def SHM_PKT_POOL_BUF_SIZE
  * @brief Buffer size of the packet pool buffer
  */
-#define SHM_PKT_POOL_BUF_SIZE  128
+#define SHM_PKT_POOL_BUF_SIZE  1856
 
 /** @def MAX_PKT_BURST
  * @brief Maximum number of packet in a burst
  */
-#define MAX_PKT_BURST          16
+#define MAX_PKT_BURST          32
 
 /**
  * Packet input mode
@@ -431,30 +431,20 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 	/* Wait for all threads to be ready*/
 	odp_barrier_wait(&barrier);
 
-#ifdef __K1__
-	uint64_t ts1 = 0, ts2 = 0;
-#endif
 	do {
 		pkts = 0;
 		rx_drops = 0;
 		tx_drops = 0;
 
 		sleep(timeout);
-#ifdef __K1__
-		ts2 = __k1_read_dsu_timestamp();
-#endif
+
 		for (i = 0; i < num_workers; i++) {
 			pkts += LOAD_U64(thr_stats[i].s.packets);
 			rx_drops += LOAD_U64(thr_stats[i].s.rx_drops);
 			tx_drops += LOAD_U64(thr_stats[i].s.tx_drops);
 		}
 		if (stats_enabled) {
-#ifdef __K1__
-			float real_pps = (pkts - pkts_prev) / ((float)(ts2-ts1)*(1.0f/__bsp_frequency));
-			pps = (uint64_t)real_pps;
-#else
 			pps = (pkts - pkts_prev) / timeout;
-#endif
 			if (pps > maximum_pps)
 				maximum_pps = pps;
 			printf("%" PRIu64 " pps, %" PRIu64 " max pps, ",  pps,
@@ -466,9 +456,6 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 			pkts_prev = pkts;
 		}
 		elapsed += timeout;
-#ifdef __K1__
-		ts1 = ts2;
-#endif
 	} while (loop_forever || (elapsed < duration));
 
 	if (stats_enabled)
@@ -497,13 +484,8 @@ int main(int argc, char *argv[])
 	int ret;
 	stats_t *stats;
 
-#ifdef __K1__
-	odp_platform_init_t platform_params = { .n_rx_thr = 6 };
-#else
-	odp_platform_init_t platform_params;
-#endif
 	/* Init ODP before calling anything else */
-	if (odp_init_global(NULL, &platform_params)) {
+	if (odp_init_global(NULL, NULL)) {
 		LOG_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -851,7 +833,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 /**
  * Print system and application info
  */
-static void print_info (char *progname, appl_args_t *appl_args)
+static void print_info(char *progname, appl_args_t *appl_args)
 {
 	int i;
 
