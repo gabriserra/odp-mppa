@@ -145,7 +145,6 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 		if (dmaengine_slave_config
 		    (priv->rx_chan, &priv->rx_config.cfg)) {
 			/* board has reset, wait for reset of netdev */
-			netif_stop_queue(netdev);
 			netif_carrier_off(netdev);
 			netdev_err(netdev,
 				   "rx %d: cannot configure channel\n",

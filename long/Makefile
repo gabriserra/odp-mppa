@@ -36,7 +36,6 @@ board = $(BOARD_NAME)
 
 cflags := -Wall -Werror -Wextra
 LIB_NOC_LFLAGS :=  -lmppapower -lmpparouting -lmppanoc
-VALID_TYPE := $(if $(findstring simu,$(OS_BOARD_NAME)),sim,jtag)
 
 ifeq ($(MAKELEVEL),0)
 $(info --- Building for arch $(arch), os $(OS_NAME), board $(BOARD_NAME) ---)
@@ -82,7 +81,3 @@ install: all
 		 else \
 			echo "WARNING: No ctest file"; \
 		 fi
-
-
-valid: install
-	cd output/bin && ctest -L $(VALID_TYPE)

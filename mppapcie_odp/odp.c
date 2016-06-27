@@ -518,7 +518,8 @@ static void mpodp_pre_reset_all(struct mpodp_pdata_priv *netdev,
 
 
 static void mpodp_disable(struct mpodp_pdata_priv *netdev,
-			struct mppa_pcie_device *pdata)
+			  struct mppa_pcie_device *pdata,
+			  int netdev_status)
 {
 	int i;
 	enum _mpodp_if_state last_state;
@@ -553,7 +554,7 @@ static void mpodp_disable(struct mpodp_pdata_priv *netdev,
 
 	netdev->if_count = 0;
 
-	atomic_set(&netdev->state, _MPODP_IF_STATE_DISABLED);
+	atomic_set(&netdev->state, netdev_status);
 }
 
 static void mpodp_enable_task(struct work_struct *work)
@@ -634,7 +635,7 @@ mpodp_dev_notifier_call(struct notifier_block *nb, unsigned long action,
 	switch (action) {
 	case MPPA_PCIE_DEV_EVENT_RESET:
 		mpodp_pre_reset_all(netdev, pdata);
-		mpodp_disable(netdev, pdata);
+		mpodp_disable(netdev, pdata, _MPODP_IF_STATE_DISABLED);
 		break;
 	case MPPA_PCIE_DEV_EVENT_POST_RESET:
 	case MPPA_PCIE_DEV_EVENT_STATUS:
@@ -712,7 +713,9 @@ static int mpodp_remove_device(struct mppa_pcie_device *pdata)
 	if (!netdev)
 		return 0;
 
-	mpodp_disable(netdev, pdata);
+	mpodp_disable(netdev, pdata, _MPODP_IF_STATE_REMOVING);
+
+	cancel_work_sync(&netdev->enable);
 
 	dev_dbg(&netdev->pdev->dev, "Removing the associated netdev\n");
 	free_irq(mppa_pcie_get_irq(pdata, MPPA_PCIE_IRQ_USER_IT, 0),
@@ -750,15 +753,17 @@ static struct notifier_block mpodp_notifier = {
 
 static int mpodp_init(void)
 {
-	printk(KERN_INFO "Loading PCIe ethernet driver\n");
+	printk(KERN_INFO "mppapcie_odp: loading PCIe ethernet driver\n");
 	mppa_pcie_register_notifier(&mpodp_notifier);
-
+	printk(KERN_DEBUG "mppapcie_odp: PCIe ethernet driver loaded\n");
 	return 0;
 }
 
 static void mpodp_exit(void)
 {
+	printk(KERN_INFO "mppapcie_odp: unloading PCIe ethernet driver\n");
 	mppa_pcie_unregister_notifier(&mpodp_notifier);
+	printk(KERN_DEBUG "mppapcie_odp: PCIe ethernet driver unloaded\n");
 }
 
 module_init(mpodp_init);

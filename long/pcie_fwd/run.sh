@@ -10,17 +10,27 @@ INIT_FREQ=$(cat /mppa/board0/mppa0/chip_freq)
 echo 400 > /mppa/board0/mppa0/chip_freq
 echo 1 > /mppa/board0/mppa0/reset
 
+k1-jtag-runner --reset
+
 #Start jtag runner in the BG
-k1-jtag-runner --multibinary=pcie_fwd_multibin.mpk --exec-multibin=IODDR0:iopcie --exec-multibin=IODDR1:iopcie -- -cpcie_fwd -a "-i p0p0:tags=60,p1p0:tags=60" -a "-m 0" -a "-s 0" -a "-c 10" &
-sleep 5
+res=1
 
-#11s for 10 pings (allow 1 drop)
-ping6 -c 10 -w 11 -I modp0.0.0.0 fe80::de:adff:febe:ef80
-res=$?
+for i in $(seq 1 5); do
+    k1-jtag-runner --multibinary=pcie_fwd_multibin.mpk --exec-multibin=IODDR0:iopcie \
+		   --exec-multibin=IODDR1:iopcie -- -cpcie_fwd \
+		   -a "-i p0p0:tags=60,p1p0:tags=60" -a "-m 0" -a "-s 0" -a "-c 8" &
+    sleep 5
 
-# Kill jtag and join it
-kill %
-wait
+    #11s for 10 pings (allow 1 drop)
+    ping6 -c 10 -w 11 -I modp0.0.0.0 fe80::de:adff:febe:ef80
+    res=$?
+
+    # Kill jtag and join it
+    kill %
+    wait
+
+    if [ $res -eq 0 ]; then break; fi
+done
 
 #Restore frequency
 echo 600 > /mppa/board0/mppa0/chip_freq
