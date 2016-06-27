@@ -21,6 +21,7 @@ enum _mpodp_if_state {
 	_MPODP_IF_STATE_ENABLING = 1,
 	_MPODP_IF_STATE_ENABLED = 2,
 	_MPODP_IF_STATE_DISABLING = 3,
+	_MPODP_IF_STATE_REMOVING = 4,
 };
 
 struct mpodp_tx {
