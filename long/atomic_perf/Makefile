@@ -10,9 +10,8 @@ ifeq ($(board),$(BOARD_explorer))
 
 else
 	$(TEST_NAME)-hw-timeout := 500
-	#$(TEST_NAME)-hw-cmd := $(DIR)/../../perf/run_single $(DIR)/../../install/local/k1tools/share/odp/tests/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/test/performance/odp_atomic.kelf --perf-file $(PERF_DIR)/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME).perf --regex-file $(DIR)/../../long/atomic_perf/regex --args t [1]
 
-	 $(TEST_NAME)-hw-cmd := ./../../../../perf/run_single ./../../../../tests/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/test/performance/odp_atomic.kelf --perf-file ./../../../../perf_files/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME).perf --regex-file ./../../../../perf/$(TEST_NAME)/regex --args t [1]
+	 $(TEST_NAME)-hw-cmd := ./../../../../perf/run_single ./../../../../tests/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/test/performance/odp_atomic.kelf --perf-file "\$$$$ENV{perf_files_path}"/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME).perf --regex-file ./../../../../perf/$(TEST_NAME)/regex --args t [1]
 
 	$(TEST_NAME)-hw-no-remote := 1
 

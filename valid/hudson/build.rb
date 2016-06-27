@@ -178,7 +178,7 @@ b.target("long") do
         board=conf.split("_")[1]
         platform=conf.split("_")[0]
 
-        testEnv = $env.merge({ :test_name => "long-#{conf}"})
+        testEnv = $env.merge({ :test_name => "long-#{conf}", :perf_files_path => odp_perf_files_path})
 
         if local_run == "1" then
             cd File.join(odp_path, "install/local/k1tools/share/odp/long", board, platform)
@@ -194,7 +194,7 @@ b.target("long") do
                      :env => testEnv,
                  })
     }
-    b.report_perf_files("ODP-perf", ["#{odp_perf_files_path}"])
+    b.report_perf_files("ODP-perf", [odp_perf_files_path])
 end
 
 
