@@ -1248,7 +1248,7 @@ main(int argc, char *argv[])
                 }
             } else if (!steady_reached) {
                 steady_reached = 1;
-                min_pps = pps*0.98; // allow pps to drop by 2% compared to max reached
+                min_pps = pps * 0.95; // allow pps to drop by 5% compared to max reached
                 //printf("%ssteady pps reached (%7.3e), min_pps = %7.3e\n",
                 //        __k1_get_cluster_id()<10?" ":"", pps, min_pps);
                 sprintf(status_str, "steady");
