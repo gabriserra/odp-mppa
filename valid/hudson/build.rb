@@ -9,7 +9,6 @@ CONFIGS = `make list-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
 APP_NAME = "ODP-perf"
 
 options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path to a valid compiler prefix."],
-                        "artifacts"     => {"type" => "string", "default" => "", "help" => "Artifacts path given by Jenkins"},
                         "local-run"     => {"type" => "string", "default" => "0", "help" => "Run target locally"},
                         "debug"         => {"type" => "boolean", "default" => false, "help" => "Debug mode." },
                         "list-configs"  => {"type" => "boolean", "default" => false, "help" => "List all targets" },
@@ -196,10 +195,7 @@ b.target("long") do
     }
     b.report_perf_files("ODP-perf", [odp_perf_files_path])
 
-    raise "artifacts option not set" if(options["artifacts"].empty?)
-    artifacts = File.expand_path(options["artifacts"])
-    #artifacts = File.expand_path(ENV["ARTIFACT_PATH"])
-
+    cd odp_path
     cd ".metabuild"
     if File.exists?("perffiles") then
         cd "perffiles"
