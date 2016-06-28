@@ -52,7 +52,7 @@ pcie_start_tx_rm();
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 		  unsigned c2h_q, tx_credit_t *tx_credit,
-		  odp_rpc_answer_t *answer);
+		  mppa_rpc_odp_answer_t *answer);
 
 static inline unsigned pcie_cluster_to_h2c_q(unsigned pcie_eth_if_id,
 					     unsigned remoteClus)

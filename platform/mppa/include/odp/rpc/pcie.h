@@ -1,25 +1,25 @@
-#ifndef __ODP_RPC_PCIE_H__
-#define __ODP_RPC_PCIE_H__
+#ifndef __MPPA_RPC_ODP_PCIE_H__
+#define __MPPA_RPC_ODP_PCIE_H__
 
 #include <odp/rpc/defines.h>
 
 /** Version of the PCIE CoS */
-#define ODP_RPC_PCIE_VERSION 0x2
+#define MPPA_RPC_ODP_PCIE_VERSION 0x2
 
 typedef enum {
-	ODP_RPC_CMD_PCIE_OPEN    /**< PCIe: Forward Rx traffic to a cluster */,
-	ODP_RPC_CMD_PCIE_CLOS    /**< PCIe: Stop forwarding Rx trafic to a cluster */,
-	ODP_RPC_CMD_PCIE_N_CMD
-} odp_rpc_cmd_pcie_e;
+	MPPA_RPC_ODP_CMD_PCIE_OPEN    /**< PCIe: Forward Rx traffic to a cluster */,
+	MPPA_RPC_ODP_CMD_PCIE_CLOS    /**< PCIe: Stop forwarding Rx trafic to a cluster */,
+	MPPA_RPC_ODP_CMD_PCIE_N_CMD
+} mppa_rpc_odp_cmd_pcie_e;
 
-#define ODP_RPC_CMD_NAMES_PCIE			\
+#define MPPA_RPC_ODP_CMD_NAMES_PCIE			\
 	"PCIE OPEN",				\
 		"PCIE CLOSE"
 
-#define ODP_RPC_ACK_LIST_PCIE odp_rpc_ack_pcie_open_t pcie_open;
+#define MPPA_RPC_ODP_ACK_LIST_PCIE mppa_rpc_odp_ack_pcie_open_t pcie_open;
 
 /**
- * Command for ODP_RPC_CMD_PCIE_OPEN
+ * Command for MPPA_RPC_ODP_CMD_PCIE_OPEN
  */
 typedef union {
 	struct {
@@ -29,12 +29,12 @@ typedef union {
 		uint8_t max_rx;
 		uint8_t cnoc_rx;
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_cmd_pcie_open_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_pcie_open_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_pcie_open_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_pcie_open_t);
 
 /**
- * Ack inline for ODP_RPC_CMD_PCIE_OPEN
+ * Ack inline for MPPA_RPC_ODP_CMD_PCIE_OPEN
  */
 typedef struct {
 	uint16_t tx_if;	/* IO Cluster id */
@@ -42,12 +42,12 @@ typedef struct {
 	uint8_t  max_tx_tag;	/* Tag of the last IO Cluster rx */
 	uint8_t  mac[ETH_ALEN];
 	uint16_t mtu;
-} odp_rpc_ack_pcie_open_t;
+} mppa_rpc_odp_ack_pcie_open_t;
 
 /**
- * Command for ODP_RPC_CMD_PCIE_CLOS
+ * Command for MPPA_RPC_ODP_CMD_PCIE_CLOS
  */
-typedef odp_rpc_cmd_eth_clos_t odp_rpc_cmd_pcie_clos_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_pcie_clos_t);
+typedef mppa_rpc_odp_cmd_eth_clos_t mppa_rpc_odp_cmd_pcie_clos_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_pcie_clos_t);
 
-#endif /* __ODP_RPC_PCIE_H__ */
+#endif /* __MPPA_RPC_ODP_PCIE_H__ */

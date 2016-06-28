@@ -101,14 +101,14 @@ static int cluster_init(void)
 static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *cluster)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
 
 	/*
 	 * RPC Msg to IODDR0 so the LB will dispatch to us
 	 */
-	odp_rpc_cmd_c2c_open_t open_cmd = {
+	mppa_rpc_odp_cmd_c2c_open_t open_cmd = {
 		{
 			.cluster_id = cluster->clus_id,
 			.min_rx = cluster->local.min_rx,
@@ -125,22 +125,22 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 		if (params->out_mode == ODP_PKTOUT_MODE_DISABLED)
 			open_cmd.tx_enabled = 0;
 	}
-	odp_rpc_t cmd = {
+	mppa_rpc_odp_t cmd = {
 		.data_len = 0,
-		.pkt_class = ODP_RPC_CLASS_C2C,
-		.pkt_subtype = ODP_RPC_CMD_C2C_OPEN,
-		.cos_version = ODP_RPC_C2C_VERSION,
+		.pkt_class = MPPA_RPC_ODP_CLASS_C2C,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_C2C_OPEN,
+		.cos_version = MPPA_RPC_ODP_C2C_VERSION,
 		.inl_data = open_cmd.inl_data,
 		.flags = 0,
 	};
-	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
+	const unsigned int rpc_server_id = mppa_rpc_odp_client_get_default_server();
 	uint8_t *payload;
 
-	odp_rpc_do_query(rpc_server_id,
-			 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(rpc_server_id,
+			 mppa_rpc_odp_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[C2C]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[C2C]");
 	if (ret <= 0)
 		return 1;
 
@@ -158,31 +158,31 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 static int cluster_rpc_send_c2c_query(pkt_cluster_t *cluster)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
 
-	odp_rpc_cmd_c2c_query_t query_cmd = {
+	mppa_rpc_odp_cmd_c2c_query_t query_cmd = {
 		{
 			.cluster_id = cluster->clus_id,
 		}
 	};
-	odp_rpc_t cmd = {
+	mppa_rpc_odp_t cmd = {
 		.data_len = 0,
-		.pkt_class = ODP_RPC_CLASS_C2C,
-		.pkt_subtype = ODP_RPC_CMD_C2C_QUERY,
-		.cos_version = ODP_RPC_C2C_VERSION,
+		.pkt_class = MPPA_RPC_ODP_CLASS_C2C,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_C2C_QUERY,
+		.cos_version = MPPA_RPC_ODP_C2C_VERSION,
 		.inl_data = query_cmd.inl_data,
 		.flags = 0,
 	};
-	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
+	const unsigned int rpc_server_id = mppa_rpc_odp_client_get_default_server();
 	uint8_t *payload;
 
-	odp_rpc_do_query(rpc_server_id,
-			 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(rpc_server_id,
+			 mppa_rpc_odp_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[C2C]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[C2C]");
 	if (ret < 0)
 		return 1;
 
@@ -357,25 +357,25 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 {
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
-	odp_rpc_cmd_c2c_clos_t close_cmd = {
+	mppa_rpc_odp_cmd_c2c_clos_t close_cmd = {
 		{
 			.cluster_id = clus->clus_id
 
 		}
 	};
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t cmd = {
-		.pkt_class = ODP_RPC_CLASS_C2C,
-		.pkt_subtype = ODP_RPC_CMD_C2C_CLOS,
-		.cos_version = ODP_RPC_C2C_VERSION,
+	mppa_rpc_odp_t cmd = {
+		.pkt_class = MPPA_RPC_ODP_CLASS_C2C,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_C2C_CLOS,
+		.cos_version = MPPA_RPC_ODP_C2C_VERSION,
 		.data_len = 0,
 		.flags = 0,
 		.inl_data = close_cmd.inl_data
 	};
-	const unsigned int rpc_server_id = odp_rpc_client_get_default_server();
+	const unsigned int rpc_server_id = mppa_rpc_odp_client_get_default_server();
 	uint8_t *payload;
 
 	/* Free packets being sent by DMA */
@@ -393,11 +393,11 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 		odp_spinlock_unlock(&g_cnoc_tx_lock);
 	}
 
-	odp_rpc_do_query(rpc_server_id,
-			 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(rpc_server_id,
+			 mppa_rpc_odp_get_io_tag_id(cluster_id),
 			 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[C2C]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[C2C]");
 	if (ret < 0)
 		return 1;
 
