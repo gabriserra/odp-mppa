@@ -33,7 +33,7 @@ local_run = options["local-run"]
 odp_path   = File.join(workspace,odp_clone)
 
 odp_perf_files_path = "#{odp_path}/perf_files"
-odp_artifact_files_path = "#{odp_path}/artifact_files"
+#odp_artifact_files_path = "#{odp_path}/artifact_files"
 
 k1tools = options["k1tools"]
 
@@ -196,9 +196,9 @@ b.target("long") do
     }
     b.report_perf_files("ODP-perf", [odp_perf_files_path])
 
-    #raise "artifacts option not set" if(options["artifacts"].empty?)
-    #artifacts = File.expand_path(options["artifacts"])
-    artifacts = File.expand_path(ENV["ARTIFACT_PATH"])
+    raise "artifacts option not set" if(options["artifacts"].empty?)
+    artifacts = File.expand_path(options["artifacts"])
+    #artifacts = File.expand_path(ENV["ARTIFACT_PATH"])
 
     cd ".metabuild"
     if File.exists?("perffiles") then
