@@ -608,10 +608,23 @@ static void mpodp_disable(struct mpodp_pdata_priv *netdev,
 		last_state = atomic_cmpxchg(&netdev->state,
 					    _MPODP_IF_STATE_ENABLED,
 					    _MPODP_IF_STATE_DISABLING);
-
-		if (last_state == _MPODP_IF_STATE_ENABLING) {
+		switch(last_state) {
+		case _MPODP_IF_STATE_ENABLING:
+			/* Wait for interface to be fully enabled before breaking it down */
 			msleep(10);
-		} else if (last_state != _MPODP_IF_STATE_ENABLED) {
+			break;
+		case _MPODP_IF_STATE_REMOVING:
+			/* Everything is already off */
+			return;
+		case _MPODP_IF_STATE_ENABLED:
+			/* Get out of the loop to disable the interfaces */
+			break;
+		case _MPODP_IF_STATE_DISABLED:
+			/* Change the status to REMOVING so interrupt can't
+			 * enable interfaces during unload */
+			atomic_set(&netdev->state, netdev_status);
+			return;
+		default:
 			return;
 		}
 	} while (last_state == _MPODP_IF_STATE_ENABLING);
