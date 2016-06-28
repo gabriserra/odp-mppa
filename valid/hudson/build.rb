@@ -50,7 +50,7 @@ clean = Target.new("clean", repo, [])
 changelog = Target.new("changelog", repo, [])
 build = Target.new("build", repo, [changelog])
 install = Target.new("install", repo, [build])
-report_perf = Target.new("report-perf", repo, [])
+report_perf = Target.new("report_perf", repo, [])
 valid = ParallelTarget.new("valid", repo, [install])
 valid_packages = ParallelTarget.new("valid-packages", repo, [])
 
@@ -195,6 +195,17 @@ b.target("long") do
                  })
     }
     b.report_perf_files("ODP-perf", [odp_perf_files_path])
+
+    #raise "artifacts option not set" if(options["artifacts"].empty?)
+    #artifacts = File.expand_path(options["artifacts"])
+    artifacts = File.expand_path(ENV["ARTIFACT_PATH"])
+
+    cd ".metabuild"
+    if File.exists?("perffiles") then
+        cd "perffiles"
+        b.run("tar -cvf perffiles.tar *.perf")
+        b.run("mv perffiles.tar #{artifacts}")
+    end
 end
 
 
@@ -385,17 +396,18 @@ b.target("dkms") do
   b.create_dkms_package(src_tar_package,pinfo,["mppapcie_odp"],)
 end
 
-b.target("report-perf") do
-    raise "artifacts option not set" if (options["artifacts"].empty?)
+
+b.target("report_perf") do
+
+    raise "artifacts option not set" if(options["artifacts"].empty?)
     artifacts = File.expand_path(options["artifacts"])
 
     cd ".metabuild"
-    if File.exists?(odp_perf_files_path) then
-        cd odp_perf_files_path
+    if File.exists?("perffiles") then
+        cd "perffiles"
         b.run("tar -cvf perffiles.tar *.perf")
         b.run("mv perffiles.tar #{artifacts}")
     end
 end
-
 
 b.launch
