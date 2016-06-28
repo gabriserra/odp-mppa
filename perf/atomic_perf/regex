@@ -1,1 +1,1 @@
-Result:(\w+)::atomic_test_result
+to complete op is (\d+) usec::atomic_us
