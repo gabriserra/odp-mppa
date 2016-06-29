@@ -29,11 +29,12 @@ void mpodp_tx_timeout(struct net_device *netdev)
 	netdev_err(netdev, "tx timeout\n");
 }
 
-static int mpodp_tx_is_done(struct mpodp_if_priv *priv, int index)
+static int mpodp_tx_is_done(struct mpodp_if_priv *priv, struct mpodp_txq *txq,
+			    int index)
 {
 	return (dmaengine_tx_status
-		(priv->tx_chan[priv->tx_ring[index].chanidx],
-		 priv->tx_ring[index].cookie, NULL) == DMA_SUCCESS);
+		(priv->tx_chan[txq->ring[index].chanidx],
+		 txq->ring[index].cookie, NULL) == DMA_SUCCESS);
 }
 
 static void unmap_skb(struct device *dev, const struct sk_buff *skb,
@@ -95,7 +96,8 @@ out_err:
 	return -ENOMEM;
 }
 
-static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
+static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
+				   struct mpodp_txq *txq,  unsigned budget)
 {
 	struct net_device *netdev = priv->netdev;
 	struct mpodp_tx *tx;
@@ -106,42 +108,41 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
 	uint32_t tx_done, first_tx_done, last_tx_done, tx_submitted,
 		tx_size, tx_head;
 
-	tx_submitted = atomic_read(&priv->tx_submitted);
-	tx_done = atomic_read(&priv->tx_done);
+	tx_submitted = atomic_read(&txq->submitted);
+	tx_done = atomic_read(&txq->done);
 	first_tx_done = tx_done;
 	last_tx_done = first_tx_done;
 
-	tx_size = priv->tx_size;
-	tx_head = atomic_read(&priv->tx_head);
+	tx_size = txq->size;
+	tx_head = atomic_read(&txq->head);
 
 	if (!tx_head) {
 		/* No carrier yet. Check if there are any buffers yet */
-		tx_head = readl(priv->tx_head_addr);
+		tx_head = readl(txq->head_addr);
 		if (tx_head) {
 			/* We now have buffers */
-			atomic_set(&priv->tx_head, tx_head);
-			netif_carrier_on(netdev);
+			atomic_set(&txq->head, tx_head);
 
-			netdev_dbg(netdev,"Link now has Tx (%u). Bring it up\n",
-				   tx_head);
+			netdev_dbg(netdev,"txq[%d]  now has Tx (%u).\n",
+				   txq->id, tx_head);
 		}
 		return 0;
 	}
 
 	/* TX: 2nd step: update TX tail (DMA transfer completed) */
 	while (tx_done != tx_submitted && worked < budget) {
-		if (!mpodp_tx_is_done(priv, tx_done)) {
+		if (!mpodp_tx_is_done(priv, txq, tx_done)) {
 			/* DMA transfer not completed */
 			break;
 		}
 
 		netdev_dbg(netdev,
-			   "tx %d: transfer done (head: %d submitted: %d done: %d)\n",
-			   tx_done, atomic_read(&priv->tx_head),
+			   "txq[%d] tx[%d]: transfer done (head: %d submitted: %d done: %d)\n",
+			   txq->id, tx_done, atomic_read(&txq->head),
 			   tx_submitted, tx_done);
 
 		/* get TX slot */
-		tx = &(priv->tx_ring[tx_done]);
+		tx = &(txq->ring[tx_done]);
 
 		/* free ressources */
 		unmap_skb(&priv->pdev->dev, tx->skb, tx);
@@ -156,17 +157,17 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
 
 	}
 	/* write new TX tail */
-	atomic_set(&priv->tx_done, tx_done);
+	atomic_set(&txq->done, tx_done);
 
 	/* TX: 3rd step: free finished TX slot */
 	while (first_tx_done != last_tx_done) {
 		netdev_dbg(netdev,
-			   "tx %d: done (head: %d submitted: %d done: %d)\n",
-			   first_tx_done, atomic_read(&priv->tx_head),
+			   "txq[%d] tx[%d]: done (head: %d submitted: %d done: %d)\n",
+			   txq->id, first_tx_done, atomic_read(&txq->head),
 			   tx_submitted, tx_done);
 
 		/* get TX slot */
-		tx = &(priv->tx_ring[first_tx_done]);
+		tx = &(txq->ring[first_tx_done]);
 		mppa_pcie_time_get(priv->tx_time, &ts);
 		mppa_pcie_time_update(priv->tx_time, &tx->time, &ts);
 
@@ -187,20 +188,24 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv, unsigned budget)
 	netdev->stats.tx_bytes += bytes_completed;
 	netdev->stats.tx_packets += packets_completed;
 
-	netdev_completed_queue(netdev, packets_completed, bytes_completed);
-	netif_wake_queue(netdev);
+	netdev_tx_completed_queue(txq->txq, packets_completed, bytes_completed);
+	netif_tx_wake_queue(txq->txq);
       out:
 	return worked;
 }
 
 int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget)
 {
-	struct netdev_queue *txq = netdev_get_tx_queue(priv->netdev, 0);
+	int i;
 	int worked = 0;
 
-	if (__netif_tx_trylock(txq)) {
-		worked = mpodp_clean_tx_unlocked(priv, MPODP_MAX_TX_RECLAIM);
-		__netif_tx_unlock(txq);
+	for (i = 0; i < priv->n_txqs; ++i){
+		struct netdev_queue *txq = priv->txqs[i].txq;
+		if (__netif_tx_trylock(txq)) {
+			worked += mpodp_clean_tx_unlocked(priv, &priv->txqs[i],
+							  MPODP_MAX_TX_RECLAIM);
+			__netif_tx_unlock(txq);
+		}
 	}
 	return worked;
 }
@@ -217,36 +222,41 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	struct mpodp_pkt_hdr *hdr;
 	uint32_t tx_autoloop_next;
 	uint32_t tx_submitted, tx_next;
-	uint32_t tx_full;
 	uint32_t tx_mppa_idx;
+	int qidx;
+	unsigned long flags = 0;
+	struct mpodp_txq *txq;
+
+	/* Fetch HW queue selected by the kernel */
+	qidx = skb_get_queue_mapping(skb);
+	txq = &priv->txqs[qidx];
 
 	/* make room before adding packets */
-	mpodp_clean_tx_unlocked(priv, -1);
+	mpodp_clean_tx_unlocked(priv, txq, -1);
 
-	tx_submitted = atomic_read(&priv->tx_submitted);
+	tx_submitted = atomic_read(&txq->submitted);
 	/* Compute txd id */
 	tx_next = (tx_submitted + 1);
-	if (tx_next == priv->tx_size)
+	if (tx_next == txq->size)
 		tx_next = 0;
 
 	/* MPPA H2C Entry to use */
-	tx_mppa_idx = atomic_read(&priv->tx_autoloop_cur);
+	tx_mppa_idx = atomic_read(&txq->autoloop_cur);
 
 	/* Check if there are txd available */
-	tx_full = atomic_read(&priv->tx_done);
-	if (tx_next == tx_full) {
+	if (tx_next == atomic_read(&txq->done)) {
 		/* Ring is full */
-		netdev_err(netdev, "TX ring full \n");
-		netif_stop_queue(netdev);
+		netdev_err(netdev, "txq[%d]: ring full \n", txq->id);
+		netif_tx_stop_queue(txq->txq);
 		return NETDEV_TX_BUSY;
 	}
 
-	tx = &(priv->tx_ring[tx_submitted]);
-	entry = &(priv->tx_cache[tx_mppa_idx]);
+	tx = &(txq->ring[tx_submitted]);
+	entry = &(txq->cache[tx_mppa_idx]);
 
 	netdev_vdbg(netdev,
-		    "Alloc TX packet descriptor %p/%d (MPPA Idx = %d)\n",
-		    tx, tx_submitted, tx_mppa_idx);
+		    "txq[%d]: alloc TX packet descriptor %p/%d (MPPA Idx = %d)\n",
+		    txq->id, tx, tx_submitted, tx_mppa_idx);
 
 	/* take the time */
 	mppa_pcie_time_get(priv->tx_time, &tx->time);
@@ -259,33 +269,28 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	    mppa_pcie_dma_check_addr(priv->pdata, tx->dst_addr, &fifo_mode,
 				     &requested_engine);
 	if (ret) {
-		netdev_err(netdev, "tx %d: invalid send address %llx\n",
-			   tx_submitted, tx->dst_addr);
+		netdev_err(netdev, "txq[%d] tx[%d]: invalid send address %llx\n",
+			   txq->id, tx_submitted, tx->dst_addr);
 		goto addr_error;
 	}
 	if (!fifo_mode) {
-		netdev_err(netdev, "tx %d: %llx is not a PCI2Noc addres\n",
-			   tx_submitted, tx->dst_addr);
+		netdev_err(netdev, "txq[%d] tx[%d]: %llx is not a PCI2Noc addres\n",
+			   txq->id, tx_submitted, tx->dst_addr);
 		goto addr_error;
 	}
 	if (requested_engine >= MPODP_NOC_CHAN_COUNT) {
 		netdev_err(netdev,
-			   "tx %d: address %llx using NoC engine out of range (%d >= %d)\n",
-			   tx_submitted, tx->dst_addr,
+			   "txq[%d] tx[%d]: address %llx using NoC engine out of range (%d >= %d)\n",
+			   txq->id, tx_submitted, tx->dst_addr,
 			   requested_engine, MPODP_NOC_CHAN_COUNT);
 		goto addr_error;
 	}
 
 	tx->chanidx = requested_engine;
 
-	/* Prepare slave args */
-	priv->tx_config[requested_engine].cfg.dst_addr = tx->dst_addr;
-	priv->tx_config[requested_engine].requested_engine = requested_engine;
-	/* FIFO mode, direction, latency were filled at setup */
-
 	netdev_vdbg(netdev,
-		    "tx %d: sending to 0x%llx. Fifo=%d Engine=%d\n",
-		    tx_submitted, (uint64_t) tx->dst_addr, fifo_mode,
+		    "txq[%d] tx[%d]: sending to 0x%llx. Fifo=%d Engine=%d\n",
+		    txq->id, tx_submitted, (uint64_t) tx->dst_addr, fifo_mode,
 		    requested_engine);
 
 	/* The packet needs a header to determine size,timestamp, etc.
@@ -324,13 +329,21 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 		goto busy;
 	}
 
+	if (priv->n_txqs > MPODP_NOC_CHAN_COUNT)
+		spin_lock_irqsave(&priv->tx_lock[requested_engine], flags);
+
+	/* Prepare slave args */
+	priv->tx_config[requested_engine].cfg.dst_addr = tx->dst_addr;
+	priv->tx_config[requested_engine].requested_engine = requested_engine;
+	/* FIFO mode, direction, latency were filled at setup */
+
 	if (dmaengine_slave_config(priv->tx_chan[requested_engine],
 				   &priv->tx_config[requested_engine].cfg)) {
 		/* board has reset, wait for reset of netdev */
-		netif_stop_queue(netdev);
+		netif_tx_stop_queue(txq->txq);
 		netif_carrier_off(netdev);
-		netdev_err(netdev, "tx %d: cannot configure channel\n",
-			   tx_submitted);
+		netdev_err(netdev, "txq[%d] tx[%d]: cannot configure channel\n",
+			   txq->id, tx_submitted);
 		goto busy;
 	}
 
@@ -340,13 +353,13 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 				    tx->sg_len, DMA_MEM_TO_DEV, 0);
 	if (dma_txd == NULL) {
 		/* dmaengine_prep_slave_sg failed, retry */
-		netdev_err(netdev, "tx %d: cannot get dma descriptor\n",
-			   tx_submitted);
+		netdev_err(netdev, "txq[%d] tx[%d]: cannot get dma descriptor\n",
+			   txq->id, tx_submitted);
 		goto busy;
 	}
 	netdev_vdbg(netdev,
-		    "tx %d: transfer start (submitted: %d done: %d) len=%d, sg_len=%d\n",
-		    tx_submitted, tx_next, atomic_read(&priv->tx_done),
+		    "txq[%d] tx[%d]: transfer start (submitted: %d done: %d) len=%d, sg_len=%d\n",
+		    txq->id, tx_submitted, tx_next, atomic_read(&txq->done),
 		    tx->len, tx->sg_len);
 
 	skb_orphan(skb);
@@ -355,29 +368,32 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	tx->cookie = dmaengine_submit(dma_txd);
 	dma_async_issue_pending(priv->tx_chan[requested_engine]);
 
+	if (priv->n_txqs > MPODP_NOC_CHAN_COUNT)
+		spin_unlock_irqrestore(&priv->tx_lock[requested_engine], flags);
+
 	/* Count number of bytes on the fly for DQL */
-	netdev_sent_queue(netdev, skb->len);
+	netdev_tx_sent_queue(txq->txq, skb->len);
 
 	/* Increment tail pointer locally */
-	atomic_set(&priv->tx_submitted, tx_next);
+	atomic_set(&txq->submitted, tx_next);
 
 	/* Update H2C entry offset */
 	tx_autoloop_next = tx_mppa_idx + 1;
-	if (tx_autoloop_next == priv->tx_cached_head)
+	if (tx_autoloop_next == txq->cached_head)
 		tx_autoloop_next = 0;
-	atomic_set(&priv->tx_autoloop_cur, tx_autoloop_next);
+	atomic_set(&txq->autoloop_cur, tx_autoloop_next);
 
 	skb_tx_timestamp(skb);
 
 	/* Check if there is room for another txd
 	 * or stop the queue if there is not */
 	tx_next = (tx_next + 1);
-	if (tx_next == priv->tx_size)
+	if (tx_next == txq->size)
 		tx_next = 0;
 
-	if (tx_next == tx_full) {
-		netdev_dbg(netdev, "TX ring full \n");
-		netif_stop_queue(netdev);
+	if (tx_next == atomic_read(&txq->done)) {
+		netdev_dbg(netdev, "txq[%d]: ring full \n", txq->id);
+		netif_tx_stop_queue(txq->txq);
 	}
 
 	return NETDEV_TX_OK;
@@ -390,28 +406,55 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	netdev->stats.tx_dropped++;
 	dev_kfree_skb(skb);
 	/* We can't do anything, just stop the queue artificially */
-	netif_stop_queue(netdev);
-	return NETDEV_TX_BUSY;
+	netif_tx_stop_queue(txq->txq);
+	return NETDEV_TX_OK;
 }
 
+u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
+#if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 13, 0))
+		       , void *accel_priv, select_queue_fallback_t fallback
+#endif
+		       )
+{
+	int txq;
+
+	txq = (skb_rx_queue_recorded(skb)
+	       ? skb_get_rx_queue(skb)
+	       : smp_processor_id());
+
+	txq = txq % dev->real_num_tx_queues;
+
+	return txq;
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 13, 0))
+	return fallback(dev, skb) % dev->real_num_tx_queues;
+#else
+	return __skb_tx_hash(dev, skb, dev->real_num_tx_queues);
+#endif
+}
 void mpodp_tx_update_cache(struct mpodp_if_priv *priv)
 {
-	/* check for new descriptors */
-	if (atomic_read(&priv->tx_head) != 0 &&
-	    priv->tx_cached_head != priv->tx_size) {
-		uint32_t tx_head;
-		struct mpodp_cache_entry *entry;
+	int i;
+	for (i = 0; i < priv->n_txqs; ++i) {
+		struct mpodp_txq *txq = &priv->txqs[i];
 
-		tx_head = readl(priv->tx_head_addr);
-		/* In autoloop, we need to cache new elements */
-		while (priv->tx_cached_head < tx_head) {
-			entry = &priv->tx_cache[priv->tx_cached_head];
+		/* check for new descriptors */
+		if (atomic_read(&txq->head) != 0 &&
+		    txq->cached_head != txq->size) {
+			uint32_t tx_head;
+			struct mpodp_cache_entry *entry;
 
-			entry->addr =
-			    readq(entry->entry_addr +
-				  offsetof(struct mpodp_h2c_ring_buff_entry,
-					   pkt_addr));
-			priv->tx_cached_head++;
+			tx_head = readl(txq->head_addr);
+			/* In autoloop, we need to cache new elements */
+			while (txq->cached_head < tx_head) {
+				entry = &txq->cache[txq->cached_head];
+
+				entry->addr =
+					readq(entry->entry_addr +
+					      offsetof(struct mpodp_h2c_entry,
+						       pkt_addr));
+				txq->cached_head++;
+			}
 		}
 	}
 }
@@ -423,6 +466,23 @@ void mpodp_tx_timer_cb(unsigned long data)
 
 	worked = mpodp_clean_tx(priv, MPODP_MAX_TX_RECLAIM);
 
+	if (!netif_carrier_ok(priv->netdev)) {
+		int i, ready = 1;
+		for (i = 0; i < priv->n_txqs; ++i) {
+			struct mpodp_txq *txq = &priv->txqs[i];
+
+			/* Check if this txq is ready */
+			if (atomic_read(&txq->head) == 0) {
+				ready = 0;
+				break;
+			}
+		}
+		if (ready) {
+			mpodp_tx_update_cache(priv);
+			netdev_dbg(priv->netdev, "all queues are ready. Turning carrier ON\n");
+			netif_carrier_on(priv->netdev);
+		}
+	}
 	mpodp_tx_update_cache(priv);
 
 	mod_timer(&priv->tx_timer, jiffies +

@@ -89,34 +89,34 @@ odp_rnd_gen_get(char *buf, unsigned len) {
 }
 
 void
-rnd_send_buffer(unsigned remoteClus, odp_rpc_t * msg) {
+rnd_send_buffer(unsigned remoteClus, mppa_rpc_odp_t * msg) {
 	unsigned interface = 0;
-	odp_rpc_cmd_rnd_t rnd = {.inl_data = msg->inl_data};
+	mppa_rpc_odp_cmd_rnd_t rnd = {.inl_data = msg->inl_data};
 
 	(void)remoteClus;
 	assert( rnd.rnd_len <= sizeof(rnd.rnd_data));
 
 	rnd.rnd_len = odp_rnd_gen_get((char*)rnd.rnd_data, rnd.rnd_len);
-	odp_rpc_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
+	mppa_rpc_odp_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
 }
 
-static int rnd_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
+static int rnd_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)
 {
-	if (msg->pkt_class != ODP_RPC_CLASS_RND)
-		return -ODP_RPC_ERR_INTERNAL_ERROR;
-	if (msg->cos_version != ODP_RPC_RND_VERSION)
-		return -ODP_RPC_ERR_VERSION_MISMATCH;
+	if (msg->pkt_class != MPPA_RPC_ODP_CLASS_RND)
+		return -MPPA_RPC_ODP_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != MPPA_RPC_ODP_RND_VERSION)
+		return -MPPA_RPC_ODP_ERR_VERSION_MISMATCH;
 
 	(void)payload;
 	switch (msg->pkt_subtype){
-	case ODP_RPC_CMD_RND_GET:
+	case MPPA_RPC_ODP_CMD_RND_GET:
 		rnd_send_buffer(remoteClus, msg);
 		break;
 	default:
-		return -ODP_RPC_ERR_BAD_SUBTYPE;
+		return -MPPA_RPC_ODP_ERR_BAD_SUBTYPE;
 	}
 
-	return -ODP_RPC_ERR_NONE;
+	return -MPPA_RPC_ODP_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __rnd_rpc_constructor()
@@ -126,5 +126,5 @@ void  __attribute__ ((constructor)) __rnd_rpc_constructor()
 	return;
 #endif
 	odp_rnd_gen_init();
-	__rpc_handlers[ODP_RPC_CLASS_RND] = rnd_rpc_handler;
+	__rpc_handlers[MPPA_RPC_ODP_CLASS_RND] = rnd_rpc_handler;
 }

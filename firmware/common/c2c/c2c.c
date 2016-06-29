@@ -27,10 +27,10 @@ typedef struct {
 
 static c2c_status_t c2c_status[RPC_MAX_CLIENTS][RPC_MAX_CLIENTS];
 
-void c2c_open(unsigned src_cluster, odp_rpc_t *msg,
-			odp_rpc_answer_t *answer)
+void c2c_open(unsigned src_cluster, mppa_rpc_odp_t *msg,
+			mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_c2c_open_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_c2c_open_t data = { .inl_data = msg->inl_data };
 	const unsigned dst_cluster = data.cluster_id;
 
 	if (c2c_status[src_cluster][dst_cluster].opened){
@@ -49,10 +49,10 @@ void c2c_open(unsigned src_cluster, odp_rpc_t *msg,
 	return;
 }
 
-void c2c_close(unsigned src_cluster, odp_rpc_t *msg,
-	       odp_rpc_answer_t *answer)
+void c2c_close(unsigned src_cluster, mppa_rpc_odp_t *msg,
+	       mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_c2c_clos_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_c2c_clos_t data = { .inl_data = msg->inl_data };
 	const unsigned dst_cluster = data.cluster_id;
 
 	if (!c2c_status[src_cluster][dst_cluster].opened){
@@ -65,10 +65,10 @@ void c2c_close(unsigned src_cluster, odp_rpc_t *msg,
 	return;
 }
 
-void c2c_query(unsigned src_cluster, odp_rpc_t *msg,
-	       odp_rpc_answer_t *answer)
+void c2c_query(unsigned src_cluster, mppa_rpc_odp_t *msg,
+	       mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_c2c_query_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_c2c_query_t data = { .inl_data = msg->inl_data };
 	const unsigned dst_cluster = data.cluster_id;
 
 	const c2c_status_t * s2d = &c2c_status[src_cluster][dst_cluster];
@@ -95,34 +95,34 @@ void c2c_query(unsigned src_cluster, odp_rpc_t *msg,
 	return;
 }
 
-static int c2c_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
+static int c2c_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)
 {
-	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
+	mppa_rpc_odp_answer_t answer = MPPA_RPC_ODP_ANSWER_INITIALIZER(msg);
 
-	if (msg->pkt_class != ODP_RPC_CLASS_C2C)
-		return -ODP_RPC_ERR_INTERNAL_ERROR;
-	if (msg->cos_version != ODP_RPC_C2C_VERSION)
-		return -ODP_RPC_ERR_VERSION_MISMATCH;
+	if (msg->pkt_class != MPPA_RPC_ODP_CLASS_C2C)
+		return -MPPA_RPC_ODP_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != MPPA_RPC_ODP_C2C_VERSION)
+		return -MPPA_RPC_ODP_ERR_VERSION_MISMATCH;
 
 	(void)payload;
 	switch (msg->pkt_subtype){
-	case ODP_RPC_CMD_C2C_OPEN:
+	case MPPA_RPC_ODP_CMD_C2C_OPEN:
 		c2c_open(remoteClus, msg, &answer);
 		break;
-	case ODP_RPC_CMD_C2C_CLOS:
+	case MPPA_RPC_ODP_CMD_C2C_CLOS:
 		c2c_close(remoteClus, msg, &answer);
 		break;
-	case ODP_RPC_CMD_C2C_QUERY:
+	case MPPA_RPC_ODP_CMD_C2C_QUERY:
 		c2c_query(remoteClus, msg, &answer);
 		break;
 	default:
-		return -ODP_RPC_ERR_BAD_SUBTYPE;
+		return -MPPA_RPC_ODP_ERR_BAD_SUBTYPE;
 	}
-	odp_rpc_server_ack(&answer);
-	return -ODP_RPC_ERR_NONE;
+	mppa_rpc_odp_server_ack(&answer);
+	return -MPPA_RPC_ODP_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __c2c_rpc_constructor()
 {
-	__rpc_handlers[ODP_RPC_CLASS_C2C] = c2c_rpc_handler;
+	__rpc_handlers[MPPA_RPC_ODP_CLASS_C2C] = c2c_rpc_handler;
 }

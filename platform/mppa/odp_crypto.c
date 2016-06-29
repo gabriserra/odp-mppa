@@ -892,36 +892,36 @@ odp_random_data(uint8_t *buf, int32_t len, odp_bool_t use_entropy ODP_UNUSED)
 	while (len) {
 		uint32_t pkt_len = len;
 
-		if (pkt_len > sizeof(((odp_rpc_cmd_rnd_t*)0)->rnd_data)) {
-			pkt_len = sizeof(((odp_rpc_cmd_rnd_t*)0)->rnd_data);
+		if (pkt_len > sizeof(((mppa_rpc_odp_cmd_rnd_t*)0)->rnd_data)) {
+			pkt_len = sizeof(((mppa_rpc_odp_cmd_rnd_t*)0)->rnd_data);
 		}
 
 		unsigned cluster_id = __k1_get_cluster_id();
-		odp_rpc_t *ack_msg;
+		mppa_rpc_odp_t *ack_msg;
 
-		odp_rpc_t cmd = {
-			.pkt_class = ODP_RPC_CLASS_RND,
-			.pkt_subtype = ODP_RPC_CMD_RND_GET,
-			.cos_version = ODP_RPC_RND_VERSION,
+		mppa_rpc_odp_t cmd = {
+			.pkt_class = MPPA_RPC_ODP_CLASS_RND,
+			.pkt_subtype = MPPA_RPC_ODP_CMD_RND_GET,
+			.cos_version = MPPA_RPC_ODP_RND_VERSION,
 			.data_len = 0,
 			.flags = 0,
-			.inl_data = (( odp_rpc_cmd_rnd_t ){
+			.inl_data = (( mppa_rpc_odp_cmd_rnd_t ){
 					.rnd_len = pkt_len }).inl_data,
 		};
 		uint8_t *payload;
 		const unsigned int rpc_server_id =
-			odp_rpc_client_get_default_server();
+			mppa_rpc_odp_client_get_default_server();
 
-		odp_rpc_do_query(rpc_server_id,
-				 odp_rpc_get_io_tag_id(cluster_id),
+		mppa_rpc_odp_do_query(rpc_server_id,
+				 mppa_rpc_odp_get_io_tag_id(cluster_id),
 				 &cmd, NULL);
-		int ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload,
-					   15 * ODP_RPC_TIMEOUT_1S, "[RND]");
+		int ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload,
+					   15 * MPPA_RPC_ODP_TIMEOUT_1S, "[RND]");
 		if (ret <= 0)
 			return rnd_len;
 
 		{
-			odp_rpc_ack_t ack;
+			mppa_rpc_odp_ack_t ack;
 			ack.inl_data = ack_msg->inl_data;
 			if (ack.status) {
 				fprintf(stderr, "Error: Server declined random number generation\n");
@@ -930,7 +930,7 @@ odp_random_data(uint8_t *buf, int32_t len, odp_bool_t use_entropy ODP_UNUSED)
 				return rnd_len;
 			}
 		}
-		const odp_rpc_cmd_rnd_t ack = {.inl_data = ack_msg->inl_data};
+		const mppa_rpc_odp_cmd_rnd_t ack = {.inl_data = ack_msg->inl_data};
 
 
 		memcpy(buf + rnd_len, ack.rnd_data, ack.rnd_len);

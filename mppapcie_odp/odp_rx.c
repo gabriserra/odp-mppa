@@ -25,36 +25,37 @@
 #include "odp.h"
 
 
-static int mpodp_rx_is_done(struct mpodp_if_priv *priv, int index)
+static int mpodp_rx_is_done(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
+			    int index)
 {
-	if (priv->rx_ring[index].len == 0) {
+	if (rxq->ring[index].len == 0) {
 		/* error packet, always done */
 		return 1;
 	}
 
-	return (dmaengine_tx_status
-		(priv->rx_chan, priv->rx_ring[index].cookie,
-		 NULL) == DMA_SUCCESS);
+	return (dmaengine_tx_status(priv->rx_chan, rxq->ring[index].cookie,
+				    NULL) == DMA_SUCCESS);
 }
 
-int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget)
+int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
+		   int budget)
 {
 	struct net_device *netdev = priv->netdev;
 	struct mpodp_rx *rx;
 	int worked = 0;
 
 	/* RX: 2nd step: give packet to kernel and update RX head */
-	while (budget-- && priv->rx_used != priv->rx_avail) {
-		if (!mpodp_rx_is_done(priv, priv->rx_used)) {
+	while (budget-- && rxq->used != rxq->avail) {
+		if (!mpodp_rx_is_done(priv, rxq, rxq->used)) {
 			/* DMA transfer not completed */
 			break;
 		}
 
-		netdev_dbg(netdev, "rx %d: transfer done\n",
-			   priv->rx_used);
+		netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer done\n",
+			   rxq->id, rxq->used);
 
 		/* get rx slot */
-		rx = &(priv->rx_ring[priv->rx_used]);
+		rx = &(rxq->ring[rxq->used]);
 
 		if (rx->len == 0) {
 			/* error packet, skip it */
@@ -65,6 +66,7 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget)
 
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
+		skb_record_rx_queue(rx->skb, rxq->id);
 		rx->skb->protocol = eth_type_trans(rx->skb, netdev);
 		napi_gro_receive(&priv->napi, rx->skb);
 
@@ -73,20 +75,20 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, int budget)
 		netdev->stats.rx_packets++;
 
 	      pkt_skip:
-		priv->rx_used = (priv->rx_used + 1) % priv->rx_size;
+		rxq->used = (rxq->used + 1) % rxq->size;
 
 		worked++;
 	}
 	/* write new RX head */
 	if (worked) {
-		writel(priv->rx_used, priv->rx_head_addr);
+		writel(rxq->used, rxq->head_addr);
 	}
 
 
 	return worked;
 }
 
-int mpodp_start_rx(struct mpodp_if_priv *priv)
+int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 {
 	struct net_device *netdev = priv->netdev;
 	struct dma_async_tx_descriptor *dma_txd;
@@ -96,33 +98,33 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 
 	/* RX: 1st step: start transfer */
 	/* read RX tail */
-	priv->rx_tail = readl(priv->rx_tail_addr);
+	rxq->tail = readl(rxq->tail_addr);
 
-	if (priv->rx_avail > priv->rx_tail) {
+	if (rxq->avail > rxq->tail) {
 		/* make a first loop to the end of the ring */
-		limit = priv->rx_size;
+		limit = rxq->size;
 	} else {
-		limit = priv->rx_tail;
+		limit = rxq->tail;
 	}
  loop:
 	/* get mppa entries */
-	memcpy_fromio(priv->rx_mppa_entries + priv->rx_avail,
-		      priv->rx_ring[priv->rx_avail].entry_addr,
-		      sizeof(struct mpodp_c2h_ring_buff_entry) *
-		      (limit - priv->rx_avail));
-	while (priv->rx_avail != limit) {
+	memcpy_fromio(rxq->mppa_entries + rxq->avail,
+		      rxq->ring[rxq->avail].entry_addr,
+		      sizeof(struct mpodp_c2h_entry) *
+		      (limit - rxq->avail));
+	while (rxq->avail != limit) {
 		/* get rx slot */
-		rx = &(priv->rx_ring[priv->rx_avail]);
+		rx = &(rxq->ring[rxq->avail]);
 
 		/* check rx status */
-		if (priv->rx_mppa_entries[priv->rx_avail].status) {
+		if (rxq->mppa_entries[rxq->avail].status) {
 			/* TODO: report correctly the error */
 			rx->len = 0;	/* means this is an error packet */
 			goto pkt_error;
 		}
 
 		/* read rx entry information */
-		rx->len = priv->rx_mppa_entries[priv->rx_avail].len;
+		rx->len = rxq->mppa_entries[rxq->avail].len;
 
 		/* get skb from kernel */
 		rx->skb = netdev_alloc_skb_ip_align(priv->netdev, rx->len);
@@ -141,14 +143,14 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 
 		/* configure channel */
 		priv->rx_config.cfg.src_addr =
-		    priv->rx_mppa_entries[priv->rx_avail].pkt_addr;
+		    rxq->mppa_entries[rxq->avail].pkt_addr;
 		if (dmaengine_slave_config
 		    (priv->rx_chan, &priv->rx_config.cfg)) {
 			/* board has reset, wait for reset of netdev */
 			netif_carrier_off(netdev);
 			netdev_err(netdev,
-				   "rx %d: cannot configure channel\n",
-				   priv->rx_avail);
+				   "rxq[%d] rx[%d]: cannot configure channel\n",
+				   rxq->id, rxq->avail);
 			break;
 		}
 
@@ -158,20 +160,20 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 					    DMA_DEV_TO_MEM, 0);
 		if (dma_txd == NULL) {
 			netdev_err(netdev,
-				   "rx %d: cannot get dma descriptor",
-				   priv->rx_avail);
+				   "rxq[%d] rx[%d]: cannot get dma descriptor",
+				   rxq->id, rxq->avail);
 			goto dma_failed;
 		}
 
-		netdev_dbg(netdev, "rx %d: transfer start\n",
-			   priv->rx_avail);
+		netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer start\n",
+			   rxq->id, rxq->avail);
 
 		/* submit and issue descriptor */
 		rx->cookie = dmaengine_submit(dma_txd);
 		work_done++;
 
 	      pkt_error:
-		priv->rx_avail++;
+		rxq->avail++;
 
 		continue;
 
@@ -186,10 +188,10 @@ int mpodp_start_rx(struct mpodp_if_priv *priv)
 	if (work_done)
 		dma_async_issue_pending(priv->rx_chan);
 
-	if (limit != priv->rx_tail) {
+	if (limit != rxq->tail) {
 		/* make the second part of the ring */
-		limit = priv->rx_tail;
-		priv->rx_avail = 0;
+		limit = rxq->tail;
+		rxq->avail = 0;
 		goto loop;
 	}
 

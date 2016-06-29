@@ -62,6 +62,7 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 {
 	struct mpodp_if_priv *priv;
 	int work_done = 0, work = 0;
+	int i;
 
 	priv = container_of(napi, struct mpodp_if_priv, napi);
 
@@ -69,10 +70,13 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 
 	/* Check for Rx transfer completion and send the SKBs to the
 	 * network stack */
-	work = mpodp_clean_rx(priv, budget);
+	for (i = 0; i < priv->n_rxqs; ++i) {
+		if (budget > work)
+			work += mpodp_clean_rx(priv, &priv->rxqs[i], budget - work);
 
-	/* Start new Rx transfer if any */
-	mpodp_start_rx(priv);
+		/* Start new Rx transfer if any */
+		mpodp_start_rx(priv, &priv->rxqs[i]);
+	}
 
 	if (work < budget) {
 		napi_complete(napi);
@@ -96,20 +100,31 @@ static void mpodp_poll_controller(struct net_device *netdev)
 static int mpodp_open(struct net_device *netdev)
 {
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
+	int i;
+	int ready = 1;
+	for (i = 0; i < priv->n_txqs; ++i) {
+		struct mpodp_txq *txq = &priv->txqs[i];
+		atomic_set(&txq->submitted, 0);
+		atomic_set(&txq->head, readl(txq->head_addr));
+		atomic_set(&txq->done, 0);
+		atomic_set(&txq->autoloop_cur, 0);
 
-	atomic_set(&priv->tx_submitted, 0);
-	atomic_set(&priv->tx_head, readl(priv->tx_head_addr));
-	atomic_set(&priv->tx_done, 0);
-	atomic_set(&priv->tx_autoloop_cur, 0);
+		/* Check if this txq is ready */
+		if (atomic_read(&txq->head) == 0)
+			ready = 0;
+	}
 
-	priv->rx_tail = readl(priv->rx_tail_addr);
-	priv->rx_head = readl(priv->rx_head_addr);
-	priv->rx_used = priv->rx_head;
-	priv->rx_avail = priv->rx_tail;
+	for (i = 0; i < priv->n_rxqs; ++i) {
+		struct mpodp_rxq *rxq = &priv->rxqs[i];
+		rxq->tail = readl(rxq->tail_addr);
+		rxq->head = readl(rxq->head_addr);
+		rxq->used = rxq->head;
+		rxq->avail = rxq->tail;
+	}
 
 	atomic_set(&priv->reset, 0);
 
-	netif_start_queue(netdev);
+	netif_tx_start_all_queues(netdev);
 	napi_enable(&priv->napi);
 
 	priv->interrupt_status = 1;
@@ -117,10 +132,12 @@ static int mpodp_open(struct net_device *netdev)
 
 	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
-	if (atomic_read(&priv->tx_head) != 0) {
+	if (ready) {
+		netdev_dbg(priv->netdev, "Interface is ready\n");
 		mpodp_tx_update_cache(priv);
 		netif_carrier_on(netdev);
 	} else {
+		netdev_dbg(priv->netdev, "Interface is not ready\n");
 		netif_carrier_off(netdev);
 	}
 
@@ -140,7 +157,7 @@ static int mpodp_close(struct net_device *netdev)
 	netif_carrier_off(netdev);
 
 	napi_disable(&priv->napi);
-	netif_stop_queue(netdev);
+	netif_tx_stop_all_queues(netdev);
 
 	mpodp_clean_tx(priv, -1);
 
@@ -151,6 +168,7 @@ static const struct net_device_ops mpodp_ops = {
 	.ndo_open = mpodp_open,
 	.ndo_stop = mpodp_close,
 	.ndo_start_xmit = mpodp_start_xmit,
+	.ndo_select_queue = mpodp_select_queue,
 	.ndo_get_stats = mpodp_get_stats,
 	.ndo_tx_timeout = mpodp_tx_timeout,
 #ifdef CONFIG_NET_POLL_CONTROLLER
@@ -162,7 +180,7 @@ static void mpodp_remove(struct net_device *netdev)
 {
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
 	int chanidx;
-
+	int i;
 
 	if (priv->tx_timer.function)
 		del_timer_sync(&priv->tx_timer);
@@ -174,10 +192,17 @@ static void mpodp_remove(struct net_device *netdev)
 	for (chanidx = 0; chanidx < MPODP_NOC_CHAN_COUNT; chanidx++) {
 		dma_release_channel(priv->tx_chan[chanidx]);
 	}
-	kfree(priv->tx_cache);
-	kfree(priv->tx_ring);
+
+	for (i = 0; i < priv->n_txqs; ++i) {
+		kfree(priv->txqs[i].cache);
+		kfree(priv->txqs[i].ring);
+	}
+
 	dma_release_channel(priv->rx_chan);
-	kfree(priv->rx_ring);
+	for (i = 0; i < priv->n_rxqs; ++i) {
+		kfree(priv->rxqs[i].ring);
+	}
+
 	mppa_pcie_time_destroy(priv->tx_time);
 	netif_napi_del(&priv->napi);
 
@@ -192,12 +217,24 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	struct mpodp_if_priv *priv;
 	dma_cap_mask_t mask;
 	char name[64];
-	int i, entries_addr;
+	int i, j, entries_addr;
 	int chanidx;
 	struct mppa_pcie_id mppa_id;
 	struct pci_dev *pdev = mppa_pcie_get_pci_dev(pdata);
 	u8 __iomem *smem_vaddr;
 	struct mppa_pcie_dmae_filter filter;
+
+	if (config->n_rxqs > MPODP_MAX_RX_QUEUES) {
+		dev_err(&pdev->dev,
+			"interface %d requires too many rx queues (%d, max=%d)\n", id, config->n_rxqs, MPODP_MAX_RX_QUEUES);
+		return NULL;
+	}
+
+	if (config->n_txqs > MPODP_MAX_TX_QUEUES) {
+		dev_err(&pdev->dev,
+			"interface %d requires too many tx queues (%d, max=%d)\n", id, config->n_txqs, MPODP_MAX_TX_QUEUES);
+		return NULL;
+	}
 
 	/* initialize mask for dma channel */
 	dma_cap_zero(mask);
@@ -211,11 +248,11 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		 mppa_id.chip_id, mppa_id.ioddr_id, id);
 
 	/* alloc netdev */
-	if (!(netdev = alloc_netdev(sizeof(struct mpodp_if_priv), name,
+	if (!(netdev = alloc_netdev_mqs(sizeof(struct mpodp_if_priv), name,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 16, 0))
 				    NET_NAME_UNKNOWN,
 #endif
-				    ether_setup))) {
+					  ether_setup, config->n_txqs, config->n_rxqs))) {
 		dev_err(&pdev->dev, "netdev allocation failed\n");
 		return NULL;
 	}
@@ -237,12 +274,14 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	priv->pdev = pdev;
 	priv->config = config;
 	priv->netdev = netdev;
+	priv->n_rxqs = config->n_rxqs;
+	priv->n_txqs = config->n_txqs;
 
 	smem_vaddr = mppa_pcie_get_smem_vaddr(pdata);
 	priv->interrupt_status_addr = smem_vaddr
-	    + eth_control_addr + offsetof(struct mpodp_control, configs)
-	+ id * sizeof(struct mpodp_if_config)
-	+ offsetof(struct mpodp_if_config, interrupt_status);
+		+ eth_control_addr + offsetof(struct mpodp_control, configs)
+		+ id * sizeof(struct mpodp_if_config)
+		+ offsetof(struct mpodp_if_config, interrupt_status);
 	netif_napi_add(netdev, &priv->napi, mpodp_poll, MPODP_NAPI_WEIGHT);
 
 	/* init fs */
@@ -251,37 +290,49 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	    mppa_pcie_time_create(name, mppapciefs_get_dentry(pdata),
 				  25000, 25000, 40, MPPA_TIME_TYPE_NS);
 
-	/* init RX ring */
-	priv->rx_size = readl(desc_info_addr(smem_vaddr,
-					     config->
-					     c2h_ring_buf_desc_addr,
-					     ring_buffer_entries_count));
-	priv->rx_head_addr =
-	    desc_info_addr(smem_vaddr, config->c2h_ring_buf_desc_addr,
-			   head);
-	priv->rx_tail_addr =
-	    desc_info_addr(smem_vaddr, config->c2h_ring_buf_desc_addr,
-			   tail);
-	priv->rx_head = readl(priv->rx_head_addr);
-	priv->rx_tail = readl(priv->rx_tail_addr);
-	entries_addr = readl(desc_info_addr(smem_vaddr,
-					    config->c2h_ring_buf_desc_addr,
-					    ring_buffer_entries_addr));
-	priv->rx_ring =
-	    kzalloc(priv->rx_size * sizeof(struct mpodp_rx), GFP_ATOMIC);
-	if (priv->rx_ring == NULL) {
-		dev_err(&pdev->dev, "RX ring allocation failed\n");
-		goto rx_alloc_failed;
+	/* Init all RX Queues */
+	for (i = 0; i < priv->n_rxqs; ++i) {
+		struct mpodp_rxq *rxq = &priv->rxqs[i];
+
+		rxq->id = i;
+		rxq->size =
+			readl(desc_info_addr(smem_vaddr, config->c2h_addr[i],
+					     count));
+		rxq->head_addr =
+			desc_info_addr(smem_vaddr, config->c2h_addr[i], head);
+		rxq->tail_addr =
+			desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
+		rxq->head = readl(rxq->head_addr);
+		rxq->tail = readl(rxq->tail_addr);
+
+		entries_addr =
+			readl(desc_info_addr(smem_vaddr, config->c2h_addr[i],
+					     addr));
+		rxq->ring =
+			kzalloc(rxq->size * sizeof(struct mpodp_rx), GFP_ATOMIC);
+		if (rxq->ring == NULL) {
+			dev_err(&pdev->dev, "RX ring allocation failed\n");
+			goto rx_alloc_failed;
+		}
+
+		for (j = 0; j < rxq->size; ++j) {
+			/* initialize scatterlist to 1 as the RX skb is in one chunk */
+			sg_init_table(rxq->ring[j].sg, 1);
+			/* set the RX ring entry address */
+			rxq->ring[j].entry_addr = smem_vaddr
+				+ entries_addr
+				+ j * sizeof(struct mpodp_c2h_entry);
+		}
+		rxq->mppa_entries =
+			kmalloc(rxq->size * sizeof(struct mpodp_c2h_entry),
+				GFP_ATOMIC);
+		if (rxq->mppa_entries == NULL) {
+			dev_err(&pdev->dev, "RX mppa_entries allocation failed\n");
+			goto rx_alloc_failed;
+		}
 	}
 
-	for (i = 0; i < priv->rx_size; ++i) {
-		/* initialize scatterlist to 1 as the RX skb is in one chunk */
-		sg_init_table(priv->rx_ring[i].sg, 1);
-		/* set the RX ring entry address */
-		priv->rx_ring[i].entry_addr = smem_vaddr
-		    + entries_addr
-		    + i * sizeof(struct mpodp_c2h_ring_buff_entry);
-	}
+	/* Init Rx DMA chan */
 	priv->rx_config.cfg.direction = DMA_DEV_TO_MEM;
 	priv->rx_config.fifo_mode = _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
 	priv->rx_config.short_latency_load_threshold = -1;
@@ -300,53 +351,58 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 						 priv);
 	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
 						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_ENABLED);
-	priv->rx_mppa_entries =
-	    kmalloc(priv->rx_size * sizeof(struct mpodp_c2h_ring_buff_entry),
-		    GFP_ATOMIC);
 
-	/* init TX ring */
-	priv->tx_mppa_size = readl(desc_info_addr(smem_vaddr,
-						  config->
-						  h2c_ring_buf_desc_addr,
-						  ring_buffer_entries_count));
-	priv->tx_size = MPODP_AUTOLOOP_DESC_COUNT;
+	/* Init all Tx Queues */
+	for (i = 0; i < priv->n_txqs; ++i) {
+		struct mpodp_txq *txq = &priv->txqs[i];
 
-	priv->tx_head_addr = desc_info_addr(smem_vaddr,
-					    config->h2c_ring_buf_desc_addr,
-					    head);
+		txq->id = i;
+		txq->txq = netdev_get_tx_queue(netdev, i);
+		txq->mppa_size =
+			readl(desc_info_addr(smem_vaddr, config->h2c_addr[i],
+					     count));
+		txq->size = MPODP_AUTOLOOP_DESC_COUNT;
 
-	/* Setup Host TX Ring */
-	priv->tx_ring =
-	    kzalloc(priv->tx_size * sizeof(struct mpodp_tx), GFP_ATOMIC);
-	if (priv->tx_ring == NULL) {
-		dev_err(&pdev->dev, "TX ring allocation failed\n");
-		goto tx_alloc_failed;
+		txq->head_addr =
+			desc_info_addr(smem_vaddr, config->h2c_addr[i],
+				       head);
+
+		/* Setup Host TX Ring */
+		txq->ring =
+			kzalloc(txq->size * sizeof(struct mpodp_tx), GFP_ATOMIC);
+		if (txq->ring == NULL) {
+			dev_err(&pdev->dev, "TX ring allocation failed\n");
+			goto tx_alloc_failed;
+		}
+		for (j = 0; j < txq->size; ++j) {
+			/* initialize scatterlist to the maximum size */
+			sg_init_table(txq->ring[j].sg, MAX_SKB_FRAGS + 1);
+		}
+
+		/* Pre cache MPPA TX Ring */
+		txq->cache =
+			kzalloc(txq->mppa_size * sizeof(*txq->cache),
+				GFP_ATOMIC);
+		if (txq->cache == NULL) {
+			dev_err(&pdev->dev, "TX cache allocation failed\n");
+			goto tx_alloc_failed;
+		}
+		entries_addr =
+			readl(desc_info_addr(smem_vaddr, config->h2c_addr[i],
+					     addr));
+		for (j = 0; j < txq->mppa_size; ++j) {
+			/* set the TX ring entry address */
+			txq->cache[j].entry_addr = smem_vaddr
+				+ entries_addr
+				+ j * sizeof(struct mpodp_h2c_entry);
+		}
+
+		txq->cached_head = 0;
 	}
-	for (i = 0; i < priv->tx_size; ++i) {
-		/* initialize scatterlist to the maximum size */
-		sg_init_table(priv->tx_ring[i].sg, MAX_SKB_FRAGS + 1);
-	}
 
-	/* Pre cache MPPA TX Ring */
-	priv->tx_cache =
-	    kzalloc(priv->tx_mppa_size * sizeof(*priv->tx_cache),
-		    GFP_ATOMIC);
-	if (priv->tx_cache == NULL) {
-		dev_err(&pdev->dev, "TX cache allocation failed\n");
-		goto tx_cache_alloc_failed;
-	}
-	entries_addr = readl(desc_info_addr(smem_vaddr,
-					    config->h2c_ring_buf_desc_addr,
-					    ring_buffer_entries_addr));
-	for (i = 0; i < priv->tx_mppa_size; ++i) {
-		/* set the TX ring entry address */
-		priv->tx_cache[i].entry_addr = smem_vaddr
-		    + entries_addr
-		    + i * sizeof(struct mpodp_h2c_ring_buff_entry);
-	}
-
-	priv->tx_cached_head = 0;
+	/* Init Tx DMA chan */
 	for (chanidx = 0; chanidx < MPODP_NOC_CHAN_COUNT; chanidx++) {
+		spin_lock_init(&priv->tx_lock[chanidx]);
 		priv->tx_config[chanidx].cfg.direction = DMA_MEM_TO_DEV;
 		priv->tx_config[chanidx].fifo_mode =
 		    _MPPA_PCIE_ENGINE_FIFO_MODE_ENABLED;
@@ -381,8 +437,8 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	setup_timer(&priv->tx_timer, mpodp_tx_timer_cb,
 		    (unsigned long) priv);
 
-	printk(KERN_INFO "Registered netdev for %s (ring rx:%d, tx:%d)\n",
-	       netdev->name, priv->rx_size, priv->tx_size);
+	printk(KERN_INFO "Registered netdev for %s (txq:%d, rxq:%d)\n",
+	       netdev->name, priv->n_txqs, priv->n_rxqs);
 
 	return netdev;
 
@@ -392,14 +448,22 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		dma_release_channel(priv->tx_chan[chanidx]);
 		chanidx--;
 	}
-	kfree(priv->tx_cache);
-      tx_cache_alloc_failed:
-	kfree(priv->tx_ring);
       tx_alloc_failed:
+	for (i = 0; i < priv->n_txqs; ++i){
+		if(priv->txqs[i].cache)
+			kfree(priv->txqs[i].cache);
+		if(priv->txqs[i].ring)
+			kfree(priv->txqs[i].ring);
+	}
 	dma_release_channel(priv->rx_chan);
       rx_chan_failed:
-	kfree(priv->rx_ring);
       rx_alloc_failed:
+	for (i = 0; i < priv->n_rxqs; ++i){
+		if(priv->rxqs[i].ring)
+			kfree(priv->rxqs[i].ring);
+		if(priv->rxqs[i].mppa_entries)
+			kfree(priv->rxqs[i].mppa_entries);
+	}
 	mppa_pcie_time_destroy(priv->tx_time);
 	netif_napi_del(&priv->napi);
       name_alloc_failed:
@@ -481,7 +545,7 @@ static void mpodp_enable(struct mppa_pcie_device *pdata,
 static void mpodp_pre_reset(struct net_device *netdev)
 {
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
-	int now;
+	int now, i;
 
 	/* There is no real need to lock these changes
 	 * but it makes sure that there is no packet being sent
@@ -489,19 +553,31 @@ static void mpodp_pre_reset(struct net_device *netdev)
 	 * one being transmitted. */
 	netif_tx_lock(netdev);
 	atomic_set(&priv->reset, 1);
-	netif_stop_queue(netdev);
+	netif_tx_stop_all_queues(netdev);
 	netif_carrier_off(netdev);
 	netif_tx_unlock(netdev);
 
-	now = jiffies;
-	while (atomic_read(&priv->tx_done) !=
-	       atomic_read(&priv->tx_submitted)
-	       || priv->rx_used != priv->rx_avail) {
-		msleep(10);
-		if (jiffies - now >= msecs_to_jiffies(1000)) {
-			netdev_err(netdev,
-				   "Transfer stalled. Removing netdev anyway\n");
-			break;
+	for (i = 0; i < priv->n_txqs; ++i) {
+		now = jiffies;
+		while (atomic_read(&priv->txqs[i].done) !=
+		       atomic_read(&priv->txqs[i].submitted)) {
+			msleep(10);
+			if (jiffies - now >= msecs_to_jiffies(1000)) {
+				netdev_err(netdev,
+					   "Txq %d stalled. Ignoring for reset\n", i);
+				break;
+			}
+		}
+	}
+	for (i = 0; i < priv->n_rxqs; ++i) {
+		now = jiffies;
+		while(priv->rxqs[i].used != priv->rxqs[i].avail) {
+			msleep(10);
+			if (jiffies - now >= msecs_to_jiffies(1000)) {
+				netdev_err(netdev,
+					   "Rxq %d stalled. Ignoring for reset\n", i);
+				break;
+			}
 		}
 	}
 }
@@ -532,10 +608,23 @@ static void mpodp_disable(struct mpodp_pdata_priv *netdev,
 		last_state = atomic_cmpxchg(&netdev->state,
 					    _MPODP_IF_STATE_ENABLED,
 					    _MPODP_IF_STATE_DISABLING);
-
-		if (last_state == _MPODP_IF_STATE_ENABLING) {
+		switch(last_state) {
+		case _MPODP_IF_STATE_ENABLING:
+			/* Wait for interface to be fully enabled before breaking it down */
 			msleep(10);
-		} else if (last_state != _MPODP_IF_STATE_ENABLED) {
+			break;
+		case _MPODP_IF_STATE_REMOVING:
+			/* Everything is already off */
+			return;
+		case _MPODP_IF_STATE_ENABLED:
+			/* Get out of the loop to disable the interfaces */
+			break;
+		case _MPODP_IF_STATE_DISABLED:
+			/* Change the status to REMOVING so interrupt can't
+			 * enable interfaces during unload */
+			atomic_set(&netdev->state, netdev_status);
+			return;
+		default:
 			return;
 		}
 	} while (last_state == _MPODP_IF_STATE_ENABLING);
@@ -571,7 +660,6 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 	struct mpodp_if_priv *priv;
 	int i;
 	enum _mpodp_if_state last_state;
-	uint32_t tx_limit;
 
 	dev_dbg(&netdev->pdev->dev, "netdev interrupt IN\n");
 
@@ -612,13 +700,6 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 				   atomic_read(&priv->reset));
 			continue;
 		}
-
-		/* Compute the limit where the Tx queue would have been saturated
-		 * - In autoloop, submitted is just before done (we don't care at all about head)
-		 */
-		if (!atomic_read(&priv->tx_head))
-			continue;
-		tx_limit = atomic_read(&priv->tx_done);
 	}
 	dev_dbg(&netdev->pdev->dev, "netdev interrupt OUT\n");
 	return IRQ_HANDLED;

@@ -23,11 +23,11 @@ static inline int get_eth_dma_id(unsigned cluster_id){
 	return offset + ETH_BASE_TX;
 }
 
-void eth_open(unsigned remoteClus, odp_rpc_t *msg,
+void eth_open(unsigned remoteClus, mppa_rpc_odp_t *msg,
 	      uint8_t *payload, unsigned fallthrough,
-	      odp_rpc_answer_t *answer)
+	      mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_eth_open_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_eth_open_t data = { .inl_data = msg->inl_data };
 	const int nocIf = get_eth_dma_id(data.dma_if);
 	const unsigned int eth_if = data.ifId % 4; /* 4 is actually 0 in 40G mode */
 
@@ -69,7 +69,7 @@ void eth_open(unsigned remoteClus, odp_rpc_t *msg,
 		goto err;
 	}
 
-	int externalAddress = odp_rpc_get_cluster_id(nocIf);
+	int externalAddress = mppa_rpc_odp_get_cluster_id(nocIf);
 
 	status[eth_if].cluster[remoteClus].rx_enabled = data.rx_enabled;
 	status[eth_if].cluster[remoteClus].tx_enabled = data.tx_enabled;
@@ -114,10 +114,10 @@ void eth_open(unsigned remoteClus, odp_rpc_t *msg,
 	return;
 }
 
-void eth_set_state(unsigned remoteClus, odp_rpc_t *msg,
-		   odp_rpc_answer_t *answer)
+void eth_set_state(unsigned remoteClus, mppa_rpc_odp_t *msg,
+		   mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_eth_state_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_eth_state_t data = { .inl_data = msg->inl_data };
 	const unsigned int eth_if = data.ifId % 4; /* 4 is actually 0 in 40G mode */
 
 	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
@@ -150,10 +150,10 @@ void eth_set_state(unsigned remoteClus, odp_rpc_t *msg,
 	return;
 }
 
-void eth_close(unsigned remoteClus, odp_rpc_t *msg,
-	       odp_rpc_answer_t *answer)
+void eth_close(unsigned remoteClus, mppa_rpc_odp_t *msg,
+	       mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_eth_clos_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_eth_clos_t data = { .inl_data = msg->inl_data };
 	const unsigned int eth_if = data.ifId % 4; /* 4 is actually 0 in 40G mode */
 
 	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
@@ -191,19 +191,19 @@ void eth_close(unsigned remoteClus, odp_rpc_t *msg,
 }
 
 void eth_dual_mac(unsigned remoteClus __attribute__((unused)),
-		  odp_rpc_t *msg,
-		  odp_rpc_answer_t *answer)
+		  mppa_rpc_odp_t *msg,
+		  mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_eth_dual_mac_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_eth_dual_mac_t data = { .inl_data = msg->inl_data };
 	ethtool_set_dual_mac(data.enabled, answer);
 	return;
 }
 
 void eth_get_stat(unsigned remoteClus __attribute__((unused)),
-			   odp_rpc_t *msg,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_t *msg,
+			   mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_eth_get_stat_t data = { .inl_data = msg->inl_data };
+	mppa_rpc_odp_cmd_eth_get_stat_t data = { .inl_data = msg->inl_data };
 
 	if (data.ifId != 4 && data.ifId > N_ETH_LANE) {
 		ETH_RPC_ERR_MSG(answer, "Bad lane id %d\n", data.ifId);
@@ -241,41 +241,41 @@ static void eth_init(void)
 	}
 }
 
-static int eth_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
+static int eth_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)
 {
-	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
+	mppa_rpc_odp_answer_t answer = MPPA_RPC_ODP_ANSWER_INITIALIZER(msg);
 
-	if (msg->pkt_class != ODP_RPC_CLASS_ETH)
-		return -ODP_RPC_ERR_INTERNAL_ERROR;
-	if (msg->cos_version != ODP_RPC_ETH_VERSION)
-		return -ODP_RPC_ERR_VERSION_MISMATCH;
+	if (msg->pkt_class != MPPA_RPC_ODP_CLASS_ETH)
+		return -MPPA_RPC_ODP_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != MPPA_RPC_ODP_ETH_VERSION)
+		return -MPPA_RPC_ODP_ERR_VERSION_MISMATCH;
 
 	switch (msg->pkt_subtype){
-	case ODP_RPC_CMD_ETH_OPEN:
+	case MPPA_RPC_ODP_CMD_ETH_OPEN:
 		eth_open(remoteClus, msg, payload, 0, &answer);
 		break;
-	case ODP_RPC_CMD_ETH_STATE:
+	case MPPA_RPC_ODP_CMD_ETH_STATE:
 		eth_set_state(remoteClus, msg, &answer);
 		break;
-	case ODP_RPC_CMD_ETH_CLOS:
-	case ODP_RPC_CMD_ETH_CLOS_DEF:
+	case MPPA_RPC_ODP_CMD_ETH_CLOS:
+	case MPPA_RPC_ODP_CMD_ETH_CLOS_DEF:
 		eth_close(remoteClus, msg, &answer);
 		break;
-	case ODP_RPC_CMD_ETH_OPEN_DEF:
+	case MPPA_RPC_ODP_CMD_ETH_OPEN_DEF:
 		eth_open(remoteClus, msg, payload, 1, &answer);
 		break;
-	case ODP_RPC_CMD_ETH_DUAL_MAC:
+	case MPPA_RPC_ODP_CMD_ETH_DUAL_MAC:
 		eth_dual_mac(remoteClus, msg, &answer);
 		break;
-	case ODP_RPC_CMD_ETH_GET_STAT:
+	case MPPA_RPC_ODP_CMD_ETH_GET_STAT:
 		eth_get_stat(remoteClus, msg, &answer);
 		break;
 	default:
-		return -ODP_RPC_ERR_BAD_SUBTYPE;
+		return -MPPA_RPC_ODP_ERR_BAD_SUBTYPE;
 	}
 
-	odp_rpc_server_ack(&answer);
-	return -ODP_RPC_ERR_NONE;
+	mppa_rpc_odp_server_ack(&answer);
+	return -MPPA_RPC_ODP_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __eth_rpc_constructor()
@@ -285,5 +285,5 @@ void  __attribute__ ((constructor)) __eth_rpc_constructor()
 #endif
 
 	eth_init();
-	__rpc_handlers[ODP_RPC_CLASS_ETH] = eth_rpc_handler;
+	__rpc_handlers[MPPA_RPC_ODP_CLASS_ETH] = eth_rpc_handler;
 }

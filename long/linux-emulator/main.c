@@ -54,29 +54,29 @@ int rx_open(rx_config_t *rx_config, int n_ports)
 int main(){
 	int ret;
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
+	mppa_rpc_odp_t *ack_msg;
 	rx_config_t rx_config;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_ack_t ack;
 
 	for (volatile int i = 0; i < 20000000; ++i);
-	odp_rpc_client_init();
+	mppa_rpc_odp_client_init();
 	{
-		odp_rpc_cmd_eth_dual_mac_t mac_cmd = {
+		mppa_rpc_odp_cmd_eth_dual_mac_t mac_cmd = {
 			.enabled = 1
 		};
-		odp_rpc_t cmd = {
+		mppa_rpc_odp_t cmd = {
 			.data_len = 0,
-			.pkt_class = ODP_RPC_CLASS_ETH,
-			.pkt_subtype = ODP_RPC_CMD_ETH_DUAL_MAC,
-			.cos_version = ODP_RPC_ETH_VERSION,
+			.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+			.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_DUAL_MAC,
+			.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 			.inl_data = mac_cmd.inl_data,
 			.flags = 0,
 		};
 
-		odp_rpc_do_query(odp_rpc_get_io_dma_id(1, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+		mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(1, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
-		ret = odp_rpc_wait_ack(&ack_msg, NULL, 15 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+		ret = mppa_rpc_odp_wait_ack(&ack_msg, NULL, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 		if (ret <= 0)
 			return 1;
 
@@ -97,7 +97,7 @@ int main(){
 			/*
 			 * RPC Msg to IOETH  #N so the LB will dispatch to us
 			 */
-			odp_rpc_cmd_eth_open_t open_cmd = {
+			mppa_rpc_odp_cmd_eth_open_t open_cmd = {
 				{
 					.ifId = 4,
 					.dma_if = cluster_id + dma,
@@ -110,20 +110,20 @@ int main(){
 					.nb_rules = 0,
 				}
 			};
-			odp_rpc_t cmd = {
+			mppa_rpc_odp_t cmd = {
 				.data_len = 0,
-				.pkt_class = ODP_RPC_CLASS_ETH,
-				.pkt_subtype = ODP_RPC_CMD_ETH_OPEN_DEF,
-				.cos_version = ODP_RPC_ETH_VERSION,
+				.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+				.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_OPEN_DEF,
+				.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 				.inl_data = open_cmd.inl_data,
 				.flags = 0,
 			};
 
-			odp_rpc_do_query(odp_rpc_get_io_dma_id(1, cluster_id),
-							 odp_rpc_get_io_tag_id(cluster_id),
+			mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(1, cluster_id),
+							 mppa_rpc_odp_get_io_tag_id(cluster_id),
 							 &cmd, NULL);
 
-			ret = odp_rpc_wait_ack(&ack_msg, NULL, -1, "[ETH]");
+			ret = mppa_rpc_odp_wait_ack(&ack_msg, NULL, -1, "[ETH]");
 			if (ret <= 0)
 				return 1;
 
@@ -139,24 +139,24 @@ int main(){
 			/*
 			 * RPC Msg to IOETH  #N so the LB will dispatch to us
 			 */
-			odp_rpc_cmd_eth_clos_t close_cmd = {
+			mppa_rpc_odp_cmd_eth_clos_t close_cmd = {
 				{
 					.ifId = 4
 				}
 			};
-			odp_rpc_t cmd = {
-				.pkt_class = ODP_RPC_CLASS_ETH,
-				.pkt_subtype = ODP_RPC_CMD_ETH_CLOS,
-				.cos_version = ODP_RPC_ETH_VERSION,
+			mppa_rpc_odp_t cmd = {
+				.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+				.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_CLOS,
+				.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 				.data_len = 0,
 				.flags = 0,
 				.inl_data = close_cmd.inl_data
 			};
-			odp_rpc_do_query(odp_rpc_get_io_dma_id(1, cluster_id),
-							 odp_rpc_get_io_tag_id(cluster_id),
+			mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(1, cluster_id),
+							 mppa_rpc_odp_get_io_tag_id(cluster_id),
 							 &cmd, NULL);
 
-			ret = odp_rpc_wait_ack(&ack_msg, NULL, -1, "[ETH]");
+			ret = mppa_rpc_odp_wait_ack(&ack_msg, NULL, -1, "[ETH]");
 			if (ret <= 0)
 				return 1;
 

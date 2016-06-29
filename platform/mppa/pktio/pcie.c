@@ -98,14 +98,14 @@ static int pcie_destroy(void)
 static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
 	uint8_t *payload;
 	/*
 	 * RPC Msg to IOPCIE  #N so the LB will dispatch to us
 	 */
-	odp_rpc_cmd_pcie_open_t open_cmd = {
+	mppa_rpc_odp_cmd_pcie_open_t open_cmd = {
 		{
 			.pcie_eth_if_id = pcie->pcie_eth_if_id,
 			.pkt_size = PKTIO_PKT_MTU,
@@ -114,20 +114,20 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 			.cnoc_rx = pcie->cnoc_rx,
 		}
 	};
-	odp_rpc_t cmd = {
+	mppa_rpc_odp_t cmd = {
 		.data_len = 0,
-		.pkt_class = ODP_RPC_CLASS_PCIE,
-		.pkt_subtype = ODP_RPC_CMD_PCIE_OPEN,
-		.cos_version = ODP_RPC_PCIE_VERSION,
+		.pkt_class = MPPA_RPC_ODP_CLASS_PCIE,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_PCIE_OPEN,
+		.cos_version = MPPA_RPC_ODP_PCIE_VERSION,
 		.inl_data = open_cmd.inl_data,
 		.flags = 0,
 	};
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(pcie->slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(pcie->slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[PCIE]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[PCIE]");
 	if (ret <= 0)
 		return 1;
 
@@ -294,20 +294,20 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 	int slot_id = pcie->slot_id;
 	int pcie_eth_if_id = pcie->pcie_eth_if_id;
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
-	odp_rpc_cmd_pcie_clos_t close_cmd = {
+	mppa_rpc_odp_cmd_pcie_clos_t close_cmd = {
 		{
 			.ifId = pcie->pcie_eth_if_id = pcie_eth_if_id
 
 		}
 	};
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t cmd = {
-		.pkt_class = ODP_RPC_CLASS_PCIE,
-		.pkt_subtype = ODP_RPC_CMD_PCIE_CLOS,
-		.cos_version = ODP_RPC_PCIE_VERSION,
+	mppa_rpc_odp_t cmd = {
+		.pkt_class = MPPA_RPC_ODP_CLASS_PCIE,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_PCIE_CLOS,
+		.cos_version = MPPA_RPC_ODP_PCIE_VERSION,
 		.data_len = 0,
 		.flags = 0,
 		.inl_data = close_cmd.inl_data
@@ -317,11 +317,11 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 	/* Free packets being sent by DMA */
 	tx_uc_flush(pcie_get_ctx(pcie));
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[PCIE]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[PCIE]");
 	ack.inl_data = ack_msg->inl_data;
 
 	if (ret <= 0)

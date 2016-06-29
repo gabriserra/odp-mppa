@@ -22,7 +22,7 @@
 
 #define RING_BUFFER_ENTRIES	16
 
-#define BUF_POOL_COUNT	(1 + MPODP_MAX_IF_COUNT)
+#define BUF_POOL_COUNT	(1 + MPODP_MAX_IF_COUNT* MPODP_MAX_RX_QUEUES)
 
 /**
  * PCIe ethernet interface config
@@ -31,7 +31,6 @@ struct mppa_pcie_g_eth_if_cfg {
 	struct mppa_pcie_eth_ring_buff_desc *rx;
 };
 
-static struct mppa_pcie_g_eth_if_cfg g_eth_if_cfg[MPPA_PCIE_ETH_IF_MAX] = {{NULL}};
 static void *g_pkt_base_addr = (void *) DDR_BUFFER_BASE_ADDR;
 
 
@@ -39,11 +38,13 @@ static int pcie_init_buff_pools()
 {
 	mppa_pcie_noc_rx_buf_t **buf_pool;
 	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST];
-	int i;
-	int j = 0;
+	unsigned i, j;
 	uint32_t buf_left;
-
-	buf_pool = calloc(MPPA_PCIE_MULTIBUF_COUNT * BUF_POOL_COUNT,
+	int n_pools = 1;
+	for (i = 0; i < eth_control.if_count; ++i) {
+		n_pools += eth_control.configs[i].n_rxqs;
+	}
+	buf_pool = calloc(MPPA_PCIE_MULTIBUF_COUNT * n_pools,
 			  sizeof(mppa_pcie_noc_rx_buf_t *));
 	if (!buf_pool) {
 		fprintf(stderr, "Failed to alloc pool descriptor\n");
@@ -51,9 +52,11 @@ static int pcie_init_buff_pools()
 	}
 	buffer_ring_init(&g_free_buf_pool, buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
 
-	for (i = 0; i < MPODP_MAX_IF_COUNT; i++) {
-		buf_pool += MPPA_PCIE_MULTIBUF_COUNT;
-		buffer_ring_init(&g_full_buf_pool[i], buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
+	for (i = 0; i < eth_control.if_count; i++) {
+		for (j = 0; j < eth_control.configs[i].n_rxqs; ++j) {
+			buf_pool += MPPA_PCIE_MULTIBUF_COUNT;
+			buffer_ring_init(&g_full_buf_pool[i][j], buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
+		}
 	}
 
 	for (i = 0; i < MPPA_PCIE_MULTIBUF_COUNT; i+= j) {
@@ -72,6 +75,25 @@ static int pcie_init_buff_pools()
 	return 0;
 }
 
+int pcie_start()
+{
+#if defined(MAGIC_SCALL)
+	return 0;
+#endif
+	if (!eth_control.if_count)
+		return -1;
+
+	for (int i = 0; i < BSP_NB_DMA_IO_MAX; i++) {
+		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_TX);
+		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_RX);
+	}
+
+	pcie_init_buff_pools();
+	pcie_start_tx_rm();
+	pcie_start_rx_rm();
+	return 0;
+}
+
 int pcie_init(int if_count)
 {
 #if defined(MAGIC_SCALL)
@@ -87,26 +109,14 @@ int pcie_init(int if_count)
 		if_cfgs[i].n_h2c_entries = RING_BUFFER_ENTRIES;
 		if_cfgs[i].flags = 0;
 		if_cfgs[i].if_id = i;
+		if_cfgs[i].n_c2h_q = if_cfgs[i].n_h2c_q = 1;
 		memcpy(if_cfgs[i].mac_addr, "\x02\xde\xad\xbe\xef", 5);
-		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((odp_rpc_get_cluster_id(0) - 128) << 1);
+		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((mppa_rpc_odp_get_cluster_id(0) - 128) << 1);
 	}
 
 	netdev_init(if_count, if_cfgs);
-	for (int i = 0; i < if_count; ++i){
-		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_control.configs[i].c2h_ring_buf_desc_addr;
-	}
-
 	__k1_mb();
 
-	for (int i = 0; i < BSP_NB_DMA_IO_MAX; i++) {
-		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_TX);
-		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_RX);
-	}
-
-	pcie_init_buff_pools();
-	pcie_start_tx_rm();
-	pcie_start_rx_rm();
-
-	return 0;
+	return pcie_start();
 }
 

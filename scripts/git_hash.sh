@@ -7,16 +7,18 @@ fi
 ROOTDIR=${1}
 
 if [ -e ${ROOTDIR}/.git ]; then
-	hash=$(git --git-dir=${ROOTDIR}/.git describe | tr -d "\n")
+	hash=$(git --git-dir=${ROOTDIR}/.git describe --match "release-*" | tr -d "\n")
 	if [[ $(git --git-dir=${ROOTDIR}/.git diff --shortstat 2> /dev/null \
 		| tail -n1) != "" ]]; then
 		dirty=.dirty
 	fi
 	echo -n "${hash}${dirty}">${ROOTDIR}/.scmversion
 
+	sed -i "s|^release-||g" ${ROOTDIR}/.scmversion
 	sed -i "s|-|.git|" ${ROOTDIR}/.scmversion
 	sed -i "s|-|.|g" ${ROOTDIR}/.scmversion
 	sed -i "s|^v||g" ${ROOTDIR}/.scmversion
+
 elif [ ! -e ${ROOTDIR}/.git -a ! -f ${ROOTDIR}/.scmversion ]; then
 	echo -n "File ROOTDIR/.scmversion not found, "
 	echo "and not inside a git repository"
