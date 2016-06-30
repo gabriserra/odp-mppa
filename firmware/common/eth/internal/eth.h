@@ -40,9 +40,10 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   mppa_rpc_odp_answer_t *answer);
 int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
 			   mppa_rpc_odp_answer_t *answer);
-int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
-			int nb_rules, const pkt_rule_t rules[nb_rules],
-			mppa_rpc_odp_answer_t *answer);
+int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
+			     int fallthrough,  int nb_rules,
+			     const pkt_rule_t rules[nb_rules],
+			     mppa_rpc_odp_answer_t *answer);
 
 int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 			   mppa_rpc_odp_answer_t *answer);
