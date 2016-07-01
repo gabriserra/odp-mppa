@@ -748,7 +748,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 			 * traffic to all MAC_MATCH clusters */
 			ethtool_add_mac_match_entry(eth_if, ethtool_mac_to_64(eth_if));
 			mppabeth_lb_cfg_extract_table_mode((void *)&(mppa_ethernet[0]->lb),
-							   ETH_MATCHALL_TABLE_ID, /* Priority */ 0,
+							   eth_if, /* Priority */ 0,
 							   MPPABETHLB_DISPATCH_POLICY_RR);
 		}
 		status[eth_if].rx_refcounts.policy[ETH_CLUS_POLICY_MAC_MATCH]++;
