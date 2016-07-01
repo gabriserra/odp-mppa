@@ -512,10 +512,11 @@ ethtool_add_mac_match_entry(int hw_rule_id, uint64_t mac)
 }
 
 static void
-ethtool_add_entry(int hw_rule_id, const pkt_rule_t *rule, int entry_id)
+ethtool_add_entry(int hw_rule_id, const pkt_rule_t *rule,
+		  int rule_id __attribute__((unused)), int entry_id)
 {
 #ifdef VERBOSE
-	printf("Rule[%d] => [%d] (P%d) Entry[%d]: offset %d cmp_mask 0x%02x cmp_value "
+	printf("Rule[%d] => HWRule[%d] (P%d) Entry[%d]: offset %d cmp_mask 0x%02x cmp_value "
 	       "0x%016llx hash_mask 0x%02x>\n",
 	       rule_id, hw_rule_id,
 	       rule->priority,
@@ -536,10 +537,10 @@ ethtool_add_entry(int hw_rule_id, const pkt_rule_t *rule, int entry_id)
 }
 
 static void
-ethtool_add_rule(int hw_rule_id, const pkt_rule_t *rule, uint64_t mac)
+ethtool_add_rule(int hw_rule_id, const pkt_rule_t *rule, int rule_id, uint64_t mac)
 {
 	for ( int entry_id = 0; entry_id < rule->nb_entries; ++entry_id) {
-		ethtool_add_entry(hw_rule_id, rule, entry_id);
+		ethtool_add_entry(hw_rule_id, rule, rule_id, entry_id);
 	}
 	if (lb_status.dual_mac) {
 		ethtool_add_mac_match_entry(hw_rule_id, mac);
@@ -552,7 +553,7 @@ ethtool_configure_rules(int hw_rule_id, int nb_rules,
 			uint64_t mac)
 {
 	for (int rule_id = 0; rule_id < nb_rules; ++rule_id, ++hw_rule_id) {
-		ethtool_add_rule(hw_rule_id, &rules[rule_id], mac);
+		ethtool_add_rule(hw_rule_id, &rules[rule_id], rule_id, mac);
 		/* Set rule to DROP mode by default.
 		 * It'll be enabled when a cluster is enabled */
 		mppabeth_lb_cfg_extract_table_mode((void *) &(mppa_ethernet[0]->lb),
