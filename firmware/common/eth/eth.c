@@ -83,14 +83,12 @@ void eth_open(unsigned remoteClus, mppa_rpc_odp_t *msg,
 		goto err;
 	if (ethtool_setup_clus2eth(remoteClus, data.ifId, nocIf, answer))
 		goto err;
-	if (fallthrough) {
-		status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_FALLTHROUGH;
-	} else {
-		if ( ethtool_apply_rules(remoteClus, data.ifId,
-					 data.nb_rules,
-					 (pkt_rule_t*)payload, answer))
-			goto err;
-	}
+
+	if ( ethtool_configure_policy(remoteClus, data.ifId, fallthrough,
+				      data.nb_rules, (pkt_rule_t*)payload,
+				      answer))
+		goto err;
+
 	if (ethtool_start_lane(data.ifId, data.loopback, data.verbose, answer))
 		goto err;
 
