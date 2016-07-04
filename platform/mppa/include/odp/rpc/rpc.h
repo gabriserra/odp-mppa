@@ -1,12 +1,12 @@
-#ifndef __ODP_RPC_RPC_H__
-#define __ODP_RPC_RPC_H__
+#ifndef __MPPA_RPC_ODP_RPC_H__
+#define __MPPA_RPC_ODP_RPC_H__
 
 #include <odp/rpc/defines.h>
 #include <odp/rpc/helpers.h>
 
 typedef struct {
 	uint64_t data[4];
-} odp_rpc_inl_data_t;
+} mppa_rpc_odp_inl_data_t;
 
 /* Command modules */
 #include <odp/rpc/bas.h>
@@ -16,15 +16,15 @@ typedef struct {
 #include <odp/rpc/rnd.h>
 
 typedef enum {
-	ODP_RPC_ERR_NONE = 0,
-	ODP_RPC_ERR_BAD_COS = 1,
-	ODP_RPC_ERR_BAD_SUBTYPE = 2,
-	ODP_RPC_ERR_VERSION_MISMATCH = 3,
-	ODP_RPC_ERR_INTERNAL_ERROR = 4,
-	ODP_RPC_ERR_TIMEOUT = 5,
-} odp_rpc_cmd_err_e;
+	MPPA_RPC_ODP_ERR_NONE = 0,
+	MPPA_RPC_ODP_ERR_BAD_COS = 1,
+	MPPA_RPC_ODP_ERR_BAD_SUBTYPE = 2,
+	MPPA_RPC_ODP_ERR_VERSION_MISMATCH = 3,
+	MPPA_RPC_ODP_ERR_INTERNAL_ERROR = 4,
+	MPPA_RPC_ODP_ERR_TIMEOUT = 5,
+} mppa_rpc_odp_cmd_err_e;
 
-typedef struct odp_rpc {
+typedef struct mppa_rpc_odp {
 	uint8_t  pkt_class;      /* Class of Service */
 	uint8_t  pkt_subtype;    /* Type of the pkt within the class of service */
 	uint16_t cos_version;    /* Version of the CoS used. Used to ensure coherency between
@@ -38,23 +38,23 @@ typedef struct odp_rpc {
 			uint8_t err_str : 1; /* When set, payload is an error string.
 						Only valid when message is a ack */
 			uint8_t rpc_err : 4; /* RPC Service error. Frame was not understood or broken
-					      * See odp_rpc_cmd_err_e for value */
+					      * See mppa_rpc_odp_cmd_err_e for value */
 		};
 		uint16_t flags;
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_t;
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_t;
 
 
 /** Class of Services for RPC commands */
 typedef enum {
-	ODP_RPC_CLASS_BAS,
-	ODP_RPC_CLASS_ETH,
-	ODP_RPC_CLASS_PCIE,
-	ODP_RPC_CLASS_C2C,
-	ODP_RPC_CLASS_RND,
-	ODP_RPC_N_CLASS
-} odp_rpc_class_e;
+	MPPA_RPC_ODP_CLASS_BAS,
+	MPPA_RPC_ODP_CLASS_ETH,
+	MPPA_RPC_ODP_CLASS_PCIE,
+	MPPA_RPC_ODP_CLASS_C2C,
+	MPPA_RPC_ODP_CLASS_RND,
+	MPPA_RPC_ODP_N_CLASS
+} mppa_rpc_odp_class_e;
 
 
 typedef union {
@@ -62,20 +62,20 @@ typedef union {
 		uint8_t status;
 		union {
 			uint8_t foo;                    /* Dummy entry for init */
-			ODP_RPC_ACK_LIST_BAS
-			ODP_RPC_ACK_LIST_ETH
-			ODP_RPC_ACK_LIST_PCIE
-			ODP_RPC_ACK_LIST_C2C
-			ODP_RPC_ACK_LIST_RND
+			MPPA_RPC_ODP_ACK_LIST_BAS
+			MPPA_RPC_ODP_ACK_LIST_ETH
+			MPPA_RPC_ODP_ACK_LIST_PCIE
+			MPPA_RPC_ODP_ACK_LIST_C2C
+			MPPA_RPC_ODP_ACK_LIST_RND
 		} cmd;
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_ack_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_ack_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_ack_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_ack_t);
 
-#define ODP_RPC_CMD_ACK_INITIALIZER { .inl_data = { .data = { 0 }}, .cmd = { 0 }, .status = 0}
+#define MPPA_RPC_ODP_CMD_ACK_INITIALIZER { .inl_data = { .data = { 0 }}, .cmd = { 0 }, .status = 0}
 
 /** RPC client status */
 extern int g_rpc_init;
 
-#endif /* __ODP_RPC_RPC_H__ */
+#endif /* __MPPA_RPC_ODP_RPC_H__ */

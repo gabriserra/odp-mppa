@@ -49,7 +49,7 @@ void
 pcie_start_tx_rm();
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
-		  tx_credit_t *tx_credit, odp_rpc_answer_t *answer);
+		  tx_credit_t *tx_credit, mppa_rpc_odp_answer_t *answer);
 
 static inline
 int no_printf(__attribute__((unused)) const char *fmt , ...)

@@ -1,27 +1,27 @@
-#ifndef __ODP_RPC_ETH_H__
-#define __ODP_RPC_ETH_H__
+#ifndef __MPPA_RPC_ODP_ETH_H__
+#define __MPPA_RPC_ODP_ETH_H__
 
 #include <odp/rpc/defines.h>
 
 /** Version of the ETH CoS */
-#define ODP_RPC_ETH_VERSION 0x4
+#define MPPA_RPC_ODP_ETH_VERSION 0x4
 
 /** Length of a mac address */
 #define ETH_ALEN 6
 
 typedef enum {
-	ODP_RPC_CMD_ETH_OPEN     /**< ETH: Configure trafic forward to/from Eth in IOETH */,
-	ODP_RPC_CMD_ETH_CLOS     /**< ETH: Free forward resources to/from Eth in IOETH */,
-	ODP_RPC_CMD_ETH_PROMISC  /**< ETH: KSet/Clear promisc mode */,
-	ODP_RPC_CMD_ETH_OPEN_DEF /**< ETH: Forward unmatch Rx traffic to a cluster */,
-	ODP_RPC_CMD_ETH_CLOS_DEF /**< ETH: Stop forwarding unmatch Rx traffic to a cluster */,
-	ODP_RPC_CMD_ETH_DUAL_MAC /**< ETH: Enable dual-mac mode (ODP + Linux) */,
-	ODP_RPC_CMD_ETH_STATE    /**< ETH: Start or Stop trafic forwarding */,
-	ODP_RPC_CMD_ETH_GET_STAT /**< ETH: GEt link status and statistics */,
-	ODP_RPC_CMD_ETH_N_CMD
-} odp_rpc_cmd_eth_e;
+	MPPA_RPC_ODP_CMD_ETH_OPEN     /**< ETH: Configure trafic forward to/from Eth in IOETH */,
+	MPPA_RPC_ODP_CMD_ETH_CLOS     /**< ETH: Free forward resources to/from Eth in IOETH */,
+	MPPA_RPC_ODP_CMD_ETH_PROMISC  /**< ETH: KSet/Clear promisc mode */,
+	MPPA_RPC_ODP_CMD_ETH_OPEN_DEF /**< ETH: Forward unmatch Rx traffic to a cluster */,
+	MPPA_RPC_ODP_CMD_ETH_CLOS_DEF /**< ETH: Stop forwarding unmatch Rx traffic to a cluster */,
+	MPPA_RPC_ODP_CMD_ETH_DUAL_MAC /**< ETH: Enable dual-mac mode (ODP + Linux) */,
+	MPPA_RPC_ODP_CMD_ETH_STATE    /**< ETH: Start or Stop trafic forwarding */,
+	MPPA_RPC_ODP_CMD_ETH_GET_STAT /**< ETH: GEt link status and statistics */,
+	MPPA_RPC_ODP_CMD_ETH_N_CMD
+} mppa_rpc_odp_cmd_eth_e;
 
-#define ODP_RPC_CMD_NAMES_ETH			\
+#define MPPA_RPC_ODP_CMD_NAMES_ETH			\
 	"ETH OPEN",				\
 		"ETH CLOSE",			\
 		"ETH PROMISC",			\
@@ -31,12 +31,12 @@ typedef enum {
 		"ETH SET STATE",		\
 		"ETH GET STATS"
 
-#define ODP_RPC_ACK_LIST_ETH				\
-	odp_rpc_ack_eth_open_t eth_open;		\
-	odp_rpc_ack_eth_get_stat_t eth_get_stat;
+#define MPPA_RPC_ODP_ACK_LIST_ETH				\
+	mppa_rpc_odp_ack_eth_open_t eth_open;		\
+	mppa_rpc_odp_ack_eth_get_stat_t eth_get_stat;
 
 /**
- * Command for ODP_RPC_CMD_ETH_OPEN
+ * Command for MPPA_RPC_ODP_CMD_ETH_OPEN
  */
 typedef union {
 	struct {
@@ -54,74 +54,74 @@ typedef union {
 		uint8_t min_payload: 6;  /**< Minimum payload for NoC packet. 0 = default */
 		uint8_t max_payload: 6;  /**< Maximum payload for NoC packet. 0 = default */
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_cmd_eth_open_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_open_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_eth_open_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_open_t);
 
 /**
- * Ack inline for ODP_RPC_CMD_ETH_OPEN
+ * Ack inline for MPPA_RPC_ODP_CMD_ETH_OPEN
  */
 typedef struct {
 	uint16_t tx_if;	/* IO Cluster id */
 	uint8_t  tx_tag;	/* Tag of the IO Cluster rx */
 	uint8_t  mac[ETH_ALEN];
 	uint16_t mtu;
-} odp_rpc_ack_eth_open_t;
+} mppa_rpc_odp_ack_eth_open_t;
 
 /**
- * Command for ODP_RPC_CMD_ETH_OPEN_DEF
+ * Command for MPPA_RPC_ODP_CMD_ETH_OPEN_DEF
  */
-typedef odp_rpc_cmd_eth_open_t odp_rpc_cmd_eth_open_def_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_open_def_t);
+typedef mppa_rpc_odp_cmd_eth_open_t mppa_rpc_odp_cmd_eth_open_def_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_open_def_t);
 
 /**
- * Command for ODP_RPC_CMD_ETH_PROMIS
+ * Command for MPPA_RPC_ODP_CMD_ETH_PROMIS
  */
 typedef union {
 	struct {
 		uint8_t ifId : 3; /* 0-3, 4 for 40G */
 		uint8_t enabled : 1;
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_cmd_eth_promisc_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_promisc_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_eth_promisc_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_promisc_t);
 
 /**
- * Command for ODP_RPC_CMD_ETH_STATE
+ * Command for MPPA_RPC_ODP_CMD_ETH_STATE
  */
-typedef odp_rpc_cmd_eth_promisc_t odp_rpc_cmd_eth_state_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_state_t);
+typedef mppa_rpc_odp_cmd_eth_promisc_t mppa_rpc_odp_cmd_eth_state_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_state_t);
 
 /**
- * Command for ODP_RPC_CMD_ETH_CLOS
+ * Command for MPPA_RPC_ODP_CMD_ETH_CLOS
  */
 typedef union {
 	struct {
 		uint8_t ifId : 3; /* 0-3, 4 for 40G */
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_cmd_eth_clos_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_clos_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_eth_clos_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_clos_t);
 
 /**
- * Command for ODP_RPC_CMD_ETH_CLOS_DEF
+ * Command for MPPA_RPC_ODP_CMD_ETH_CLOS_DEF
  */
-typedef odp_rpc_cmd_eth_clos_t odp_rpc_cmd_eth_clos_def_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_clos_def_t);
+typedef mppa_rpc_odp_cmd_eth_clos_t mppa_rpc_odp_cmd_eth_clos_def_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_clos_def_t);
 
 /**
- * Command for ODP_RPC_CMD_ETH_DUAL_MAC
+ * Command for MPPA_RPC_ODP_CMD_ETH_DUAL_MAC
  */
 typedef union {
 	struct {
 		uint8_t enabled : 1;
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_cmd_eth_dual_mac_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_dual_mac_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_eth_dual_mac_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_dual_mac_t);
 
 /**
- * Command for ODP_RPC_CMD_ETH_GET_STAT
+ * Command for MPPA_RPC_ODP_CMD_ETH_GET_STAT
  */
 typedef union {
 	struct {
@@ -130,19 +130,19 @@ typedef union {
 					 * counters in payload. If disabled
 					 * just return link status */
 	};
-	odp_rpc_inl_data_t inl_data;
-} odp_rpc_cmd_eth_get_stat_t;
-ODP_RPC_CHECK_STRUCT_SIZE(odp_rpc_cmd_eth_get_stat_t);
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_eth_get_stat_t;
+MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_get_stat_t);
 
 /**
- * Ack inline for ODP_RPC_CMD_GET_STAT
+ * Ack inline for MPPA_RPC_ODP_CMD_GET_STAT
  */
 typedef struct {
 	uint16_t link_status;
-} odp_rpc_ack_eth_get_stat_t;
+} mppa_rpc_odp_ack_eth_get_stat_t;
 
 /**
- * Payload for ack of ODP_RPC_CMD_GET_STAT.
+ * Payload for ack of MPPA_RPC_ODP_CMD_GET_STAT.
  *
  * Follows RFCs for Management Information Base
  * (MIB)for use with network management protocols in the Internet community:
@@ -211,7 +211,7 @@ typedef struct {
 	 * CarrierSenseErrors. See ifOutErrors in RFC 3635.
 	 */
 	uint64_t out_errors;
-}  odp_rpc_payload_eth_get_stat_t;
+}  mppa_rpc_odp_payload_eth_get_stat_t;
 
 
 
@@ -249,4 +249,4 @@ typedef struct pkt_rule {
 	uint8_t priority   : 4;
 } pkt_rule_t;
 
-#endif /* __ODP_RPC_ETH_H__ */
+#endif /* __MPPA_RPC_ODP_ETH_H__ */

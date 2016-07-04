@@ -20,7 +20,7 @@
 #include <odp/rpc/helpers.h>
 
 enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
-							odp_rpc_answer_t *answer)
+							mppa_rpc_odp_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	enum mppa_eth_mac_ethernet_mode_e link_speed =
@@ -58,7 +58,7 @@ int ethtool_init_lane(int eth_if)
 }
 
 int ethtool_open_cluster(unsigned remoteClus, unsigned if_id,
-			 odp_rpc_answer_t *answer)
+			 mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 	if (if_id == 4) {
@@ -89,7 +89,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   int nocIf, int externalAddress,
 			   int min_rx, int max_rx,
 			   int min_payload, int max_payload,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_answer_t *answer)
 {
 	int ret;
 
@@ -102,7 +102,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 		return 0;
 
 	ret = mppa_routing_get_dnoc_unicast_route(externalAddress,
-						  odp_rpc_undensify_cluster_id(remoteClus),
+						  mppa_rpc_odp_undensify_cluster_id(remoteClus),
 						  &config, &header);
 	if (ret != MPPA_ROUTING_RET_SUCCESS) {
 		ETH_RPC_ERR_MSG(answer,
@@ -171,7 +171,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 
 
 int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_answer_t *answer)
 {
 	int ret;
 	unsigned rx_port;
@@ -252,7 +252,7 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
 }
 
 int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
-		       odp_rpc_answer_t *answer)
+		       mppa_rpc_odp_answer_t *answer)
 {
 	int ret;
 	int eth_if = if_id % 4;
@@ -358,7 +358,7 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 }
 
 int ethtool_stop_lane(unsigned if_id,
-		      odp_rpc_answer_t *answer __attribute__((unused)))
+		      mppa_rpc_odp_answer_t *answer __attribute__((unused)))
 {
 	const int eth_if = if_id % 4;
 
@@ -403,7 +403,7 @@ static int compare_rule_entries(const pkt_rule_entry_t entry1,
 }
 
 static int check_rules_identical(const pkt_rule_t *rules, int nb_rules,
-				 odp_rpc_answer_t *answer)
+				 mppa_rpc_odp_answer_t *answer)
 {
 	for ( int rule_id = 0; rule_id < nb_rules; ++rule_id ) {
 		for ( int entry_id = 0; entry_id < rules[rule_id].nb_entries; ++entry_id ) {
@@ -579,7 +579,7 @@ ethtool_mac_to_64(unsigned eth_if) {
 int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
 			     int fallthrough, int nb_rules,
 			     const pkt_rule_t rules[nb_rules],
-			     odp_rpc_answer_t *answer )
+			     mppa_rpc_odp_answer_t *answer )
 {
 	const int eth_if = if_id % 4;
 	eth_cluster_policy_t policy;
@@ -665,7 +665,7 @@ int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 	const int noc_if = status[eth_if].cluster[remoteClus].nocIf;
@@ -768,7 +768,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
-			    odp_rpc_answer_t *answer)
+			    mppa_rpc_odp_answer_t *answer)
 {
 
 	const int eth_if = if_id % 4;
@@ -838,7 +838,7 @@ int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
-			  odp_rpc_answer_t *answer)
+			  mppa_rpc_odp_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	int noc_if = status[eth_if].cluster[remoteClus].nocIf;
@@ -920,7 +920,7 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_set_dual_mac(int enable,
-			 odp_rpc_answer_t *answer)
+			 mppa_rpc_odp_answer_t *answer)
 {
 	if (lb_status.dual_mac == enable)
 		return 0;
@@ -952,7 +952,7 @@ int ethtool_poll_lane(unsigned if_id)
 	return 0;
 }
 int ethtool_lane_stats(unsigned if_id,
-		       odp_rpc_answer_t *answer)
+		       mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 
@@ -962,8 +962,8 @@ int ethtool_lane_stats(unsigned if_id,
 		return -1;
 	}
 
-	odp_rpc_payload_eth_get_stat_t *stats =
-		(odp_rpc_payload_eth_get_stat_t *)answer->payload;
+	mppa_rpc_odp_payload_eth_get_stat_t *stats =
+		(mppa_rpc_odp_payload_eth_get_stat_t *)answer->payload;
 	answer->payload_len = sizeof(*stats);
 
 	if (lb_status.loopback){

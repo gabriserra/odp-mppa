@@ -94,7 +94,7 @@ int pcie_init(int if_count)
 		if_cfgs[i].flags = 0;
 		if_cfgs[i].if_id = i;
 		memcpy(if_cfgs[i].mac_addr, "\x02\xde\xad\xbe\xef", 5);
-		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((odp_rpc_get_cluster_id(0) - 128) << 1);
+		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((mppa_rpc_odp_get_cluster_id(0) - 128) << 1);
 	}
 
 	netdev_configure(if_count, if_cfgs);

@@ -73,7 +73,7 @@ int odp_init_global(const odp_init_t *params,
 		return -1;
 	}
 
-	if (odp_rpc_client_init()) {
+	if (mppa_rpc_odp_client_init()) {
 		ODP_ERR("ODP RPC init failed.\n");
 		return -1;
 	}
@@ -124,7 +124,7 @@ int odp_term_global(void)
 		rc = -1;
 	}
 
-	if (odp_rpc_client_term()) {
+	if (mppa_rpc_odp_client_term()) {
 		ODP_ERR("ODP RPC tem failed.\n");
 		return -1;
 	}

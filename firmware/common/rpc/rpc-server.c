@@ -13,9 +13,9 @@
 #include "internal/rpc-server.h"
 #include "internal/cache.h"
 
-#define RPC_PKT_SIZE (sizeof(odp_rpc_t) + RPC_MAX_PAYLOAD)
+#define RPC_PKT_SIZE (sizeof(mppa_rpc_odp_t) + RPC_MAX_PAYLOAD)
 
-odp_rpc_handler_t __rpc_handlers[ODP_RPC_N_CLASS];
+mppa_rpc_odp_handler_t __rpc_handlers[MPPA_RPC_ODP_N_CLASS];
 int __n_rpc_handlers;
 static uint64_t __rpc_ev_masks[BSP_NB_DMA_IO_MAX][4];
 static uint64_t __rpc_fair_masks[BSP_NB_DMA_IO_MAX][4];
@@ -35,7 +35,7 @@ __attribute__((section(".upper_internal_memory")))
 #endif
 
 static inline int rxToMsg(unsigned ifId, unsigned tag,
-			   odp_rpc_t **msg, uint8_t **payload)
+			   mppa_rpc_odp_t **msg, uint8_t **payload)
 {
 	int remoteClus;
 #if defined(K1B_EXPLORER)
@@ -46,7 +46,7 @@ static inline int rxToMsg(unsigned ifId, unsigned tag,
 	remoteClus = 4 * locIfId + ((tag - RPC_BASE_RX)) / 4 * 16 + ((tag - RPC_BASE_RX) % 4);
 #endif
 
-	odp_rpc_t *cmd = (void*)g_clus_priv[remoteClus].recv_buf;
+	mppa_rpc_odp_t *cmd = (void*)g_clus_priv[remoteClus].recv_buf;
 	*msg = cmd;
 	INVALIDATE(cmd);
 
@@ -55,7 +55,7 @@ static inline int rxToMsg(unsigned ifId, unsigned tag,
 		INVALIDATE_AREA(*payload, cmd->data_len);
 	}
 #ifdef VERBOSE
-	odp_rpc_print_msg(cmd, *payload);
+	mppa_rpc_odp_print_msg(cmd, *payload);
 #endif
 
 	return remoteClus;
@@ -118,7 +118,7 @@ static int get_if_rx_id(unsigned interface_id)
 static int dma_id;
 
 static
-int odp_rpc_server_poll_msg(odp_rpc_t **msg, uint8_t **payload)
+int mppa_rpc_odp_server_poll_msg(mppa_rpc_odp_t **msg, uint8_t **payload)
 {
 	const int base_if = 4;
 	int idx;
@@ -139,67 +139,67 @@ int odp_rpc_server_poll_msg(odp_rpc_t **msg, uint8_t **payload)
 	return -1;
 }
 
-int odp_rpc_server_ack(odp_rpc_answer_t *answer)
+int mppa_rpc_odp_server_ack(mppa_rpc_odp_answer_t *answer)
 {
 	answer->msg->ack = 1;
 	answer->msg->data_len = answer->payload_len;
 	answer->msg->inl_data = answer->ack.inl_data;
 
 	unsigned interface = get_rpc_local_dma_id(answer->msg->dma_id);
-	return odp_rpc_send_msg(interface, answer->msg->dma_id,
+	return mppa_rpc_odp_send_msg(interface, answer->msg->dma_id,
 				answer->msg->dnoc_tag, answer->msg,
 				answer->payload);
 }
 
 static
-int odp_rpc_server_handle(odp_rpc_t ** unhandled_msg)
+int mppa_rpc_odp_server_handle(mppa_rpc_odp_t ** unhandled_msg)
 {
 	int remoteClus;
-	odp_rpc_t *msg;
+	mppa_rpc_odp_t *msg;
 	uint8_t *payload = NULL;
 
-	remoteClus = odp_rpc_server_poll_msg(&msg, &payload);
+	remoteClus = mppa_rpc_odp_server_poll_msg(&msg, &payload);
 	if(remoteClus >= 0) {
 		*unhandled_msg = msg;
 
-		if (msg->pkt_class >= ODP_RPC_N_CLASS ||
+		if (msg->pkt_class >= MPPA_RPC_ODP_N_CLASS ||
 		    __rpc_handlers[msg->pkt_class] == NULL) {
 			/* Unhandled message type */
 			*unhandled_msg = msg;
-			return -ODP_RPC_ERR_BAD_COS;
+			return -MPPA_RPC_ODP_ERR_BAD_COS;
 		}
 		return __rpc_handlers[msg->pkt_class](remoteClus, msg, payload);
 	}
 
 	/* No message */
-	return -ODP_RPC_ERR_NONE;
+	return -MPPA_RPC_ODP_ERR_NONE;
 }
 
-static int bas_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
+static int bas_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)
 {
-	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
+	mppa_rpc_odp_answer_t answer = MPPA_RPC_ODP_ANSWER_INITIALIZER(msg);
 
-	if (msg->pkt_class != ODP_RPC_CLASS_BAS)
-		return -ODP_RPC_ERR_INTERNAL_ERROR;
-	if (msg->cos_version != ODP_RPC_BAS_VERSION)
-		return -ODP_RPC_ERR_VERSION_MISMATCH;
+	if (msg->pkt_class != MPPA_RPC_ODP_CLASS_BAS)
+		return -MPPA_RPC_ODP_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != MPPA_RPC_ODP_BAS_VERSION)
+		return -MPPA_RPC_ODP_ERR_VERSION_MISMATCH;
 
 	(void)remoteClus;
 	(void)payload;
 
 	switch (msg->pkt_subtype){
-	case ODP_RPC_CMD_BAS_PING:
+	case MPPA_RPC_ODP_CMD_BAS_PING:
 		break;
 	default:
-		return -ODP_RPC_ERR_BAD_SUBTYPE;
+		return -MPPA_RPC_ODP_ERR_BAD_SUBTYPE;
 	}
-	odp_rpc_server_ack(&answer);
-	return -ODP_RPC_ERR_NONE;
+	mppa_rpc_odp_server_ack(&answer);
+	return -MPPA_RPC_ODP_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __bas_rpc_constructor()
 {
-	__rpc_handlers[ODP_RPC_CLASS_BAS] = bas_rpc_handler;
+	__rpc_handlers[MPPA_RPC_ODP_CLASS_BAS] = bas_rpc_handler;
 }
 
 
@@ -214,33 +214,33 @@ int odp_rpc_server_thread()
 	}
 
 	while (1) {
-		odp_rpc_t *msg;
+		mppa_rpc_odp_t *msg;
 		int ret;
-		ret = odp_rpc_server_handle(&msg);
+		ret = mppa_rpc_odp_server_handle(&msg);
 		if (ret < 0) {
-			odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
+			mppa_rpc_odp_answer_t answer = MPPA_RPC_ODP_ANSWER_INITIALIZER(msg);
 
 			switch(ret){
-			case -ODP_RPC_ERR_BAD_COS:
+			case -MPPA_RPC_ODP_ERR_BAD_COS:
 				RPC_ERROR(&answer, "[RPC]", "Message has unsupported Class of Service %d\n",
 					  msg->pkt_class);
 				break;
-			case -ODP_RPC_ERR_BAD_SUBTYPE:
+			case -MPPA_RPC_ODP_ERR_BAD_SUBTYPE:
 				RPC_ERROR(&answer, "[RPC]", "Message has subtype %d for Class of Service %d\n",
 					  msg->pkt_subtype, msg->pkt_class);
 				break;
-			case -ODP_RPC_ERR_VERSION_MISMATCH:
+			case -MPPA_RPC_ODP_ERR_VERSION_MISMATCH:
 				RPC_ERROR(&answer, "[RPC]", "Message has a different CoS Version: %d\n",
 					  msg->cos_version);
 				break;
-			case -ODP_RPC_ERR_INTERNAL_ERROR:
+			case -MPPA_RPC_ODP_ERR_INTERNAL_ERROR:
 			default:
 				RPC_ERROR(&answer, "[RPC]", "Internal error while handling RPC message\n");
 				break;
 			}
 			/* Error in handling. Send a RPC command with error flag */
 			msg->rpc_err = -ret;
-			odp_rpc_server_ack(&answer);
+			mppa_rpc_odp_server_ack(&answer);
 		}
 	}
 	return 0;

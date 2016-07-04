@@ -1,21 +1,21 @@
-#ifndef __ODP_RPC_BAS_H__
-#define __ODP_RPC_BAS_H__
+#ifndef __MPPA_RPC_ODP_BAS_H__
+#define __MPPA_RPC_ODP_BAS_H__
 
 #include <odp/rpc/defines.h>
 
 /** Version of the BAS CoS */
-#define ODP_RPC_BAS_VERSION 0x2
+#define MPPA_RPC_ODP_BAS_VERSION 0x2
 
 typedef enum {
-	ODP_RPC_CMD_BAS_INVL = 0 /**< BASE: Invalid command. Skip */,
-	ODP_RPC_CMD_BAS_PING     /**< BASE: Ping command. server sends back ack = 0 */,
-	ODP_RPC_CMD_BAS_N_CMD
-} odp_rpc_cmd_bas_e;
+	MPPA_RPC_ODP_CMD_BAS_INVL = 0 /**< BASE: Invalid command. Skip */,
+	MPPA_RPC_ODP_CMD_BAS_PING     /**< BASE: Ping command. server sends back ack = 0 */,
+	MPPA_RPC_ODP_CMD_BAS_N_CMD
+} mppa_rpc_odp_cmd_bas_e;
 
-#define ODP_RPC_CMD_NAMES_BAS			\
+#define MPPA_RPC_ODP_CMD_NAMES_BAS			\
 	"INVALID",							\
 		"PING"
 
-#define ODP_RPC_ACK_LIST_BAS
+#define MPPA_RPC_ODP_ACK_LIST_BAS
 
-#endif /* __ODP_RPC_BAS_H__ */
+#endif /* __MPPA_RPC_ODP_BAS_H__ */
