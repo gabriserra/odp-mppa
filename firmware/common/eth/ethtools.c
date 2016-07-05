@@ -272,6 +272,16 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 
 	switch (status[eth_if].initialized) {
 	case ETH_LANE_OFF:
+		if (if_id == 4) {
+			for (int i = 0; i < N_ETH_LANE; ++i) {
+				if (status[i].initialized != ETH_LANE_ON)
+					continue;
+				ETH_RPC_ERR_MSG(answer,
+						"One lane was enabled in 1 or 10G. Cannot set lane %d in 40G\n",
+						eth_if);
+				return -1;
+			}
+		}
 		if (loopback) {
 			if (verbose)
 				printf("[ETH] Initializing lane %d in loopback\n", eth_if);
@@ -296,8 +306,9 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 			ret = mppa_eth_utils_init_mac(eth_if, link_speed);
 			switch(ret){
 			case BAD_VENDOR:
-				fprintf(stderr,
-					"[ETH] Warning: QSFP coonector is not supported\n");
+				ETH_RPC_ERR_MSG(answer,
+						"[ETH] Warning: QSFP coonector is not supported\n");
+				return -1;
 				break;
 			case -EBUSY:
 				/* lane is already configured. Ignore */
