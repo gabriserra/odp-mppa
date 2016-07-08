@@ -451,8 +451,8 @@ static int pcie_promisc_mode(pktio_entry_t *const pktio_entry ODP_UNUSED){
 }
 
 static int pcie_mtu_get(pktio_entry_t *const pktio_entry ODP_UNUSED) {
-	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
-	return eth->mtu;
+	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+	return pcie->mtu;
 }
 const pktio_if_ops_t pcie_pktio_ops = {
 	.init = pcie_init,
