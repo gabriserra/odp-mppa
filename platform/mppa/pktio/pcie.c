@@ -454,6 +454,20 @@ static int pcie_mtu_get(pktio_entry_t *const pktio_entry ODP_UNUSED) {
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 	return pcie->mtu;
 }
+
+static int pcie_stats(pktio_entry_t *const pktio_entry,
+		      _odp_pktio_stats_t *stats)
+{
+	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+
+	memset(stats, 0, sizeof(*stats));
+
+	if (rx_thread_fetch_stats(pcie->rx_config.pktio_id,
+				  &stats->in_dropped, &stats->in_discards))
+		return -1;
+	return 0;
+}
+
 const pktio_if_ops_t pcie_pktio_ops = {
 	.init = pcie_init,
 	.term = pcie_destroy,
@@ -461,6 +475,7 @@ const pktio_if_ops_t pcie_pktio_ops = {
 	.close = pcie_close,
 	.start = NULL,
 	.stop = NULL,
+	.stats = pcie_stats,
 	.recv = pcie_recv,
 	.send = pcie_send,
 	.mtu_get = pcie_mtu_get,
