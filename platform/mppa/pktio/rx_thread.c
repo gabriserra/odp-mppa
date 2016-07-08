@@ -290,6 +290,7 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 		if (info._.pkt_size < sizeof(*header)) {
 			/* Probably a spurious EOT. */
 			STORE_U64(header->info, 0ULL);
+			newpkt = pkt;
 			pkt = ODP_PACKET_INVALID;
 			if_th->dropped_pkts++;
 			mapped_pkt = 1;
