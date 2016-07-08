@@ -589,6 +589,18 @@ static int cluster_mtu_get(pktio_entry_t *const pktio_entry)
 	return pkt_cluster->mtu;
 }
 
+static int cluster_stats(pktio_entry_t *const pktio_entry,
+			 _odp_pktio_stats_t *stats)
+{
+	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
+
+	memset(stats, 0, sizeof(*stats));
+
+	if (rx_thread_fetch_stats(clus->rx_config.pktio_id,
+				  &stats->in_dropped, &stats->in_discards))
+		return -1;
+	return 0;
+}
 const pktio_if_ops_t cluster_pktio_ops = {
 	.init = cluster_init,
 	.term = NULL,
@@ -596,6 +608,7 @@ const pktio_if_ops_t cluster_pktio_ops = {
 	.close = cluster_close,
 	.start = NULL,
 	.stop = NULL,
+	.stats = cluster_stats,
 	.recv = cluster_recv,
 	.send = cluster_send,
 	.mtu_get = cluster_mtu_get,
