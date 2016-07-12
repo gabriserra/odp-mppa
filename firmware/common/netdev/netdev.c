@@ -43,7 +43,8 @@ int netdev_c2h_is_full(struct mpodp_if_config *cfg, uint32_t c2h_q)
 int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 			    uint32_t c2h_q,
 			    struct mpodp_c2h_entry *data,
-			    struct mpodp_c2h_entry *old_entry)
+			    struct mpodp_c2h_entry *old_entry,
+			    int it)
 {
 	struct mpodp_ring_buff_desc *c2h =
 		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
@@ -75,7 +76,7 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 #ifdef NETDEV_VERBOSE
 	printf("C2H data 0x%llx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
 #endif
-	if (LOAD_U32(cfg->interrupt_status))
+	if (it)
 		mppa_pcie_send_it_to_host();
 
 	return 0;
