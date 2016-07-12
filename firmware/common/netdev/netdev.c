@@ -26,7 +26,7 @@ int netdev_c2h_is_full(struct mpodp_if_config *cfg, uint32_t c2h_q)
 
 	struct mpodp_ring_buff_desc *c2h =
 		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
-	uint32_t tail = LOAD_U32(c2h->tail);
+	uint32_t tail = c2h->tail;
 	uint32_t next_tail = tail + 1;
 
 	if (next_tail == c2h->count)
@@ -48,7 +48,7 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 {
 	struct mpodp_ring_buff_desc *c2h =
 		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
-	uint32_t tail = LOAD_U32(c2h->tail);
+	uint32_t tail = c2h->tail;
 	uint32_t next_tail = tail + 1;
 
 	if (next_tail == c2h->count)
@@ -64,14 +64,15 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 	struct mpodp_c2h_entry *entry = entry_base + tail;
 
 	if (old_entry) {
-		old_entry->pkt_addr = LOAD_U64(entry->pkt_addr);
-		old_entry->data = LOAD_U64(entry->data);
+		old_entry->pkt_addr = entry->pkt_addr;
+		old_entry->data = entry->data;
 	}
 
 	memcpy(entry, data, sizeof(*entry));
 	__k1_wmb();
 
-	STORE_U32(c2h->tail, next_tail);
+	c2h->tail = next_tail;
+	__k1_wmb();
 
 #ifdef NETDEV_VERBOSE
 	printf("C2H data 0x%llx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
