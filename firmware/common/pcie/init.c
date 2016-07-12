@@ -20,7 +20,8 @@
 
 #define MAX_DNOC_TX_PER_PCIE_ETH_IF	16
 
-#define RING_BUFFER_ENTRIES	17
+#define H2C_RING_BUFFER_ENTRIES	17
+#define C2H_RING_BUFFER_ENTRIES	64
 
 #define BUF_POOL_COUNT	(1 + MPODP_MAX_IF_COUNT* MPODP_MAX_RX_QUEUES)
 
@@ -105,8 +106,8 @@ int pcie_init(int if_count)
 	eth_if_cfg_t if_cfgs[if_count];
 	for (int i = 0; i < if_count; ++i){
 		if_cfgs[i].mtu = MPODP_DEFAULT_MTU;
-		if_cfgs[i].n_c2h_entries = RING_BUFFER_ENTRIES;
-		if_cfgs[i].n_h2c_entries = RING_BUFFER_ENTRIES;
+		if_cfgs[i].n_c2h_entries = C2H_RING_BUFFER_ENTRIES;
+		if_cfgs[i].n_h2c_entries = H2C_RING_BUFFER_ENTRIES;
 		if_cfgs[i].flags = 0;
 		if_cfgs[i].if_id = i;
 		if_cfgs[i].n_c2h_q = if_cfgs[i].n_h2c_q = 1;
