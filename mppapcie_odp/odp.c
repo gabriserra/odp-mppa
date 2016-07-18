@@ -538,6 +538,10 @@ static void mpodp_pre_reset(struct net_device *netdev)
 	 * but it makes sure that there is no packet being sent
 	 * when we release the lock so we just have to wai for the
 	 * one being transmitted. */
+
+	if (priv->tx_timer.function)
+		del_timer_sync(&priv->tx_timer);
+
 	netif_tx_lock(netdev);
 	atomic_set(&priv->reset, 1);
 	netif_tx_stop_all_queues(netdev);
