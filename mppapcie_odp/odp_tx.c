@@ -448,6 +448,14 @@ void mpodp_tx_update_cache(struct mpodp_if_priv *priv)
 			struct mpodp_cache_entry *entry;
 
 			tx_head = readl(txq->head_addr);
+			/* Nothing yet */
+			if (tx_head < 0)
+				continue;
+
+			if (tx_head >= txq->mppa_size) {
+				netdev_err(priv->netdev, "Invalid head %d set in Txq[%d]\n", tx_head, txq->id);
+				return;
+			}
 			/* In autoloop, we need to cache new elements */
 			while (txq->cached_head < tx_head) {
 				entry = &txq->cache[txq->cached_head];
