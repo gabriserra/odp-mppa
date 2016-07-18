@@ -624,10 +624,13 @@ int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
 			ETH_RPC_ERR_MSG(answer, "Lane already opened with different rules\n");
 			return -1;
 		}
-		status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_HASH;
 		return 0;
 	}
 
+	/* If we are in MAC MATCH mode, we have nothing to do here.
+	 * Rule is created when ENABLE command is received */
+	if (!nb_rules)
+		return 0;
 	/* No Hash rules yet. Make sure no one opened anything yet */
 	for (int i =0; i < N_ETH_LANE; ++i){
 		if (status[i].initialized == ETH_LANE_OFF)
