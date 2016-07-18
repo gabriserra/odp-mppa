@@ -104,6 +104,11 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 	int work_done = 0;
 	int add_it;
 
+	if (atomic_read(&priv->reset) == 1) {
+		/* Interface is reseting, do not start new transfers */
+		return 0;
+	}
+
 	/* RX: 1st step: start transfer */
 	/* read RX tail */
 	rxq->tail = readl(rxq->tail_addr);
@@ -199,8 +204,6 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 		/* napi will be rescheduled */
 		break;
 	}
-	if (work_done)
-		dma_async_issue_pending(priv->rx_chan);
 
 	if (limit != rxq->tail) {
 		/* make the second part of the ring */
@@ -208,6 +211,8 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 		rxq->avail = 0;
 		goto loop;
 	}
+	if (work_done)
+		dma_async_issue_pending(priv->rx_chan);
 
 	return 0;
 }
