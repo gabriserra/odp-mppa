@@ -234,6 +234,9 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	/* make room before adding packets */
 	mpodp_clean_tx_unlocked(priv, txq, -1);
 
+	if (atomic_read(&priv->reset) == 1)
+		goto addr_error;
+
 	tx_submitted = atomic_read(&txq->submitted);
 	/* Compute txd id */
 	tx_next = (tx_submitted + 1);
