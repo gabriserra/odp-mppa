@@ -624,7 +624,6 @@ int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
 			ETH_RPC_ERR_MSG(answer, "Lane already opened with different rules\n");
 			return -1;
 		}
-		status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_HASH;
 		return 0;
 	}
 
