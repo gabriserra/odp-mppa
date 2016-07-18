@@ -27,7 +27,7 @@ typedef struct {
 			(answer)->ack.status = 1;								\
 			(answer)->msg->err_str = 1;								\
 			(answer)->payload_len = snprintf((char*)(answer)->payload,				\
-							 RPC_MAX_PAYLOAD, mod " Error:" x);			\
+							 RPC_MAX_PAYLOAD, mod " Error:" x) + 1;			\
 			RPC_VERBOSE_PRINT(mod " Error:" x);							\
 		}												\
 	} while(0)
