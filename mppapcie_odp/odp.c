@@ -50,14 +50,6 @@ static struct net_device_stats *mpodp_get_stats(struct net_device *netdev)
 	return &netdev->stats;
 }
 
-
-static void mpodp_dma_callback_rx(void *param)
-{
-	struct mpodp_if_priv *priv = param;
-
-	napi_schedule(&priv->napi);
-}
-
 static int mpodp_poll(struct napi_struct *napi, int budget)
 {
 	struct mpodp_if_priv *priv;
@@ -346,11 +338,6 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	}
 	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
 						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
-	mppa_pcie_dmaengine_set_channel_callback(priv->rx_chan,
-						 mpodp_dma_callback_rx,
-						 priv);
-	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
-						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_ENABLED);
 
 	/* Init all Tx Queues */
 	for (i = 0; i < priv->n_txqs; ++i) {
@@ -551,6 +538,10 @@ static void mpodp_pre_reset(struct net_device *netdev)
 	 * but it makes sure that there is no packet being sent
 	 * when we release the lock so we just have to wai for the
 	 * one being transmitted. */
+
+	if (priv->tx_timer.function)
+		del_timer_sync(&priv->tx_timer);
+
 	netif_tx_lock(netdev);
 	atomic_set(&priv->reset, 1);
 	netif_tx_stop_all_queues(netdev);

@@ -23,12 +23,13 @@ void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
 }
 
 
+#define IT_BURSTINESS 32
 static uint64_t pkt_count[MPPA_PCIE_ETH_IF_MAX] = {0};
 static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 {
 	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST], *buf;
 	uint32_t left, pkt_size;
-	int ret = 0, buf_idx;
+	int ret = 0, buf_idx, count;
 	void * pkt_addr;
 	union mpodp_pkt_hdr_info info;
 	struct mpodp_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
@@ -46,8 +47,8 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 		return;
 	assert(ret <= MPPA_PCIE_MULTIBUF_COUNT);
 
-	dbg_printf("%d buffer ready to be sent\n", ret);
-	for(buf_idx = 0; buf_idx < nb_bufs; buf_idx++) {
+	dbg_printf("%d buffer ready to be sent\n", nb_bufs);
+	for(buf_idx = 0, count = 0; buf_idx < nb_bufs; buf_idx++) {
 		buf = bufs[buf_idx];
 		buf->pkt_count = 0;
 
@@ -70,8 +71,12 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 			pkt.status = 0;
 			pkt.pkt_addr = (unsigned long)pkt_addr;
 			pkt.data = (unsigned long)buf;
+			count++;
 			do {
-				ret = netdev_c2h_enqueue_data(cfg, c2h_q, &pkt, &free_pkt);
+				ret = netdev_c2h_enqueue_data(cfg, c2h_q, &pkt, &free_pkt,
+							      (count % IT_BURSTINESS == 0) ||
+							      ( buf_idx == nb_bufs - 1 &&
+								info._.hash_key & END_OF_PACKETS) );
 			} while (ret < 0);
 
 			if (free_pkt.data != 0)

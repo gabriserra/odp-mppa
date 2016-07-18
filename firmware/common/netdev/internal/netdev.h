@@ -28,7 +28,7 @@ int netdev_c2h_is_full(struct mpodp_if_config *cfg, uint32_t c2h_q);
 int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 			    uint32_t c2h_q,
 			    struct mpodp_c2h_entry *data,
-			    struct mpodp_c2h_entry *old_entry);
+			    struct mpodp_c2h_entry *old_entry, int it);
 
 /* H2C */
 int netdev_h2c_enqueue_buffer(struct mpodp_if_config *cfg,

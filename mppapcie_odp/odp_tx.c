@@ -234,6 +234,9 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	/* make room before adding packets */
 	mpodp_clean_tx_unlocked(priv, txq, -1);
 
+	if (atomic_read(&priv->reset) == 1)
+		goto addr_error;
+
 	tx_submitted = atomic_read(&txq->submitted);
 	/* Compute txd id */
 	tx_next = (tx_submitted + 1);
@@ -445,6 +448,14 @@ void mpodp_tx_update_cache(struct mpodp_if_priv *priv)
 			struct mpodp_cache_entry *entry;
 
 			tx_head = readl(txq->head_addr);
+			/* Nothing yet */
+			if (tx_head < 0)
+				continue;
+
+			if (tx_head >= txq->mppa_size) {
+				netdev_err(priv->netdev, "Invalid head %d set in Txq[%d]\n", tx_head, txq->id);
+				return;
+			}
 			/* In autoloop, we need to cache new elements */
 			while (txq->cached_head < tx_head) {
 				entry = &txq->cache[txq->cached_head];

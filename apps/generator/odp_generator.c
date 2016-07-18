@@ -444,8 +444,8 @@ static void *gen_send_thread(void *arg)
 
 		err = odp_queue_enq_multi(outq_def, (odp_event_t*)pkt, PKT_BURST_SZ);
 		if (err != PKT_BURST_SZ) {
-			EXAMPLE_ERR("  [%02i] send pkt err!\n", thr);
-			return NULL;
+			/* EXAMPLE_ERR("  [%02i] send pkt err!\n", thr); */
+			/* return NULL; */
 		}
 
 		static uint64_t toto = 0;
