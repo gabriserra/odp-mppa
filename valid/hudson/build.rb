@@ -258,7 +258,8 @@ b.target("package") do
     #K1 ODP
     tar_package = File.expand_path("odp.tar")
     depends = []
-    depends.push b.depends_info_struct.new("k1-tools","=", options["k1version"], "")
+    depends.push b.depends_info_struct.new("k1-re","=", options["k1version"], "")
+    depends.push b.depends_info_struct.new("k1-dev","=", options["k1version"], "")
 
     if not options["librariesversion"].to_s.empty? then
       depends.push b.depends_info_struct.new("k1-libraries","=", options["librariesversion"], "")
