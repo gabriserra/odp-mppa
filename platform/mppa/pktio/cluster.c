@@ -219,6 +219,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int cluster_id;
 	int nRx = 3;
 	int rr_policy = -1;
+	int rr_offset = 0;
 	int nofree = 0;
 
 	/* String should in the following format: "cluster<cluster_id>" */
@@ -247,7 +248,15 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		}  else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -302,7 +311,8 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		if (rret != MPPA_ROUTING_RET_SUCCESS)
 			return 1;
 
-		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx, rr_policy, -1, -1);
+		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx,
+					  rr_policy, rr_offset, -1, -1);
 		if(ret < 0) {
 			ODP_ERR("Failed to setup rx threads\n");
 			return -1;

@@ -62,6 +62,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int max_rx = -1;
 	int slot_id;
 	int rr_policy = -1;
+	int rr_offset = -1;
 	int n_fragments = 1;
 
 	/*
@@ -103,7 +104,15 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -149,7 +158,8 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
 		ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		nRx = max_rx - min_rx + 1;
-		ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy, min_rx, max_rx);
+		ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy,
+					  rr_offset, min_rx, max_rx);
 		if(ret < 0)
 			return -1;
 		else

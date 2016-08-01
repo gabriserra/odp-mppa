@@ -500,7 +500,9 @@ static void *_rx_thread_start(void *arg)
 	return NULL;
 }
 
-int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy, int min_rx, int max_rx)
+int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
+			int rr_policy, int rr_offset,
+			int min_rx, int max_rx)
 {
 	const int dma_if = 0;
 	if (rx_config->pktio_id >= MAX_RX_IF) {
@@ -615,7 +617,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy, int 
 		/* Each thread picks rr_policy Rx every odp_global_data.n_rx_thr */
 		for (int port = rx_config->min_port, th_id = 0;
 		     port <= rx_config->max_port; ++port, ++th_id){
-			int th = (th_id / rr_policy) % odp_global_data.n_rx_thr;
+			int th = ((th_id + rr_offset) / rr_policy) % odp_global_data.n_rx_thr;
 
 			const unsigned word = port / (8 * sizeof(ev_masks[0][0]));
 			const unsigned offset = port % ( 8 * sizeof(ev_masks[0][0]));
