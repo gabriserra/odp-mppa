@@ -304,7 +304,7 @@ static void *pktio_direct_recv_thread(void *arg)
 
 	/* Loop packets */
 	while (!__builtin_k1_lwu(&exit_threads)) {
-		int sent, i, j;
+		int sent, i;
 		unsigned tx_drops;
 
 		pkts = odp_pktio_recv(pktio_src, pkt_tbl, MAX_PKT_BURST);
@@ -317,11 +317,11 @@ static void *pktio_direct_recv_thread(void *arg)
 				int sub_count;
 
 				sub_count = _odp_packet_fragment(pkt_tbl[i], sub_pkts);
-				printf("Got a packet with %d frags\n", sub_count);
-				for (j = 0; j < sub_count; ++j) {
-					printf("\tFrag[%d].size = %d\n", j,
-					       (int)odp_packet_len(sub_pkts[j]));
-				}
+				/* printf("Got a packet with %d frags\n", sub_count); */
+				/* for (j = 0; j < sub_count; ++j) { */
+				/* 	printf("\tFrag[%d].size = %d\n", j, */
+				/* 	       (int)odp_packet_len(sub_pkts[j])); */
+				/* } */
 				pkt_tbl[i] = sub_pkts[0];
 				odp_packet_free_multi(sub_pkts + 1, sub_count - 1);
 			} else {
@@ -497,8 +497,8 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 	if (stats_enabled)
 		printf("TEST RESULT: %" PRIu64 " maximum packets per second.\n",
 		       maximum_pps);
-
-	return pkts == 1 ? 0 : -1;
+	printf("%lld packets total\n", pkts);
+	return pkts ==  300000 ? 0 : -1;
 }
 
 /**
@@ -660,13 +660,14 @@ int main(int argc, char *argv[])
 	exit_threads = 1;
 	__k1_wmb();
 #ifdef __K1__
-	if (gbl_args->appl.pktio_stats) {
-		for (i = 0; i < gbl_args->appl.if_count; ++i) {
-			_odp_pktio_stats_t pktio_stats;
-			pktio = gbl_args->pktios[i];
-			_odp_pktio_stats(pktio, &pktio_stats);
-			_odp_pktio_stats_print(pktio, &pktio_stats);
-		}
+
+	for (i = 0; i < gbl_args->appl.if_count; ++i) {
+		_odp_pktio_stats_t pktio_stats;
+		pktio = gbl_args->pktios[i];
+		_odp_pktio_stats(pktio, &pktio_stats);
+		_odp_pktio_stats_print(pktio, &pktio_stats);
+		if (pktio_stats.in_dropped || pktio_stats.in_discards)
+			ret = 1;
 	}
 #endif
 	/* Master thread waits for other threads to exit */

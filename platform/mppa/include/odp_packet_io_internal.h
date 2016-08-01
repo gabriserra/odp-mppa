@@ -127,6 +127,10 @@ typedef struct {
 
 	uint8_t slot_id;                /**< IO Eth Id */
 
+	mppa_cnoc_config_t config;
+	mppa_cnoc_header_t header;
+	uint64_t pkt_count;
+
 	pkt_tx_uc_config tx_config;
 } pkt_ioddr_t;
 

@@ -25,17 +25,48 @@
 #define MAX_IODDR_SLOTS 2
 
 #define N_RX_P_IODDR 10
+#define NOC_CLUS_IFACE_ID       0
 #define NOC_IODDR_UC_COUNT 0
 
 #include <mppa_noc.h>
 #include <mppa_routing.h>
 
+static int g_cnoc_tx_id = -1;
+static odp_spinlock_t g_cnoc_tx_lock;
 /**
  * #############################
  * PKTIO Interface
  * #############################
  */
 static uint8_t ioddr_mac[ETH_ALEN] =  { 0xde, 0xad, 0xbe, 0xbe, 0x00 };
+
+static int cluster_init_cnoc_tx(void)
+{
+	mppa_noc_ret_t ret;
+
+	if (g_cnoc_tx_id >= 0)
+		return 0;
+
+	/* CnoC */
+	odp_spinlock_init(&g_cnoc_tx_lock);
+	ret = mppa_noc_cnoc_tx_alloc_auto(NOC_CLUS_IFACE_ID,
+					  (unsigned *)&g_cnoc_tx_id, MPPA_NOC_BLOCKING);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return 1;
+
+	return 0;
+}
+
+static int cluster_configure_cnoc_tx(pkt_ioddr_t *ioddr)
+{
+	mppa_noc_ret_t nret;
+
+	nret = mppa_noc_cnoc_tx_configure(NOC_CLUS_IFACE_ID,
+					  g_cnoc_tx_id,
+					  ioddr->config, ioddr->header);
+
+	return (nret != MPPA_NOC_RET_SUCCESS);
+}
 
 static int ioddr_init(void)
 {
@@ -64,7 +95,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int rr_policy = -1;
 	int rr_offset = -1;
 	int n_fragments = 1;
-
+	int cnoc_port = -1;
 	/*
 	 * Check device name and extract slot/port
 	 */
@@ -124,6 +155,14 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 				return -1;
 			}
 			pptr = eptr;
+		}  else if (!strncmp(pptr, "cnoc=", strlen("cnoc="))){
+			pptr += strlen("cnoc=");
+			cnoc_port = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid cnoc %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -150,23 +189,36 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		ODP_ERR("min_rx and max_rx options must be specified\n");
 		return -1;
 	}
-
-	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
-		/* Setup Rx threads */
-		ioddr->rx_config.dma_if = 0;
-		ioddr->rx_config.pool = pool;
-		ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
-		ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		nRx = max_rx - min_rx + 1;
-		ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy,
-					  rr_offset, min_rx, max_rx);
-		if(ret < 0)
-			return -1;
-		else
-			ret = 0;
+	if (cnoc_port == -1) {
+		ODP_ERR("cnoc option must be specified\n");
+		return -1;
 	}
 
-	return ret;
+	if (pktio_entry->s.param.in_mode == ODP_PKTIN_MODE_DISABLED)
+		return 0;
+
+	/* Setup Rx threads */
+	ioddr->rx_config.dma_if = 0;
+	ioddr->rx_config.pool = pool;
+	ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
+	ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
+	nRx = max_rx - min_rx + 1;
+	ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy,
+				  rr_offset, min_rx, max_rx);
+	if(ret < 0)
+		return -1;
+
+	if (cluster_init_cnoc_tx()) {
+		ODP_ERR("Failed to initialize CNoC Rx\n");
+		return -1;
+	}
+
+	ret = mppa_routing_get_cnoc_unicast_route(__k1_get_cluster_id(),
+						   128 + 64 * slot_id,
+						   &ioddr->config,
+						   &ioddr->header);
+	ioddr->header._.tag = cnoc_port;
+	return 0;
 }
 
 static int ioddr_close(pktio_entry_t * const pktio_entry)
@@ -233,6 +285,7 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	const int frag_per_pkt = ioddr->n_fragments;;
 	unsigned wanted_segs = len * frag_per_pkt;
 	odp_packet_t tmp_table[wanted_segs];
+	uint64_t pkt_count;
 
 	do {
 		n_packet = odp_buffer_ring_get_multi(ioddr->rx_config.ring,
@@ -241,6 +294,17 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		wanted_segs -= n_packet;
 		total_packet += n_packet;
 	} while(total_packet % ioddr->n_fragments != 0);
+
+	if (!total_packet)
+		return 0;
+
+
+	odp_spinlock_lock(&g_cnoc_tx_lock);
+	pkt_count = LOAD_U64(ioddr->pkt_count) + total_packet;
+	STORE_U64(ioddr->pkt_count, pkt_count);
+	cluster_configure_cnoc_tx(ioddr);
+	mppa_noc_cnoc_tx_push(NOC_CLUS_IFACE_ID, g_cnoc_tx_id, pkt_count);
+	odp_spinlock_unlock(&g_cnoc_tx_lock);
 
 	for (n_packet = 0; n_packet < total_packet / frag_per_pkt; ++n_packet) {
 		odp_packet_t top_pkt = tmp_table[n_packet * frag_per_pkt];

@@ -14,6 +14,7 @@
 /* If you change this, make sure to change the nfragments paremeter of the pktio */
 #define DATA_SIZE 2048
 #define PKTIO_MTU 512
+#define CNOC_RX 2
 
 char data[DATA_SIZE];
 
@@ -38,6 +39,27 @@ typedef struct mppa_ethernet_header_s {
 	union mppa_ethernet_header_info_t info;
 } mppa_ethernet_header_t;
 
+static int cluster_init_cnoc_rx(void)
+{
+	mppa_cnoc_mailbox_notif_t notif = {0};
+	mppa_noc_ret_t ret;
+	mppa_noc_cnoc_rx_configuration_t conf = {0};
+
+	conf.mode = MPPA_NOC_CNOC_RX_MAILBOX;
+	conf.init_value = 0;
+
+	/* CNoC */
+	ret = mppa_noc_cnoc_rx_alloc(0, CNOC_RX);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return 1;
+	printf("Rx alloced \n");
+	ret = mppa_noc_cnoc_rx_configure(0, CNOC_RX,
+					 conf, &notif);
+	if (ret != MPPA_NOC_RET_SUCCESS)
+		return -1;
+	printf("Rx configured \n");
+	return 0;
+}
 
 int main()
 {
@@ -55,13 +77,18 @@ int main()
 		fprintf(stderr, "[RPC] Error: Failed to start server\n");
 		exit(EXIT_FAILURE);
 	}
-
+	printf("CNOC setup\n");
+	if (cluster_init_cnoc_rx() < 0){
+		fprintf(stderr, "Failed to setup CNoC\n");
+		exit(EXIT_FAILURE);
+	}
+	printf("CNOC setup done\n");
 
 	printf("Spawning clusters\n");
 	{
 		static char const * _argv[] = {
 			"pktio-ddr",
-			"-i", "ioddr0:min_rx=127:max_rx=142:nfragments=4,drop",
+			"-i", "ioddr0:min_rx=128:max_rx=143:nfragments=4:cnoc=2,drop",
 			"-m", "0",
 			"-s", "0",
 			"-t", "15",
@@ -105,23 +132,38 @@ int main()
 	}
 
 	sleep(10);
-	header._.tag = 127;
+	header._.tag = 128;
+	eth_header.timestamp = 0;
+	eth_header.info._.pkt_id = 0;
+	eth_header.info._.pkt_size = PKTIO_MTU + sizeof(eth_header);
 
-	for( int i = 0; i < DATA_SIZE / PKTIO_MTU; i ++) {
-		printf("Start sending seg %d\n", i);
-		header._.tag = 127 + i;
+	uint64_t pkt_count = 0;
+	printf("Start sending\n");
+	while(pkt_count < 1200000) {
+		for( int i = 0; i < DATA_SIZE / PKTIO_MTU; i ++) {
+			uint64_t remote_pkt_count;
 
-		ret = mppa_noc_dnoc_tx_configure(0, nocTx, header, config);
-		if (ret != MPPA_NOC_RET_SUCCESS) {
-			fprintf(stderr, "Failed to configure Tx\n");
-			return -1;
+			ret = mppa_noc_dnoc_tx_configure(0, nocTx, header, config);
+			if (ret != MPPA_NOC_RET_SUCCESS) {
+				fprintf(stderr, "Failed to configure Tx\n");
+				return -1;
+			}
+
+			eth_header.timestamp++;
+			eth_header.info._.pkt_id++;
+
+			do {
+				remote_pkt_count = mppa_noc_cnoc_rx_get_value(0, CNOC_RX);
+			} while(pkt_count > remote_pkt_count + (143 - 128 + 1));
+			mppa_noc_dnoc_tx_send_data(0, nocTx, sizeof(eth_header), &eth_header);
+			mppa_noc_dnoc_tx_send_data_eot(0, nocTx, PKTIO_MTU, &data[i * PKTIO_MTU]);
+
+			header._.tag++;
+			if (header._.tag > 143)
+				header._.tag = 128;
+
+			pkt_count++;
 		}
-
-		eth_header.timestamp = i;
-		eth_header.info._.pkt_id = i;
-		eth_header.info._.pkt_size = PKTIO_MTU + sizeof(eth_header);
-		mppa_noc_dnoc_tx_send_data(0, nocTx, sizeof(eth_header), &eth_header);
-		mppa_noc_dnoc_tx_send_data_eot(0, nocTx, PKTIO_MTU, &data[i * PKTIO_MTU]);
 	}
 
 	if ((ret = join_clusters(&status)) != 0) {
