@@ -298,7 +298,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pkt_cluster->rx_config.pool = pool;
 		pkt_cluster->rx_config.pktio_id = RX_C2C_IF_BASE + cluster_id;
 		pkt_cluster->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-
+		pkt_cluster->rx_config.if_type = RX_IF_TYPE_C2C;
 		if (cluster_init_cnoc_tx()) {
 			ODP_ERR("Failed to initialize CNoC Rx\n");
 			return -1;

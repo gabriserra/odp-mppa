@@ -243,29 +243,47 @@ static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
 }
 
 
-static uint64_t _reload_rx(int th_id, int rx_id)
+static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 {
 	const int dma_if = 0;
 	const int pktio_id = rx_hdl.tag[rx_id].pktio_id;
 	rx_ifce_th_t *if_th = &rx_hdl.th[th_id].ifce[pktio_id];
+	rx_ifce_t *ifce = &rx_hdl.ifce[pktio_id];
 	const rx_config_t * rx_config = &rx_hdl.ifce[pktio_id].rx_config;
 	rx_pool_t * rx_pool = &rx_hdl.th[th_id].
 		pools[rx_hdl.ifce[pktio_id].pool_id];
 	int mapped_pkt = 0;
+	int n_events = __builtin_k1_cbs((*mask) & ifce->ev_masks[rx_id / 64]) + 1;
 
-	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 
-	if (odp_unlikely(!rx_pool->n_spares)) {
+	if (rx_config->if_type == RX_IF_TYPE_IODDR) {
+		if (n_events > rx_pool->n_spares) {
+			/* Alloc */
+			pool_entry_t * p_entry = (pool_entry_t*) rx_config->pool;
+			struct pool_entry_s *entry = &p_entry->s;
+
+			rx_pool->n_spares +=
+				get_buf_multi(entry,
+					      (odp_buffer_hdr_t **)(rx_pool->spares + rx_pool->n_spares),
+					      MIN(MAX(n_events, rx_pool->n_rx), PKT_BURST_SZ));
+		}
+		if (n_events > rx_pool->n_spares) {
+			/* Clear all bits of this pktio as
+			 * we don't want to break order */
+			*mask = (*mask) & ~(ifce->ev_masks[rx_id / 64]);
+			return 0;
+		}
+	} else if (odp_unlikely(!rx_pool->n_spares)) {
 		/* Alloc */
 		pool_entry_t * p_entry = (pool_entry_t*) rx_config->pool;
 		struct pool_entry_s *entry = &p_entry->s;
-
 		rx_pool->n_spares =
 			get_buf_multi(entry,
 				      (odp_buffer_hdr_t **)rx_pool->spares,
 				      MIN(rx_pool->n_rx, PKT_BURST_SZ));
 	}
 
+	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
 
@@ -407,7 +425,7 @@ static void _poll_masks(int th_id)
 				const int rx_id = mask_bit + i * 64;
 
 				mask = mask ^ (1ULL << mask_bit);
-				if_mask |=  _reload_rx(th_id, rx_id);
+				if_mask |=  _reload_rx(th_id, rx_id, &mask);
 			}
 		}
 

@@ -30,16 +30,16 @@
  */
 #define MAX_WORKERS            32
 
-/** @def SHM_PKT_POOL_SIZE
- * @brief Size of the shared memory block
- */
-#define SHM_PKT_POOL_SIZE      (400*2048)
 
 /** @def SHM_PKT_POOL_BUF_SIZE
  * @brief Buffer size of the packet pool buffer
  */
 #define SHM_PKT_POOL_BUF_SIZE  1856
 
+/** @def SHM_PKT_POOL_SIZE
+ * @brief Size of the shared memory block
+ */
+#define SHM_PKT_POOL_SIZE      SHM_PKT_POOL_BUF_SIZE * 33
 /** @def MAX_PKT_BURST
  * @brief Maximum number of packet in a burst
  */

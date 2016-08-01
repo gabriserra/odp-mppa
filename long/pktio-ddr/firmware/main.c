@@ -88,7 +88,7 @@ int main()
 	{
 		static char const * _argv[] = {
 			"pktio-ddr",
-			"-i", "ioddr0:min_rx=128:max_rx=143:nfragments=4:cnoc=2,drop",
+			"-i", "ioddr0:min_rx=128:max_rx=143:nfragments=4:cnoc=2:rrpolicy=16:rroffset=16,drop",
 			"-m", "0",
 			"-s", "0",
 			"-t", "15",
