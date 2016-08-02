@@ -49,6 +49,12 @@ void packet_parse_reset(odp_packet_hdr_t *pkt_hdr)
 	pkt_hdr->l4_protocol      = 0;
 }
 
+void _odp_packet_mark_nofree(odp_packet_t pkt)
+{
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	pkt_hdr->nofree = 1;
+}
+
 /**
  * Initialize packet buffer
  */
@@ -75,6 +81,7 @@ void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 	pkt_hdr->l3_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->l4_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->payload_offset = ODP_PACKET_OFFSET_INVALID;
+	pkt_hdr->nofree = 0;
 
  	/* Disable lazy parsing on user allocated packets */
 	if (!parse)
