@@ -15,6 +15,11 @@
 #define DATA_SIZE 2048
 #define PKTIO_MTU 512
 #define CNOC_RX 2
+#define MIN_TAG 200
+#define MAX_TAG 219
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
 char data[DATA_SIZE];
 
@@ -88,7 +93,9 @@ int main()
 	{
 		static char const * _argv[] = {
 			"pktio-ddr",
-			"-i", "ioddr0:min_rx=128:max_rx=143:nfragments=4:cnoc=2:rrpolicy=16:rroffset=16,drop",
+			"-i", "ioddr0:min_rx=" TOSTRING(MIN_TAG)
+			":max_rx=" TOSTRING(MAX_TAG)
+			":nfragments=4:cnoc=2:rrpolicy=20:rroffset=20,drop",
 			"-m", "0",
 			"-s", "0",
 			"-t", "15",
@@ -132,7 +139,7 @@ int main()
 	}
 
 	sleep(10);
-	header._.tag = 128;
+	header._.tag = MIN_TAG;
 	eth_header.timestamp = 0;
 	eth_header.info._.pkt_id = 0;
 	eth_header.info._.pkt_size = PKTIO_MTU + sizeof(eth_header);
@@ -154,13 +161,13 @@ int main()
 
 			do {
 				remote_pkt_count = mppa_noc_cnoc_rx_get_value(0, CNOC_RX);
-			} while(pkt_count > remote_pkt_count + (143 - 128 + 1));
+			} while(pkt_count > remote_pkt_count + (MAX_TAG - MIN_TAG + 1));
 			mppa_noc_dnoc_tx_send_data(0, nocTx, sizeof(eth_header), &eth_header);
 			mppa_noc_dnoc_tx_send_data_eot(0, nocTx, PKTIO_MTU, &data[i * PKTIO_MTU]);
 
 			header._.tag++;
-			if (header._.tag > 143)
-				header._.tag = 128;
+			if (header._.tag > MAX_TAG)
+				header._.tag = MIN_TAG;
 
 			pkt_count++;
 		}
