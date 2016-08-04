@@ -788,7 +788,7 @@ int rx_thread_link_close(uint8_t pktio_id)
 		/* No more interface open. */
 		if (rx_hdl.if_opened == 0 &&
 		    rx_hdl.drop_pkt != ODP_PACKET_INVALID) {
-			odp_packet_free(rx_hdl.drop_pkt);
+			odp_packet_free_multi(&rx_hdl.drop_pkt, 1);
 			rx_hdl.drop_pkt = ODP_PACKET_INVALID;
 		}
 	}

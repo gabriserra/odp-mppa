@@ -49,7 +49,9 @@ uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 				continue;
 
 			for (unsigned i = 0; i < job->pkt_count; ++i) {
-				if (!((odp_packet_hdr_t*)job->pkt_table[i])->nofree)
+				/* If it's 1 someone else will free it. If it's -1 someone else freed
+				 * it and it should not have happened. */
+				if (_odp_atomic_u32_fetch_sub_mm(&odp_packet_hdr(job->pkt_table[i])->nofree, 1, 0) == 0)
 					continue;
 
 				/* We have a nofree. Free the previous ones */
