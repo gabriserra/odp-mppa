@@ -218,7 +218,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 						   128 + 64 * slot_id,
 						   &ioddr->config,
 						   &ioddr->header);
-	ioddr->header._.tag = cnoc_port;
+	ioddr->header._.tag = cnoc_port + __k1_get_cluster_id();
 	return 0;
 }
 
