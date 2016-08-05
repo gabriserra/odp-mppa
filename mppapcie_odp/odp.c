@@ -279,8 +279,8 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	/* init fs */
 	snprintf(name, 64, "netdev%d-txtime", id);
 	priv->tx_time =
-	    mppa_pcie_time_create(name, mppapciefs_get_dentry(pdata),
-				  25000, 25000, 40, MPPA_TIME_TYPE_NS);
+		mppa_pcie_time_create(pdata, name, 25000, 25000,
+				      40, MPPA_TIME_TYPE_NS);
 
 	/* Init all RX Queues */
 	for (i = 0; i < priv->n_rxqs; ++i) {
