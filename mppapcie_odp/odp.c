@@ -327,6 +327,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	/* Init Rx DMA chan */
 	priv->rx_config.cfg.direction = DMA_DEV_TO_MEM;
 	priv->rx_config.fifo_mode = _MPPA_PCIE_ENGINE_FIFO_MODE_DISABLED;
+	priv->rx_config.requested_engine = -1;
 	priv->rx_config.short_latency_load_threshold = -1;
 
 	filter.direction = _MPPA_PCIE_ENGINE_DIRECTION_MPPA_TO_HOST;
