@@ -3,21 +3,12 @@
 CUR_DIR=$(readlink -e $(dirname $0))
 cd $CUR_DIR
 
-#Save initial freq
-INIT_FREQ=$(cat /mppa/board0/mppa0/chip_freq)
-
-#Set it at 400 for the test
-echo 400 > /mppa/board0/mppa0/chip_freq
-echo 1 > /mppa/board0/mppa0/reset
-
-k1-jtag-runner --reset
-
 #Start jtag runner in the BG
 res=1
 
 for i in $(seq 1 5); do
     k1-jtag-runner --multibinary=pcie_fwd_multibin.mpk --exec-multibin=IODDR0:iopcie \
-		   --exec-multibin=IODDR1:iopcie -- -cpcie_fwd \
+		   --exec-multibin=IODDR1:iopcie --chip-freq=400 -- -cpcie_fwd \
 		   -a "-i p0p0:tags=60,p1p0:tags=60" -a "-m 0" -a "-s 0" -a "-c 8" &
     sleep 5
 
@@ -32,8 +23,5 @@ for i in $(seq 1 5); do
     if [ $res -eq 0 ]; then break; fi
 done
 
-#Restore frequency
-echo 600 > /mppa/board0/mppa0/chip_freq
-echo 1 > /mppa/board0/mppa0/reset
 
 exit $res
