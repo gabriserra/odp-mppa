@@ -1,5 +1,10 @@
 #!/usr/bin/ruby
 # coding: utf-8
+#
+# Copyright (C) 2008-2016 Kalray SA.
+#
+# All rights reserved.
+#
 
 $LOAD_PATH.push('metabuild/lib')
 require 'metabuild'
