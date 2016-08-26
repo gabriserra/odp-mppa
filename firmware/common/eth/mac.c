@@ -1,10 +1,16 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <HAL/hal/hal.h>
+#include <mppa_bsp.h>
 #include "internal/cnoc_debug.h"
+#include "internal/mac.h"
+
+#define SCALL_ETH_GETSERIAL 4034
+
 
 static int debug_cnoc_init = 0;
-void init_debug_cnoc()  {
+static int syscall_registered = 0;
+static void init_debug_cnoc()  {
 
   //may be change by a real route finding function
   unsigned int route = 0x2 | 0x2 << 3;
@@ -17,6 +23,29 @@ void init_debug_cnoc()  {
   __k1_cnoc_debug_send_set_return_route (0xC0000000 | (return_route>>3));
   __k1_cnoc_debug_send_set_ctrl_reg (1);
 }
+
+
+static int mac_syscall_handler(int r0 /* Node ID */__attribute__((unused)),
+			       int r1 /* 0 = Read from fuse */,
+			       int r2 /* Fuse offset in B */,
+			       int r3 /* Out val */,
+			       int r4 __attribute__((unused)),
+			       int r5 __attribute__((unused)),
+			       int r6 __attribute__((unused)),
+			       int r7){
+	uint64_t *fuse_val = (uint64_t*)r3;
+	if(r7 == SCALL_ETH_GETSERIAL && r1 == 0){
+		if (!debug_cnoc_init) {
+			init_debug_cnoc();
+			debug_cnoc_init = 1;
+		}
+		*fuse_val = __k1_cnoc_debug_peek((unsigned int) ((uint8_t*)&mppa_ftu[0]->fuse_box[0][0]) + r2,
+						 sizeof(unsigned long long));
+		return 1;
+	}
+	return 0;
+}
+
 int mppa_ethernet_generate_mac(unsigned int ioeth_id, unsigned int ifce_id, uint8_t *buffer)
 {
 	uint64_t serial, mac;
@@ -24,6 +53,10 @@ int mppa_ethernet_generate_mac(unsigned int ioeth_id, unsigned int ifce_id, uint
 	int i;
 	const int clus_id = __k1_get_cluster_id();
 
+	if (!syscall_registered) {
+		__k1_add_syscall_handler(mac_syscall_handler);
+		syscall_registered = 1;
+	}
 	if (ifce_id >= 4) {
 		fprintf(stderr, "[ETH] Error: Wrong interface id %d\n", ifce_id);
 		return -1;
@@ -41,18 +74,15 @@ int mppa_ethernet_generate_mac(unsigned int ioeth_id, unsigned int ifce_id, uint
 
 	if ((clus_id >= 128 && clus_id <= 131) ||
 	    (clus_id >= 160 && clus_id <= 163)) {
+		//		printf("OUlala\n");
 		mppa_fuse_init();
 		serial = mppa_fuse_get_serial();
 	} else if ((clus_id >= 192 && clus_id <= 195) ||
 		   (clus_id >= 224 && clus_id <= 227)) {
-
-		if (!debug_cnoc_init) {
-			init_debug_cnoc();
-			debug_cnoc_init = 1;
-		}
-		serial = __k1_cnoc_debug_peek((unsigned int) &mppa_ftu[0]->fuse_box[1][0],
-					      sizeof(unsigned long long));
-
+		serial  = 0ULL;
+		__k1_syscall4(SCALL_ETH_GETSERIAL, 128, 0,
+			      ((uint8_t*)&mppa_ftu[0]->fuse_box[1][0]) -
+			      ((uint8_t*)&mppa_ftu[0]->fuse_box[0][0]), (__k1_uint32_t)&serial);
 	} else {
 		/* no fuses on this cluser */
 		fprintf(stderr, "[ETH] Warning: Could not access fuse\n");
