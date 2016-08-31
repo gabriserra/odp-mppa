@@ -34,6 +34,8 @@
 #include <odp_ipsec_loop_db.h>
 #include <odp_ipsec_cache.h>
 #include <odp_ipsec_stream.h>
+#include <HAL/hal/cluster/dsu.h>
+#include <HAL/hal/core/mp.h>
 
 #define MAX_WORKERS     32   /**< maximum number of worker threads */
 #define PKT_BURST_SIZE 16

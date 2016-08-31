@@ -12,6 +12,8 @@ extern "C" {
 #endif
 
 #include <odp_buffer_ring_internal.h>
+#include <HAL/hal/cluster/cnoc.h>
+#include <HAL/hal/cluster/dnoc.h>
 
 #define N_EV_MASKS 4
 #define MAX_RX_ETH_IF 10

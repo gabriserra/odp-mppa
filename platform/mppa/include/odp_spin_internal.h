@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-#include <HAL/hal/hal.h>
+#include <HAL/hal/core/atomic.h>
 
 /**
  * Spin loop for ODP internal use

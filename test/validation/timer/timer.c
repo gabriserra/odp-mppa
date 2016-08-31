@@ -12,6 +12,9 @@
 #define _POSIX_C_SOURCE 200112L
 #include <time.h>
 #include <odp.h>
+#ifdef __K1__
+#include <HAL/hal/cluster/dsu.h>
+#endif
 #include "odp_cunit_common.h"
 #include "test_debug.h"
 #include "../../syscall/include/common.h"

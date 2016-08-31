@@ -10,7 +10,7 @@
 #include <odp/time.h>
 #include <odp/hints.h>
 #include <odp_debug_internal.h>
-#include <HAL/hal/hal.h>
+#include <HAL/hal/cluster/dsu.h>
 
 static odp_time_t start_time;
 

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <assert.h>
-#include <HAL/hal/hal.h>
+#include <HAL/hal/core/mp.h>
 #include <unistd.h>
 #include <string.h>
 

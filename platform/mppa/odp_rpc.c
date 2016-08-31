@@ -6,12 +6,12 @@
 
 #include <stdio.h>
 #include <inttypes.h>
-#include <HAL/hal/hal.h>
 #include <odp/rpc/api.h>
 
 #include <mppa_bsp.h>
 #include <mppa_routing.h>
 #include <mppa_noc.h>
+#include <HAL/hal/board/boot_args.h>
 
 #define INVALIDATE_AREA(p, s) do {	__k1_dcache_invalidate_mem_area((__k1_uintptr_t)(void*)p, s);	\
 	}while(0)

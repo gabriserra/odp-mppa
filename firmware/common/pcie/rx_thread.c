@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <mppa_noc.h>
+#include <HAL/hal/core/optimize.h>
+#include <HAL/hal/core/power.h>
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"

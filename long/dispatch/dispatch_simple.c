@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <HAL/hal/cluster/dsu.h>
 
 #define MAX_PKT_BURST 1
 

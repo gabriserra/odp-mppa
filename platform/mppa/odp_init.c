@@ -12,8 +12,6 @@
 #include <odp_rx_internal.h>
 #include <errno.h>
 
-#include <HAL/hal/hal.h>
-
 struct odp_global_data_s odp_global_data;
 
 int odp_init_global(const odp_init_t *params,

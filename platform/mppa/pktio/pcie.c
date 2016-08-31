@@ -6,7 +6,6 @@
 #include <odp_packet_io_internal.h>
 #include <odp/thread.h>
 #include <odp/cpumask.h>
-#include <HAL/hal/hal.h>
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>

@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <assert.h>
-#include <HAL/hal/hal.h>
 #include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
+#include <HAL/hal/core/optimize.h>
+#include <HAL/hal/core/power.h>
 
 #include <mppa_bsp.h>
 #include <mppa_routing.h>

@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
-#include <HAL/hal/hal.h>
+#include <HAL/hal/cluster/dsu.h>
 #include "../../syscall/include/common.h"
 
 static int my_nanosleep(struct timespec *ts){

@@ -23,6 +23,8 @@
 #include <odp/helper/ip.h>
 #include <odp/helper/udp.h>
 #include <odp/helper/icmp.h>
+#include <HAL/hal/cluster/dsu.h>
+#include <HAL/hal/core/mp.h>
 
 #define MAX_WORKERS            32		/**< max number of works */
 #define SHM_PKT_POOL_SIZE      (64*2048)	/**< pkt pool size */

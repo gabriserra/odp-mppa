@@ -35,6 +35,8 @@
 #include <odp_ipsec_loop_db.h>
 #include <odp_ipsec_cache.h>
 #include <odp_ipsec_stream.h>
+#include <HAL/hal/cluster/dsu.h>
+#include <HAL/hal/core/mp.h>
 
 #define PAYLOAD 1500
 #define MAX_WORKERS     16   /**< maximum number of worker threads */

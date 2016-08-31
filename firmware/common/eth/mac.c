@@ -1,7 +1,8 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <HAL/hal/hal.h>
 #include <mppa_bsp.h>
+#include <HAL/hal/cluster/cnoc.h>
+#include <HAL/hal/cluster/ftu.h>
 #include "internal/cnoc_debug.h"
 #include "internal/mac.h"
 

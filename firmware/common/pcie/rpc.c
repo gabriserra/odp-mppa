@@ -2,7 +2,6 @@
 #include <string.h>
 #include <mppa_noc.h>
 #include <mppa_routing.h>
-#include <HAL/hal/hal.h>
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"

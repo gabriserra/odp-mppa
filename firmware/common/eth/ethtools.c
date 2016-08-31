@@ -3,7 +3,6 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <errno.h>
-#include <HAL/hal/hal.h>
 
 #include <odp/rpc/rpc.h>
 #include <mppa_eth_core.h>
@@ -14,10 +13,12 @@
 #include <mppa_noc.h>
 #include <mppa_eth_io_utils.h>
 #include <mppa_eth_qsfp_utils.h>
+#include <odp/rpc/helpers.h>
+#include <HAL/hal/core/optimize.h>
+
 #include "rpc-server.h"
 #include "internal/rpc-server.h"
 #include "internal/eth.h"
-#include <odp/rpc/helpers.h>
 
 enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
 							mppa_rpc_odp_answer_t *answer)

@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 #include <odp/align.h>
-#include <HAL/hal/hal.h>
+#include <HAL/hal/core/cache.h>
 
 /**
  * @internal

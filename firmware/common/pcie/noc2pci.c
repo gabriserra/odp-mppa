@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <mppa_noc.h>
+#include <HAL/hal/core/power.h>
 
 #include "internal/pcie.h"
 #include "internal/netdev.h"

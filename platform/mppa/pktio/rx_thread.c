@@ -6,10 +6,10 @@
 #include <odp_packet_io_internal.h>
 #include <odp/thread.h>
 #include <odp/cpumask.h>
-#include <HAL/hal/hal.h>
 #include <odp/errno.h>
 #include <errno.h>
 #include <mppa_noc.h>
+#include <HAL/hal/core/optimize.h>
 
 #ifdef K1_NODEOS
 #include <pthread.h>

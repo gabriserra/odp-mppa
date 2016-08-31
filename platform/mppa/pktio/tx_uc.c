@@ -3,10 +3,10 @@
  *
  * SPDX-License-Identifier:     BSD-3-Clause
  */
-#include <HAL/hal/hal.h>
 #include <odp/errno.h>
 #include <errno.h>
 #include <mppa_noc.h>
+#include <HAL/hal/core/legacy.h>
 
 #include "odp_packet_io_internal.h"
 #include "odp_pool_internal.h"

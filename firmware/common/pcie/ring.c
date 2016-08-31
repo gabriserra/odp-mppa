@@ -1,4 +1,4 @@
-#include <HAL/hal/hal.h>
+#include <HAL/hal/core/atomic.h>
 #include "ring.h"
 
 static inline int atomic_u32_cmp_xchg_strong_mm(

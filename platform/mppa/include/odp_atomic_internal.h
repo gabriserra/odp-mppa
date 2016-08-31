@@ -20,7 +20,7 @@
 #include <odp/align.h>
 #include <odp/hints.h>
 #include <odp/atomic.h>
-#include <HAL/hal/hal.h>
+#include <HAL/hal/core/atomic.h>
 
 #ifdef __cplusplus
 extern "C" {

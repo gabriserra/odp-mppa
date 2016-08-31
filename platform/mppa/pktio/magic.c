@@ -4,7 +4,6 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <HAL/hal/hal.h>
 #include <odp/errno.h>
 #include <errno.h>
 #include "odp_classification_internal.h"

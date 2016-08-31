@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include <mppa_power.h>
+#include <HAL/hal/core/mp.h>
 
 #define PKT_BUF_NUM            64
 #define PKT_BUF_SIZE           (2 * 1024)

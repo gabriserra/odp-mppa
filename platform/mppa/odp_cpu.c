@@ -6,7 +6,7 @@
 
 #include <odp/cpu.h>
 #include <odp/hints.h>
-#include <HAL/hal/hal.h>
+#include <HAL/hal/cluster/dsu.h>
 
 uint64_t odp_cpu_cycles(void)
 {

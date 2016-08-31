@@ -3,7 +3,6 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <stdio.h>
-#include <HAL/hal/hal.h>
 #include <odp/rpc/rpc.h>
 
 #include "rpc-server.h"

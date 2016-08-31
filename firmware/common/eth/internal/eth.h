@@ -2,6 +2,7 @@
 #define __FIRMWARE__IOETH__ETH__H__
 
 #include <mppa_noc.h>
+#include <HAL/hal/cluster/ethernet.h>
 
 #ifdef K1B_EXPLORER
 #define ETH_BASE_TX 0

@@ -1,7 +1,4 @@
 #include "internal/lib_trng.h"
-#include <HAL/hal/hal.h>
-
-
 
 /** check if some FRO have raised alarms or were shutdown  **/ 
 /*void mppa_check_alarm(void) {

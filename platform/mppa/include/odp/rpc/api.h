@@ -1,7 +1,6 @@
 #ifndef __MPPA_RPC_ODP_API_H__
 #define __MPPA_RPC_ODP_API_H__
 
-#include <HAL/hal/hal.h>
 #include <odp/rpc/rpc.h>
 
 /**
@@ -35,14 +34,14 @@ void mppa_rpc_odp_print_msg(const struct mppa_rpc_odp * cmd, const uint8_t *payl
  * @param[in] payload Associated payload. The payload length must be stored in cmd->data_len
  */
 int mppa_rpc_odp_send_msg(uint16_t local_interface, uint16_t dest_id, uint16_t dest_tag,
-		     const struct mppa_rpc_odp * cmd, const void * payload);
+			  const struct mppa_rpc_odp * cmd, const void * payload);
 
 /**
  * Auto fill a RPC command headers with reply informations and
  * send it through #mppa_rpc_odp_send_msg
  */
 int mppa_rpc_odp_do_query(uint16_t dest_id, uint16_t dest_tag,
-		     struct mppa_rpc_odp * cmd, void * payload);
+			  struct mppa_rpc_odp * cmd, void * payload);
 
 /**
  * Wait for a ACK.
@@ -57,7 +56,7 @@ int mppa_rpc_odp_do_query(uint16_t dest_id, uint16_t dest_tag,
  * @retval 0 Timeout
  * @retval 1 OK
  */
-mppa_rpc_odp_cmd_err_e mppa_rpc_odp_wait_ack(struct mppa_rpc_odp ** cmd, void ** payload, uint64_t timeout,
-				   const char* mod);
+mppa_rpc_odp_cmd_err_e mppa_rpc_odp_wait_ack(struct mppa_rpc_odp ** cmd, void ** payload,
+					     uint64_t timeout, const char* mod);
 
 #endif /* __MPPA_RPC_ODP_API_H__ */

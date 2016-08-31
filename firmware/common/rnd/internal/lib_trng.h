@@ -1,4 +1,5 @@
-#include <HAL/hal/hal.h>
+#include <HAL/hal/cluster/trng.h>
+#include <HAL/hal/core/types.h>
 
 typedef struct mppa_trng_rnd_data {
 	__k1_uint32_t data[4];

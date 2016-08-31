@@ -6,7 +6,6 @@
 #include <inttypes.h>
 
 #include <mppa/osconfig.h>
-#include <HAL/hal/hal.h>
 #include <mppa_noc.h>
 
 #include "pcie.h"

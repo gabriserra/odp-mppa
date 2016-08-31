@@ -1,6 +1,8 @@
 #ifndef __MPPA_RPC_ODP_HELPERS_H__
 #define __MPPA_RPC_ODP_HELPERS_H__
 
+#include <HAL/hal/core/mp.h>
+
 static inline int MPPA_RPC_ODP_FUNCTION(get_cluster_id)(int local_if){
 	int reg_cluster_id = __k1_get_cluster_id();
 	int base_cluster_id = (reg_cluster_id / 64 * 64) + (reg_cluster_id % 32);

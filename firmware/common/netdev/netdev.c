@@ -4,12 +4,12 @@
 #include <stdint.h>
 #include <string.h>
 #include <inttypes.h>
+#include <HAL/hal/cluster/pcie.h>
 
 #include <pcie_service.h>
 #include <pcie_queue.h>
 #include <pcie_queue_protocol.h>
 #include <mppa/osconfig.h>
-#include <HAL/hal/hal.h>
 #include "netdev.h"
 #include "internal/cache.h"
 
