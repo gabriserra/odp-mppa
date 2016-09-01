@@ -235,7 +235,6 @@ iounified_CONFIGS += k1b-kalray_emb01
 # IOETH
 #
 ioeth_CONFIGS += k1b-kalray_developer
-ioeth_CONFIGS += k1b-kalray_simu
 ioeth_CONFIGS += k1b-kalray_konic80
 ioeth_CONFIGS += k1b-kalray_ab04
 ioeth_CONFIGS += k1b-kalray_emb01
