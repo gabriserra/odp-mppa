@@ -218,7 +218,8 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	struct dma_async_tx_descriptor *dma_txd;
 	struct mpodp_cache_entry *entry;
 	int ret;
-	uint8_t fifo_mode, requested_engine;
+	uint8_t fifo_mode;
+	int16_t requested_engine;
 	struct mpodp_pkt_hdr *hdr;
 	uint32_t tx_autoloop_next;
 	uint32_t tx_submitted, tx_next;

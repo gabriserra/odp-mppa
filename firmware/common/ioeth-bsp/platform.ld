@@ -1,6 +1,7 @@
 /* Include board-specific definitions */
 INCLUDE board.ld 
 
+_dtb_size = 16K;
 REGION_ALIAS("REGION_TLS", internal_mem);
 
 /* Definition of sections */
@@ -54,10 +55,10 @@ SECTIONS
   /* The bsp configuration arguments */
   .bsp_config ALIGN(8) :
   {
+    KEEP(*(.bsp_config_desc))
     INTERNAL_RAM_SIZE_VALUE = ABSOLUTE(INTERNAL_RAM_SIZE) ;
     RM_STACK_SIZE_VALUE = ABSOLUTE(RM_STACK_SIZE) ;
     DDR_SIZE_VALUE = ABSOLUTE(RamSize) ;
-    *(.bsp_config_desc)
     *(.bsp_config)
   }  > internal_mem
 
@@ -178,4 +179,12 @@ SECTIONS
     KEEP (*(__k1_tracepoint_data*))
   }
 
+  .dtb (K1_BOOT_ADDRESS + LENGTH(internal_mem) - _dtb_size) :
+  {
+    . = .; /* Force output of an empty section */
+    __dtb_start = .;
+    LONG(0xdeadfeed);
+    . += _dtb_size - 4;
+    __dtb_end = .;
+  } > internal_mem
 }
