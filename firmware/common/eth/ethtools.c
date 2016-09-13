@@ -169,6 +169,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 	return 0;
 }
 
+extern int phy_status;
 
 int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
 			   mppa_rpc_odp_answer_t *answer)
@@ -716,44 +717,20 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 
 		unsigned long long start = __k1_read_dsu_timestamp();
 		int up = 0;
-		while (__k1_read_dsu_timestamp() - start < 3ULL * __bsp_frequency) {
-			if (!mppa_eth_utils_mac_poll_state(eth_if, link_speed)) {
-				up = 1;
-				break;
-			}
-		}
-		if (!up) {
-
-			printf("RX block lock: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status._.stat_rx_block_lock);
-			if(mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status._.stat_rx_block_lock != 0xf){
-				printf("FATAL SERDES ERROR\n");
-				return -1;
-			}
-			
-			printf("RX synced: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status._.stat_rx_synced);
-			if(mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status._.stat_rx_synced != 0xf){
-				printf("FATAL SERDES SYNC ERROR\n");
-				return -1;
+		do
+		{
+			while (__k1_read_dsu_timestamp() - start < 3ULL * __bsp_frequency) {
+				if (mppa_eth_utils_mac_poll_state(eth_if, link_speed) == 0) {
+					up = 1;
+					break;
+				}
 			}
 
-			printf("VL demuxed: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status._.stat_rx_vl_demuxed);
-			if(mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status._.stat_rx_vl_demuxed != 0){
-				printf("FATAL MAC DEMUX ERROR\n");
-				return -1;
+			if(up != 1) {
+				phy_status = -1;
+				mppa_eth_utils_init_mac(eth_if, link_speed);
 			}
-			
-			printf("pcs_lane_status 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_lane_status.reg);
-			
-
-			printf("pcs_40g_bad_sh_cnt: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_40g_bad_sh_cnt.reg);
-			printf("pcs_bad_sh_cnt: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_bad_sh_cnt.reg);
-			printf("pcs_rx_error_block_cnt: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_rx_error_block_cnt.reg);
-			printf("pcs_rx_bad_code_cnt: 0x%x\n", mppa_ethernet[0]->mac.lane_stat[0].pcs_rx_bad_code_cnt.reg);
-			
-
-			ETH_RPC_ERR_MSG(answer, "No carrier on lane %d\n", eth_if);
-			return -1;
-		}
+		}while(!up);
 	}
 
 	status[eth_if].cluster[remoteClus].enabled = 1;
