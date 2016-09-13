@@ -109,6 +109,15 @@ SECTIONS
     KEEP (*(.dtors))
   }
   
+  .dtb ALIGN(0x100) :
+  {
+	  . = .; /* Force output of an empty section */
+	  __dtb_start = .;
+	  KEEP(*(.dtb));
+	  __dtb_size = ABSOLUTE(.)- ABSOLUTE(__dtb_start);
+	  __dtb_end = ABSOLUTE(.);
+  } > internal_mem
+
   .bss   ALIGN(8):
   {
     _bss_start = .;
@@ -178,13 +187,4 @@ SECTIONS
   {
     KEEP (*(__k1_tracepoint_data*))
   }
-
-  .dtb (K1_BOOT_ADDRESS + LENGTH(internal_mem) - __dtb_size) :
-  {
-    . = .; /* Force output of an empty section */
-    __dtb_start = .;
-    LONG(0xdeadfeed);
-    . += __dtb_size - 4;
-    __dtb_end = .;
-  } > internal_mem
 }
