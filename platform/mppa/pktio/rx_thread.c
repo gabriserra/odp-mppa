@@ -11,6 +11,14 @@
 #include <errno.h>
 #include <mppa_noc.h>
 
+ 
+#define MPPA_TRACEPOINT_DEFINE
+#include "odp_trace.h"
+
+#define MPPA_CREATE_TRACEPOINT
+#include "mppa_trace.h"
+
+
 #ifdef K1_NODEOS
 #include <pthread.h>
 #else
@@ -391,6 +399,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list;
+
+		mppa_tracepoint(odp, rx_thread, pkt);
 
 		if_th->recv_pkts++;
 		*(hdr_list->tail) = (odp_buffer_hdr_t *)pkt;

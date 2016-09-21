@@ -1,0 +1,20 @@
+#undef MPPA_TRACEPOINT_PROVIDER
+#define MPPA_TRACEPOINT_PROVIDER odp
+#undef MPPA_TRACEPOINT_FILE
+#define MPPA_TRACEPOINT_FILE odp_trace.h
+
+#if !defined(_ODP_TRACE_H_) || defined(MPPA_TRACEPOINT_HEADER_MULTI_READ)
+#define _ODP_TRACE_H_
+
+#include "mppa_trace.h"
+
+MPPA_DECLARE_TRACEPOINT(odp, packet_init, (MPPA_TRACEPOINT_HEX_FIELD(void *, pkt_hdr)))
+MPPA_TRACEPOINT_LOGLEVEL(odp, packet_init, MPPA_TRACE_INFO)
+
+MPPA_DECLARE_TRACEPOINT(odp, eth_recv, (MPPA_TRACEPOINT_HEX_FIELD(void *, pkt_hdr)))
+MPPA_TRACEPOINT_LOGLEVEL(odp, eth_recv, MPPA_TRACE_INFO)
+
+MPPA_DECLARE_TRACEPOINT(odp, rx_thread, (MPPA_TRACEPOINT_HEX_FIELD(void *, pkt_hdr)))
+MPPA_TRACEPOINT_LOGLEVEL(odp, rx_thread, MPPA_TRACE_INFO)
+
+#endif
