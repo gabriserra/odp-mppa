@@ -717,6 +717,8 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 
 		unsigned long long start = __k1_read_dsu_timestamp();
 		int up = 0;
+		int attempt = 0;
+		int max_attempt = 10;
 		do
 		{
 			while (__k1_read_dsu_timestamp() - start < 3ULL * __bsp_frequency) {
@@ -725,12 +727,19 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 					break;
 				}
 			}
-
 			if(up != 1) {
 				phy_status = -1;
 				mppa_eth_utils_init_mac(eth_if, link_speed);
+				attempt++;
+				printf("[ETH] Reinitializing lane %d (%d times over %d\n", eth_if,attempt, max_attempt);
 			}
-		}while(!up);
+		}while(!up && attempt <= max_attempt);
+
+		if (!up) {
+			ETH_RPC_ERR_MSG(answer, "No carrier on lane %d\n", eth_if);
+			return -1;
+		}
+
 	}
 
 	status[eth_if].cluster[remoteClus].enabled = 1;
