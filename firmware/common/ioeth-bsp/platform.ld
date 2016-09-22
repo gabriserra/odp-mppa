@@ -1,7 +1,6 @@
 /* Include board-specific definitions */
 INCLUDE board.ld 
 
-__dtb_size = 16K;
 REGION_ALIAS("REGION_TLS", internal_mem);
 
 /* Definition of sections */
@@ -114,7 +113,6 @@ SECTIONS
 	  . = .; /* Force output of an empty section */
 	  __dtb_start = .;
 	  KEEP(*(.dtb));
-	  __dtb_size = ABSOLUTE(.)- ABSOLUTE(__dtb_start);
 	  __dtb_end = ABSOLUTE(.);
   } > internal_mem
 
@@ -187,4 +185,5 @@ SECTIONS
   {
     KEEP (*(__k1_tracepoint_data*))
   }
+  __dtb_size = ABSOLUTE(__dtb_end)- ABSOLUTE(__dtb_start);
 }
