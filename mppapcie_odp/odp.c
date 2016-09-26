@@ -292,8 +292,10 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 					     count));
 		rxq->head_addr =
 			desc_info_addr(smem_vaddr, config->c2h_addr[i], head);
-		rxq->tail_addr =
-			desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
+		rxq->tail_host_addr = pci_alloc_consistent(pdev, sizeof(*rxq->tail_addr),
+							   &rxq->tail_handle);
+		writel(rxq->tail_handle, desc_info_addr(smem_vaddr, config->c2h_addr[i], h_tail_addr));
+		rxq->tail_addr = desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
 		rxq->head = readl(rxq->head_addr);
 		rxq->tail = readl(rxq->tail_addr);
 
@@ -315,13 +317,15 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 				+ entries_addr
 				+ j * sizeof(struct mpodp_c2h_entry);
 		}
-		rxq->mppa_entries =
-			kmalloc(rxq->size * sizeof(struct mpodp_c2h_entry),
-				GFP_ATOMIC);
+		rxq->mppa_entries = pci_alloc_consistent(pdev,
+							 rxq->size * sizeof(struct mpodp_c2h_entry),
+							 &rxq->mppa_entries_handle);
 		if (rxq->mppa_entries == NULL) {
 			dev_err(&pdev->dev, "RX mppa_entries allocation failed\n");
 			goto rx_alloc_failed;
 		}
+		writel(rxq->mppa_entries_handle,
+		       desc_info_addr(smem_vaddr, config->c2h_addr[i], host_addr));
 	}
 
 	/* Init Rx DMA chan */

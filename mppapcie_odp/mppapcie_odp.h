@@ -112,8 +112,10 @@ struct mpodp_c2h_entry {
  */
 struct mpodp_ring_buff_desc {
 	uint64_t addr;     	/*< Pointer to ring buffer entries depending on RX or TX */
+	uint64_t host_addr;     /*< Pointer to host ring buffer entries for Tx */
 	uint32_t head;		/*< Index of head */
 	uint32_t tail;		/*< Index of tail */
+	uint32_t h_tail_addr;	/*< Adress of host tail  */
 	uint32_t count; 	/*< Count of ring buffer entries */
 } __attribute__ ((packed, aligned(8)));
 

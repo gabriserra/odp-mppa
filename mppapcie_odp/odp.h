@@ -91,10 +91,13 @@ struct mpodp_rxq {
 	int avail;
 	int tail;
 	u8 __iomem *tail_addr;
+	uint16_t  *tail_host_addr;
+	dma_addr_t tail_handle;
 	int head;
 	u8 __iomem *head_addr;
 	int size;
 	struct mpodp_c2h_entry *mppa_entries;
+	dma_addr_t mppa_entries_handle;
 };
 
 struct mpodp_if_priv {

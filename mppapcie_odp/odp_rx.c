@@ -111,7 +111,7 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 
 	/* RX: 1st step: start transfer */
 	/* read RX tail */
-	rxq->tail = readl(rxq->tail_addr);
+	rxq->tail = *rxq->tail_host_addr;
 
 	if (rxq->avail > rxq->tail) {
 		/* make a first loop to the end of the ring */
@@ -121,10 +121,6 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 	}
  loop:
 	/* get mppa entries */
-	memcpy_fromio(rxq->mppa_entries + rxq->avail,
-		      rxq->ring[rxq->avail].entry_addr,
-		      sizeof(struct mpodp_c2h_entry) *
-		      (limit - rxq->avail));
 	while (rxq->avail != limit) {
 		/* get rx slot */
 		rx = &(rxq->ring[rxq->avail]);
