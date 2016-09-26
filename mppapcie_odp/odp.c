@@ -53,7 +53,7 @@ static struct net_device_stats *mpodp_get_stats(struct net_device *netdev)
 static int mpodp_poll(struct napi_struct *napi, int budget)
 {
 	struct mpodp_if_priv *priv;
-	int work_done = 0, work = 0;
+	int work_pending = 0, work = 0;
 	int i;
 
 	priv = container_of(napi, struct mpodp_if_priv, napi);
@@ -67,16 +67,16 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 			work += mpodp_clean_rx(priv, &priv->rxqs[i], budget - work);
 
 		/* Start new Rx transfer if any */
-		mpodp_start_rx(priv, &priv->rxqs[i]);
+		work_pending += mpodp_start_rx(priv, &priv->rxqs[i]);
 	}
 
-	if (work < budget) {
+	if (work < budget && !work_pending) {
 		napi_complete(napi);
 	}
 
 	netdev_dbg(priv->netdev, "netdev_poll OUT\n");
 
-	return work_done;
+	return work;
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER

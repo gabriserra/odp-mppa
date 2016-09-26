@@ -214,5 +214,5 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 	if (work_done)
 		dma_async_issue_pending(priv->rx_chan);
 
-	return 0;
+	return work_done;
 }
