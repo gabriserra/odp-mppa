@@ -24,6 +24,7 @@
 #include "mppapcie_odp.h"
 #include "odp.h"
 
+#define TX_POLL_THRESHOLD 32
 void mpodp_tx_timeout(struct net_device *netdev)
 {
 	netdev_err(netdev, "tx timeout\n");

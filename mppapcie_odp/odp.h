@@ -11,7 +11,7 @@
 
 /* Sufficient for K1B not for K1A but not expected to be used */
 #define MPODP_NOC_CHAN_COUNT 4
-#define MPODP_AUTOLOOP_DESC_COUNT 32
+#define MPODP_AUTOLOOP_DESC_COUNT 256
 
 #define desc_info_addr(_smem_addr, addr, field)				\
 	_smem_addr + addr +  offsetof(struct mpodp_ring_buff_desc, field)
@@ -31,6 +31,7 @@ struct mpodp_tx {
 	dma_cookie_t cookie;
 	u32 len;		/* to be able to free the skb in the TX 2nd step */
 	union mppa_timestamp time;
+	int jiffies;
 	dma_addr_t dst_addr;
 	int chanidx;
 };
