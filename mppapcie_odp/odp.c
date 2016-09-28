@@ -53,7 +53,7 @@ static struct net_device_stats *mpodp_get_stats(struct net_device *netdev)
 static int mpodp_poll(struct napi_struct *napi, int budget)
 {
 	struct mpodp_if_priv *priv;
-	int work_done = 0, work = 0;
+	int work_pending = 0, work = 0;
 	int i;
 
 	priv = container_of(napi, struct mpodp_if_priv, napi);
@@ -67,16 +67,16 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 			work += mpodp_clean_rx(priv, &priv->rxqs[i], budget - work);
 
 		/* Start new Rx transfer if any */
-		mpodp_start_rx(priv, &priv->rxqs[i]);
+		work_pending += mpodp_start_rx(priv, &priv->rxqs[i]);
 	}
 
-	if (work < budget) {
+	if (work < budget && !work_pending) {
 		napi_complete(napi);
 	}
 
 	netdev_dbg(priv->netdev, "netdev_poll OUT\n");
 
-	return work_done;
+	return work;
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
@@ -193,6 +193,14 @@ static void mpodp_remove(struct net_device *netdev)
 	dma_release_channel(priv->rx_chan);
 	for (i = 0; i < priv->n_rxqs; ++i) {
 		kfree(priv->rxqs[i].ring);
+		pci_free_consistent(priv->pdev,
+				    priv->rxqs[i].size * sizeof(struct mpodp_c2h_entry),
+				    priv->rxqs[i].mppa_entries,
+				    priv->rxqs[i].mppa_entries_handle);
+		pci_free_consistent(priv->pdev,
+				    sizeof(*priv->rxqs[i].tail_host_addr),
+				    priv->rxqs[i].tail_host_addr,
+				    priv->rxqs[i].tail_handle);
 	}
 
 	mppa_pcie_time_destroy(priv->tx_time);
@@ -292,8 +300,14 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 					     count));
 		rxq->head_addr =
 			desc_info_addr(smem_vaddr, config->c2h_addr[i], head);
-		rxq->tail_addr =
-			desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
+		rxq->tail_host_addr = pci_alloc_consistent(pdev, sizeof(*rxq->tail_addr),
+							   &rxq->tail_handle);
+		if (rxq->tail_host_addr == NULL) {
+			dev_err(&pdev->dev, "Failed to allocate consistent memory\n");
+			goto rx_alloc_failed;
+		}
+		writel(rxq->tail_handle, desc_info_addr(smem_vaddr, config->c2h_addr[i], h_tail_addr));
+		rxq->tail_addr = desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
 		rxq->head = readl(rxq->head_addr);
 		rxq->tail = readl(rxq->tail_addr);
 
@@ -315,13 +329,15 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 				+ entries_addr
 				+ j * sizeof(struct mpodp_c2h_entry);
 		}
-		rxq->mppa_entries =
-			kmalloc(rxq->size * sizeof(struct mpodp_c2h_entry),
-				GFP_ATOMIC);
+		rxq->mppa_entries = pci_alloc_consistent(pdev,
+							 rxq->size * sizeof(struct mpodp_c2h_entry),
+							 &rxq->mppa_entries_handle);
 		if (rxq->mppa_entries == NULL) {
 			dev_err(&pdev->dev, "RX mppa_entries allocation failed\n");
 			goto rx_alloc_failed;
 		}
+		writel(rxq->mppa_entries_handle,
+		       desc_info_addr(smem_vaddr, config->c2h_addr[i], host_addr));
 	}
 
 	/* Init Rx DMA chan */
@@ -449,8 +465,18 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	for (i = 0; i < priv->n_rxqs; ++i){
 		if(priv->rxqs[i].ring)
 			kfree(priv->rxqs[i].ring);
-		if(priv->rxqs[i].mppa_entries)
-			kfree(priv->rxqs[i].mppa_entries);
+		if(priv->rxqs[i].mppa_entries) {
+			pci_free_consistent(pdev,
+					    priv->rxqs[i].size * sizeof(struct mpodp_c2h_entry),
+					    priv->rxqs[i].mppa_entries,
+					    priv->rxqs[i].mppa_entries_handle);
+		}
+		if (priv->rxqs[i].tail_host_addr) {
+			pci_free_consistent(pdev,
+					    sizeof(*priv->rxqs[i].tail_host_addr),
+					    priv->rxqs[i].tail_host_addr,
+					    priv->rxqs[i].tail_handle);
+		}
 	}
 	mppa_pcie_time_destroy(priv->tx_time);
 	netif_napi_del(&priv->napi);

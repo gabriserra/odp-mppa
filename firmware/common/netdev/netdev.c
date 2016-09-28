@@ -21,6 +21,38 @@ __attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
 
+#define MEM_WRITE_32 0x40
+#define MEM_WRITE_64 0x60
+static inline
+__k1_uint32_t __k1_pcie_write_32( __k1_uint32_t address, __k1_uint32_t data)
+{
+
+	static const mppa_pcie_master_itf_master_cmd_t
+		master_cmd = {._ = { .start_cmd = 1,
+				     .cmd_type = MEM_WRITE_32,
+				     .byte_en = 0xf
+		}};
+	/* mppa_pcie_master_itf_mst_res_t    mst_res; */
+
+	// write
+	/* mppa_pcie_master_itf[0]->pcie_addr_hi.word = 0; */
+	mppa_pcie_master_itf[0]->pcie_addr.word    = address;
+	mppa_pcie_master_itf[0]->pcie_wr_data.word = data;
+	mppa_pcie_master_itf[0]->master_cmd   = master_cmd;
+
+	// FIXME: We should do this but it works without. Uncomment if transfers are weird
+	/* // wait for response */
+	/* do{ */
+	/* 	mst_res.word = mppa_pcie_master_itf[0]->mst_res.word; */
+	/* } while(mst_res._.cmd_done == 0); */
+
+	/* if (mst_res._.cmd_status) */
+	/* 	printf("BAD Status = %d\n", mst_res._.cmd_status); */
+	/* return mst_res._.cmd_status; */
+
+	return 0;
+}
+
 int netdev_c2h_is_full(struct mpodp_if_config *cfg, uint32_t c2h_q)
 {
 
@@ -69,10 +101,45 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 	}
 
 	memcpy(entry, data, sizeof(*entry));
-	__k1_wmb();
+	/* __k1_wmb(); */
+
+	/* Also store the data on the host side of things */
+	uint64_t host_addr = LOAD_U64(c2h->host_addr);
+	if (host_addr) {
+		uint64_t entry_addr = host_addr + tail * sizeof(*data);
+		union {
+			uint32_t val;
+			struct {
+				uint16_t len;
+				uint16_t status;
+			};
+		} meta;
+		meta.len = data->len;
+		meta.status = data->status;
+		__k1_pcie_write_32(entry_addr +
+				   offsetof(struct mpodp_c2h_entry, pkt_addr),
+				   data->pkt_addr & 0xffffffff);
+		__k1_pcie_write_32(entry_addr +
+				   offsetof(struct mpodp_c2h_entry, pkt_addr) + 4,
+				   data->pkt_addr >> 32);
+		__k1_pcie_write_32(entry_addr +
+				   offsetof(struct mpodp_c2h_entry, data),
+				   data->data & 0xffffffff);
+		__k1_pcie_write_32(entry_addr +
+				   offsetof(struct mpodp_c2h_entry, data) + 4,
+				   data->data >> 32);
+		__k1_pcie_write_32(entry_addr +
+				   offsetof(struct mpodp_c2h_entry, len),
+				   meta.val);
+	}
 
 	c2h->tail = next_tail;
-	__k1_wmb();
+	/* __k1_wmb(); */
+
+	uint64_t h_tail_addr = LOAD_U64(c2h->h_tail_addr);
+	if (h_tail_addr) {
+		__k1_pcie_write_32(h_tail_addr, next_tail);
+	}
 
 #ifdef NETDEV_VERBOSE
 	printf("C2H data 0x%llx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);

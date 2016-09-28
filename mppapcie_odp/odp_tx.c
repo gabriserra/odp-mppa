@@ -24,6 +24,7 @@
 #include "mppapcie_odp.h"
 #include "odp.h"
 
+#define TX_POLL_THRESHOLD 32
 void mpodp_tx_timeout(struct net_device *netdev)
 {
 	netdev_err(netdev, "tx timeout\n");
@@ -222,7 +223,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	int16_t requested_engine;
 	struct mpodp_pkt_hdr *hdr;
 	uint32_t tx_autoloop_next;
-	uint32_t tx_submitted, tx_next;
+	uint32_t tx_submitted, tx_next, tx_done;
 	uint32_t tx_mppa_idx;
 	int qidx;
 	unsigned long flags = 0;
@@ -232,11 +233,10 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	qidx = skb_get_queue_mapping(skb);
 	txq = &priv->txqs[qidx];
 
-	/* make room before adding packets */
-	mpodp_clean_tx_unlocked(priv, txq, -1);
-
-	if (atomic_read(&priv->reset) == 1)
+	if (atomic_read(&priv->reset) == 1) {
+		mpodp_clean_tx_unlocked(priv, txq, -1);
 		goto addr_error;
+	}
 
 	tx_submitted = atomic_read(&txq->submitted);
 	/* Compute txd id */
@@ -246,6 +246,14 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 
 	/* MPPA H2C Entry to use */
 	tx_mppa_idx = atomic_read(&txq->autoloop_cur);
+
+	tx_done = atomic_read(&txq->done);
+	if (tx_done != tx_submitted &&
+	    ((txq->ring[tx_done].jiffies + msecs_to_jiffies(5) >= jiffies) ||
+	     (tx_submitted < tx_done && tx_submitted + txq->size - tx_done >= TX_POLL_THRESHOLD) ||
+	     (tx_submitted >= tx_done && tx_submitted - tx_done >= TX_POLL_THRESHOLD))) {
+		mpodp_clean_tx_unlocked(priv, txq, -1);
+	}
 
 	/* Check if there are txd available */
 	if (tx_next == atomic_read(&txq->done)) {
@@ -369,6 +377,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	skb_orphan(skb);
 
 	/* submit and issue descriptor */
+	tx->jiffies = jiffies;
 	tx->cookie = dmaengine_submit(dma_txd);
 	dma_async_issue_pending(priv->tx_chan[requested_engine]);
 
@@ -377,6 +386,11 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 
 	/* Count number of bytes on the fly for DQL */
 	netdev_tx_sent_queue(txq->txq, skb->len);
+	if (test_bit(__QUEUE_STATE_STACK_XOFF, &txq->txq->state)){
+		/* We reached over the limit of DQL. Try to clean some
+		 * tx so we are rescheduled right now */
+		mpodp_clean_tx_unlocked(priv, txq, -1);
+	}
 
 	/* Increment tail pointer locally */
 	atomic_set(&txq->submitted, tx_next);
