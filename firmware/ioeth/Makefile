@@ -1,5 +1,6 @@
 SRCDIR   := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 SRCDIRS  := $(SRCDIR)
+SHELL    := /bin/bash
 
 _LDFLAGS = -lmppapower -lmppanoc -lmpparouting
 EXTRA_BINS += $(BUILDDIR)/$(FIRMDIR).bin

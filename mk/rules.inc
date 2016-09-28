@@ -1,6 +1,8 @@
 #
 # Define all rules for a given config for odp and CUNIT
 #
+SHELL:=/bin/bash
+
 define CONFIG_RULE
 #Arg1 = machine name
 cunit-$(1)-configure: $(ARCH_DIR)/cunit/$(1)/Makefile
