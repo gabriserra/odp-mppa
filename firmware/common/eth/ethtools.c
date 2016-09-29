@@ -733,6 +733,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 				attempt++;
 				printf("[ETH] Reinitializing lane %d (%d times over %d\n", eth_if,attempt, max_attempt);
 			}
+			start = __k1_read_dsu_timestamp();
 		}while(!up && attempt <= max_attempt);
 
 		if (!up) {
