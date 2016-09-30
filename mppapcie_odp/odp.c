@@ -353,8 +353,6 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		dev_err(&pdev->dev, "RX chan request failed\n");
 		goto rx_chan_failed;
 	}
-	mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->rx_chan,
-						       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
 
 	/* Init all Tx Queues */
 	for (i = 0; i < priv->n_txqs; ++i) {
@@ -423,11 +421,6 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 			chanidx--;
 			goto tx_chan_failed;
 		}
-		mppa_pcie_dmaengine_set_channel_interrupt_mode(priv->
-							       tx_chan
-							       [chanidx],
-							       _MPPA_PCIE_ENGINE_INTERRUPT_CHAN_DISABLED);
-
 	}
 	priv->packet_id = 0ULL;
 
