@@ -254,7 +254,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	rx_pool_t * rx_pool = &rx_hdl.th[th_id].
 		pools[rx_hdl.ifce[pktio_id].pool_id];
 	int mapped_pkt = 0;
-	int n_events = __builtin_k1_cbs((*mask) & ifce->ev_masks[rx_id / 64]) + 1;
+	uint64_t _mask = (*mask) & ifce->ev_masks[rx_id / 64];
+	int n_events = __builtin_k1_cbs(_mask & 0xFFFFFFFF) + __builtin_k1_cbs(_mask >> 32) + 1;
 
 
 	if (rx_config->if_type == RX_IF_TYPE_IODDR) {
