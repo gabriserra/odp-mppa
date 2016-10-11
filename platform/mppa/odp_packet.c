@@ -152,8 +152,9 @@ int odp_packet_alloc_multi(odp_pool_t pool_hdl, uint32_t len,
 void odp_packet_free(odp_packet_t pkt)
 {
 	odp_packet_hdr_t *const pkt_hdr = (odp_packet_hdr_t *)(pkt);
-	if (_odp_atomic_u32_fetch_sub_mm(&pkt_hdr->nofree, 1, 0) != 0)
-		return;
+	if (odp_global_data.enable_pkt_nofree)
+		if (_odp_atomic_u32_fetch_sub_mm(&pkt_hdr->nofree, 1, 0) != 0)
+			return;
 
 	if (pkt_hdr->input != ODP_PKTIO_INVALID){
 		ret_buf(&((pool_entry_t*)pkt_hdr->buf_hdr.pool_hdl)->s,
@@ -166,15 +167,17 @@ void odp_packet_free(odp_packet_t pkt)
 void odp_packet_free_multi(const odp_packet_t pkt[], int num)
 {
 	int free_base = 0;
-	for (int i = 0; i < num; ++i) {
-		/* If it's 1 someone else will free it. If it's -1 someone else freed
-		 * it and it should not have happened. */
-		if (_odp_atomic_u32_fetch_sub_mm(&odp_packet_hdr(pkt[i])->nofree, 1, 0) == 0)
-			continue;
+	if (odp_global_data.enable_pkt_nofree) {
+		for (int i = 0; i < num; ++i) {
+			/* If it's 1 someone else will free it. If it's -1 someone else freed
+			 * it and it should not have happened. */
+			if (_odp_atomic_u32_fetch_sub_mm(&odp_packet_hdr(pkt[i])->nofree, 1, 0) == 0)
+				continue;
 
-		/* We should not free this one. Free previous ones and skip to next */
-		odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), i - free_base);
-		free_base = i + 1;
+			/* We should not free this one. Free previous ones and skip to next */
+			odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), i - free_base);
+			free_base = i + 1;
+		}
 	}
 	if (free_base < num)
 		odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), num - free_base);
