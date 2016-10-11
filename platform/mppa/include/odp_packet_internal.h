@@ -226,11 +226,6 @@ static inline int packet_parse_not_complete(odp_packet_hdr_t *pkt_hdr)
 	return !pkt_hdr->input_flags.parsed_all;
 }
 
-static inline void packet_free_multi(odp_packet_t pkt_tbl[], unsigned len)
-{
-	odp_buffer_free_multi((odp_buffer_t *)pkt_tbl, len);
-}
-
 /* Forward declarations */
 int _odp_packet_copy_to_packet(odp_packet_t srcpkt, uint32_t srcoffset,
 			       odp_packet_t dstpkt, uint32_t dstoffset,

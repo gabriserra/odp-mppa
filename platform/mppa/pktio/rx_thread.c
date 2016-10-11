@@ -178,7 +178,8 @@ static int _close_rx(rx_config_t *rx_config ODP_UNUSED, int rx_id)
 		rx_queue->activation.reg = 0x0;
 
 	if (rx_hdl.tag[rx_id].pkt != ODP_PACKET_INVALID)
-		odp_packet_free(rx_hdl.tag[rx_id].pkt);
+		odp_packet_free_multi(&rx_hdl.tag[rx_id].pkt, 1);
+
 	rx_hdl.tag[rx_id].pkt = ODP_PACKET_INVALID;
 
 	mppa_noc_dnoc_rx_free(dma_if, rx_id);
@@ -501,7 +502,7 @@ static void *_rx_thread_start(void *arg)
 			if (!rx_hdl.th[th_id].pools[i].n_spares)
 				continue;
 			/* Free all the spares pre allocated */
-			packet_free_multi(rx_hdl.th[th_id].pools[i].spares,
+			odp_packet_free_multi(rx_hdl.th[th_id].pools[i].spares,
 					  rx_hdl.th[th_id].pools[i].n_spares);
 			rx_hdl.th[th_id].pools[i].n_spares = 0;
 		}

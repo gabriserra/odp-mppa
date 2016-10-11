@@ -53,15 +53,15 @@ uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 					continue;
 
 				/* We have a nofree. Free the previous ones */
-				packet_free_multi(job->pkt_table + free_base,
+				odp_packet_free_multi(job->pkt_table + free_base,
 						  i - free_base);
 				/* Switch free base to the next.
 				 * This one is not to be freed */
 				free_base = i + 1;
 			}
 			if (free_base < job->pkt_count)
-				packet_free_multi(job->pkt_table + free_base,
-						  job->pkt_count  - free_base);
+				odp_packet_free_multi(job->pkt_table + free_base,
+						      job->pkt_count  - free_base);
 		}
 	}
 	return head;
