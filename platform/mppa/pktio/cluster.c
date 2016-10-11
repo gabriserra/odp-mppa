@@ -221,6 +221,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int rr_policy = -1;
 	int rr_offset = 0;
 	int nofree = 0;
+	int flow_controlled = 0;
 
 	/* String should in the following format: "cluster<cluster_id>" */
 	if(strncmp("cluster", devname, strlen("cluster")))
@@ -263,6 +264,14 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		} else if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
 			nofree = 1;
+		} else if (!strncmp(pptr, "fc=", strlen("fc="))){
+			pptr += strlen("fc=");
+			flow_controlled = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid fc %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -299,7 +308,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pkt_cluster->rx_config.pktio_id = RX_C2C_IF_BASE + cluster_id;
 		pkt_cluster->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		pkt_cluster->rx_config.if_type = RX_IF_TYPE_C2C;
-		pkt_cluster->rx_config.flow_controlled = 0;
+		pkt_cluster->rx_config.flow_controlled = flow_controlled;
 		if (cluster_init_cnoc_tx()) {
 			ODP_ERR("Failed to initialize CNoC Rx\n");
 			return -1;
