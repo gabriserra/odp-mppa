@@ -96,6 +96,8 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int rr_offset = -1;
 	int log2_fragments = 0;
 	int cnoc_port = -1;
+	int flow_controlled = 0;
+
 	/*
 	 * Check device name and extract slot/port
 	 */
@@ -163,6 +165,14 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 				return -1;
 			}
 			pptr = eptr;
+		}  else if (!strncmp(pptr, "fc=", strlen("fc="))){
+			pptr += strlen("fc=");
+			flow_controlled = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid fc %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -203,7 +213,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
 	ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 	ioddr->rx_config.if_type = RX_IF_TYPE_IODDR;
-	ioddr->rx_config.flow_controlled = 0;
+	ioddr->rx_config.flow_controlled = flow_controlled;
 	nRx = max_rx - min_rx + 1;
 	ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy,
 				  rr_offset, min_rx, max_rx);
