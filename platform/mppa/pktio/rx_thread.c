@@ -258,7 +258,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	int n_events = __builtin_k1_cbs(_mask & 0xFFFFFFFF) + __builtin_k1_cbs(_mask >> 32) + 1;
 
 
-	if (rx_config->if_type == RX_IF_TYPE_IODDR) {
+	if (rx_config->flow_controlled) {
 		if (n_events > rx_pool->n_spares) {
 			/* Alloc */
 			pool_entry_t * p_entry = (pool_entry_t*) rx_config->pool;
@@ -532,7 +532,6 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
 		ODP_ERR("asking for too many Rx port");
 		return -1;
 	}
-
 	rx_ifce_t *ifce =
 		&rx_hdl.ifce[rx_config->pktio_id];
 	char loopq_name[ODP_QUEUE_NAME_LEN];
@@ -555,6 +554,12 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
 	if (max_rx < 0)
 		max_rx = MPPA_DNOC_RX_QUEUES_NUMBER - 1;
 	for (first_rx = min_rx; first_rx < max_rx + 2 - n_ports; ++first_rx) {
+		/* If the ifce has "flow control", make sure all events are in the
+		 * dword in DNoC event register */
+		if (rx_config->flow_controlled &&
+		    first_rx / 64 != (first_rx + n_rx) / 64)
+			continue;
+
 		for (n_rx = 0; n_rx < n_ports; ++n_rx) {
 			mppa_noc_ret_t ret;
 			ret = mppa_noc_dnoc_rx_alloc(dma_if,
@@ -582,6 +587,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
 	rx_config->max_port = first_rx + n_rx - 1;
 	rx_config->pkt_offset = ((pool_entry_t *)rx_config->pool)->s.headroom -
 		rx_config->header_sz;
+
 	/*
 	 * Compute event mask to detect events on our own tags later
 	 */

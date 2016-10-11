@@ -259,6 +259,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			MAX_RX_ETH_IF;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
+		pcie->rx_config.flow_controlled = 0;
 		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy,
 				    rr_offset, -1, -1);
 	}
