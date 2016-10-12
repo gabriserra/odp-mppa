@@ -39,7 +39,7 @@
 /** @def SHM_PKT_POOL_SIZE
  * @brief Size of the shared memory block
  */
-#define SHM_PKT_POOL_SIZE      SHM_PKT_POOL_BUF_SIZE * 33
+#define SHM_PKT_POOL_SIZE      SHM_PKT_POOL_BUF_SIZE * 41
 /** @def MAX_PKT_BURST
  * @brief Maximum number of packet in a burst
  */
