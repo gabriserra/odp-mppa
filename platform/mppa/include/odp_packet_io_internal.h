@@ -123,7 +123,7 @@ typedef struct {
 	/* Rx Data */
 	rx_config_t rx_config;
 	int promisc;
-	int n_fragments;
+	int log2_fragments;
 
 	uint8_t slot_id;                /**< IO Eth Id */
 

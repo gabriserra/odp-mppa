@@ -94,7 +94,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int slot_id;
 	int rr_policy = -1;
 	int rr_offset = -1;
-	int n_fragments = 1;
+	int log2_fragments = 0;
 	int cnoc_port = -1;
 	/*
 	 * Check device name and extract slot/port
@@ -147,11 +147,11 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 				return -1;
 			}
 			pptr = eptr;
-		} else if (!strncmp(pptr, "nfragments=", strlen("nfragments="))){
-			pptr += strlen("nfragments=");
-			n_fragments = strtoul(pptr, &eptr, 10);
+		} else if (!strncmp(pptr, "log2fragments=", strlen("log2fragments="))){
+			pptr += strlen("log2fragments=");
+			log2_fragments = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid nfragments %s\n", pptr);
+				ODP_ERR("Invalid log2fragments %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -182,7 +182,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	 */
 	ioddr->slot_id = slot_id;
 	ioddr->pool = pool;
-	ioddr->n_fragments = n_fragments;
+	ioddr->log2_fragments = log2_fragments;
 	ioddr->tx_config.nofree = 0;
 	ioddr->tx_config.add_end_marker = 0;
 	if (min_rx == -1 || max_rx == -1) {
@@ -283,18 +283,15 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 {
 	int total_packet = 0, n_packet;
 	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
-	const int frag_per_pkt = ioddr->n_fragments;;
-	unsigned wanted_segs = len * frag_per_pkt;
+	const int log2_frag_per_pkt = ioddr->log2_fragments;
+	const int frag_per_pkt = 1 << log2_frag_per_pkt;
+	const unsigned wanted_segs = len << log2_frag_per_pkt;
 	odp_packet_t tmp_table[wanted_segs];
 	uint64_t pkt_count;
 
-	do {
-		n_packet = odp_buffer_ring_get_multi(ioddr->rx_config.ring,
-						     (odp_buffer_hdr_t **)(&tmp_table[total_packet]),
-						     wanted_segs, 0, NULL);
-		wanted_segs -= n_packet;
-		total_packet += n_packet;
-	} while(total_packet % ioddr->n_fragments != 0);
+	total_packet = odp_buffer_ring_get_multi(ioddr->rx_config.ring,
+					     (odp_buffer_hdr_t **)(&tmp_table[total_packet]),
+					     wanted_segs, log2_frag_per_pkt, NULL);
 
 	if (!total_packet)
 		return 0;
@@ -307,15 +304,16 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	mppa_noc_cnoc_tx_push(NOC_CLUS_IFACE_ID, g_cnoc_tx_id, pkt_count);
 	odp_spinlock_unlock(&g_cnoc_tx_lock);
 
-	for (n_packet = 0; n_packet < total_packet / frag_per_pkt; ++n_packet) {
-		odp_packet_t top_pkt = tmp_table[n_packet * frag_per_pkt];
+	for (n_packet = 0; n_packet < total_packet >> log2_frag_per_pkt; ++n_packet) {
+		const int pkt_base = n_packet << log2_frag_per_pkt;
+		odp_packet_t top_pkt = tmp_table[pkt_base];
 		odp_packet_hdr_t *top_pkt_hdr = odp_packet_hdr(top_pkt);
 
 		pkt_table[n_packet] = top_pkt;
 		_ioddr_compute_pkt_size(top_pkt);
 
 		for (int j = 1; j < frag_per_pkt; ++j) {
-			odp_packet_t pkt = tmp_table[n_packet * frag_per_pkt + j];
+			odp_packet_t pkt = tmp_table[pkt_base + j];
 
 			top_pkt_hdr->sub_packets[j - 1] = pkt;
 			_ioddr_compute_pkt_size(pkt);

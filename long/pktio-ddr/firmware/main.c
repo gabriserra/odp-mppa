@@ -95,7 +95,7 @@ int main()
 			"pktio-ddr",
 			"-i", "ioddr0:min_rx=" TOSTRING(MIN_TAG)
 			":max_rx=" TOSTRING(MAX_TAG)
-			":nfragments=4:cnoc=2:rrpolicy=20:rroffset=20,drop",
+			":log2fragments=2:cnoc=2:rrpolicy=20:rroffset=20,drop",
 			"-m", "0",
 			"-s", "0",
 			"-t", "15",
