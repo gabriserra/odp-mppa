@@ -291,7 +291,7 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	do {
 		n_packet = odp_buffer_ring_get_multi(ioddr->rx_config.ring,
 						     (odp_buffer_hdr_t **)(&tmp_table[total_packet]),
-						     wanted_segs, NULL);
+						     wanted_segs, 0, NULL);
 		wanted_segs -= n_packet;
 		total_packet += n_packet;
 	} while(total_packet % ioddr->n_fragments != 0);

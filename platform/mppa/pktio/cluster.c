@@ -464,7 +464,7 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 
 	n_packet = odp_buffer_ring_get_multi(clus->rx_config.ring,
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	if (!n_packet)
 		return 0;
