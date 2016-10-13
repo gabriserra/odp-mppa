@@ -62,7 +62,8 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 			goto pkt_skip;
 		}
 
-		dma_unmap_sg(&priv->pdev->dev, rx->sg, 1, DMA_FROM_DEVICE);
+		dma_unmap_sg(&priv->pdev->dev, rx->sg,
+			     rx->dma_len, DMA_FROM_DEVICE);
 
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
@@ -88,13 +89,57 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 	return worked;
 }
 
-int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
+static int mpodp_flush_rx_trans(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
+				struct mpodp_rx *rx, uint32_t first_slot)
 {
 	struct net_device *netdev = priv->netdev;
 	struct dma_async_tx_descriptor *dma_txd;
+
+	rx->dma_len =
+		dma_map_sg(&priv->pdev->dev, rx->sg, rx->sg_len,
+			   DMA_FROM_DEVICE);
+	if (rx->dma_len == 0)
+		return -1;
+
+	/* configure channel */
+	priv->rx_config.cfg.src_addr =
+		    rxq->mppa_entries[first_slot].pkt_addr;
+	if (dmaengine_slave_config(priv->rx_chan, &priv->rx_config.cfg)) {
+		/* board has reset, wait for reset of netdev */
+		netif_carrier_off(netdev);
+		netdev_err(netdev,
+			   "rxq[%d] rx[%d]: cannot configure channel\n",
+			   rxq->id, first_slot);
+		goto dma_failed;
+	}
+
+	/* get transfer descriptor */
+	dma_txd = dmaengine_prep_slave_sg(priv->rx_chan,
+					  rx->sg, rx->dma_len,
+					  DMA_DEV_TO_MEM, 0);
+	if (dma_txd == NULL) {
+		netdev_err(netdev,
+			   "rxq[%d] rx[%d]: cannot get dma descriptor",
+			   rxq->id, first_slot);
+		goto dma_failed;
+	}
+
+	netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer start (%d)\n",
+		   rxq->id, rxq->avail, rx->sg_len);
+
+	/* submit and issue descriptor */
+	rx->cookie = dmaengine_submit(dma_txd);
+
+	return 0;
+ dma_failed:
+	dma_unmap_sg(&priv->pdev->dev, rx->sg, rx->sg_len, DMA_FROM_DEVICE);
+	return -1;
+}
+
+int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
+{
 	struct mpodp_rx *rx;
-	int dma_len, limit;
-	int work_done = 0;
+	int limit, work_done = 0;
 
 	if (atomic_read(&priv->reset) == 1) {
 		/* Interface is reseting, do not start new transfers */
@@ -135,42 +180,11 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 
 		/* prepare sg */
 		sg_set_buf(rx->sg, rx->skb->data, rx->len);
-		dma_len =
-		    dma_map_sg(&priv->pdev->dev, rx->sg, 1,
-			       DMA_FROM_DEVICE);
-		if (dma_len == 0) {
-			goto map_failed;
-		}
+		rx->sg_len = 1;
 
-		/* configure channel */
-		priv->rx_config.cfg.src_addr =
-		    rxq->mppa_entries[rxq->avail].pkt_addr;
-		if (dmaengine_slave_config
-		    (priv->rx_chan, &priv->rx_config.cfg)) {
-			/* board has reset, wait for reset of netdev */
-			netif_carrier_off(netdev);
-			netdev_err(netdev,
-				   "rxq[%d] rx[%d]: cannot configure channel\n",
-				   rxq->id, rxq->avail);
-			break;
-		}
-
-		/* get transfer descriptor */
-		dma_txd =
-		    dmaengine_prep_slave_sg(priv->rx_chan, rx->sg, dma_len,
-					    DMA_DEV_TO_MEM, 0);
-		if (dma_txd == NULL) {
-			netdev_err(netdev,
-				   "rxq[%d] rx[%d]: cannot get dma descriptor",
-				   rxq->id, rxq->avail);
+		if (mpodp_flush_rx_trans(priv, rxq, rx, rxq->avail))
 			goto dma_failed;
-		}
 
-		netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer start\n",
-			   rxq->id, rxq->avail);
-
-		/* submit and issue descriptor */
-		rx->cookie = dmaengine_submit(dma_txd);
 		work_done++;
 
 	      pkt_error:
@@ -179,8 +193,6 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 		continue;
 
 	      dma_failed:
-		dma_unmap_sg(&priv->pdev->dev, rx->sg, 1, DMA_FROM_DEVICE);
-	      map_failed:
 		dev_kfree_skb_any(rx->skb);
 	      skb_failed:
 		/* napi will be rescheduled */

@@ -40,6 +40,7 @@ struct mpodp_rx {
 	struct sk_buff *skb;
 	struct scatterlist sg[1];
 	u32 sg_len;
+	u32 dma_len;
 	dma_cookie_t cookie;
 	void *entry_addr;
 	u32 len;		/* avoid to re-read the entry in the RX 2nd step */
