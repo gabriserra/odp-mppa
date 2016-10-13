@@ -25,13 +25,6 @@
 #include "odp.h"
 
 
-static void mpodp_dma_callback_rx(void *param)
-{
-	struct mpodp_if_priv *priv = param;
-
-	napi_schedule(&priv->napi);
-}
-
 static int mpodp_rx_is_done(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 			    int index)
 {
@@ -102,7 +95,6 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 	struct mpodp_rx *rx;
 	int dma_len, limit;
 	int work_done = 0;
-	int add_it;
 
 	if (atomic_read(&priv->reset) == 1) {
 		/* Interface is reseting, do not start new transfers */
@@ -164,11 +156,9 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 		}
 
 		/* get transfer descriptor */
-		add_it = ((rxq->avail + 1)  == limit);
 		dma_txd =
 		    dmaengine_prep_slave_sg(priv->rx_chan, rx->sg, dma_len,
-					    DMA_DEV_TO_MEM,
-					    add_it ? DMA_PREP_INTERRUPT : 0);
+					    DMA_DEV_TO_MEM, 0);
 		if (dma_txd == NULL) {
 			netdev_err(netdev,
 				   "rxq[%d] rx[%d]: cannot get dma descriptor",
@@ -176,10 +166,6 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 			goto dma_failed;
 		}
 
-		if (add_it) {
-			dma_txd->callback = mpodp_dma_callback_rx;
-			dma_txd->callback_param = priv;
-		}
 		netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer start\n",
 			   rxq->id, rxq->avail);
 
