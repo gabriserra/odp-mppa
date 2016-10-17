@@ -43,7 +43,7 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 	struct net_device *netdev = priv->netdev;
 	struct mpodp_rx *rx;
 	int worked = 0;
-
+	ktime_t now = ktime_get_real();
 	/* RX: 2nd step: give packet to kernel and update RX head */
 	while (budget-- && rxq->used != rxq->avail) {
 		if (!mpodp_rx_is_done(priv, rxq, rxq->used)) {
@@ -68,8 +68,10 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
 		skb_record_rx_queue(rx->skb, rxq->id);
+		rx->skb->tstamp = now;
+
 		rx->skb->protocol = eth_type_trans(rx->skb, netdev);
-		napi_gro_receive(&priv->napi, rx->skb);
+		netif_receive_skb(rx->skb);
 
 		/* update stats */
 		netdev->stats.rx_bytes += rx->len;
