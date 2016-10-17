@@ -127,12 +127,6 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 				   offsetof(struct mpodp_c2h_entry, pkt_addr) + 4,
 				   data->pkt_addr >> 32);
 		__k1_pcie_write_32(entry_addr +
-				   offsetof(struct mpodp_c2h_entry, data),
-				   data->data & 0xffffffff);
-		__k1_pcie_write_32(entry_addr +
-				   offsetof(struct mpodp_c2h_entry, data) + 4,
-				   data->data >> 32);
-		__k1_pcie_write_32(entry_addr +
 				   offsetof(struct mpodp_c2h_entry, len),
 				   meta.val);
 	}
