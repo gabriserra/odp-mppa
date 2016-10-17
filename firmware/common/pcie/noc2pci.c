@@ -23,7 +23,7 @@ void mppa_pcie_noc_rx_buffer_consumed(uint64_t data)
 }
 
 
-#define IT_BURSTINESS 32
+#define IT_BURSTINESS 64
 static uint64_t pkt_count[MPPA_PCIE_ETH_IF_MAX] = {0};
 static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 {
@@ -35,7 +35,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 	struct mpodp_if_config *cfg = netdev_get_eth_if_config(pcie_eth_if);
 	struct mpodp_c2h_entry pkt, free_pkt;
 	int nb_bufs;
-
+	int do_it = 1;
 	if (netdev_c2h_is_full(cfg, c2h_q)) {
 		dbg_printf("PCIe eth tx is full !!!\n");
 		return;
@@ -57,9 +57,9 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 
 		while (1) {
 			/* Read header from packet */
+			int last;
 
 			info.dword = __builtin_k1_ldu(pkt_addr + offsetof(struct mpodp_pkt_hdr, info));
-			pkt_size = info._.pkt_size;
 			pkt_addr += sizeof(struct mpodp_pkt_hdr);
 			buf->pkt_count++;
 
@@ -67,31 +67,46 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 
 			/* Send one packet of the buffer and add buf as padding
 			 * data to handle consumed packets */
-			pkt.len = pkt_size;
 			pkt.status = 0;
 			pkt.pkt_addr = (unsigned long)pkt_addr;
-			pkt.data = (unsigned long)buf;
+
+			pkt_size = info._.pkt_size;
+			last = info._.hash_key & END_OF_PACKETS;
+			pkt.len = pkt_size;
+			pkt.data = last ? (unsigned long)buf : 0;
+
 			count++;
+
+			do_it = (count % IT_BURSTINESS == 0);
+			if (do_it)
+				if (!__builtin_k1_lwu(&cfg->interrupt_status))
+					do_it = 0;
 			do {
 				ret = netdev_c2h_enqueue_data(cfg, c2h_q, &pkt, &free_pkt,
-							      (count % IT_BURSTINESS == 0) ||
-							      ( buf_idx == nb_bufs - 1 &&
-								info._.hash_key & END_OF_PACKETS) );
+							      do_it);
 			} while (ret < 0);
 
-			if (free_pkt.data != 0)
-				mppa_pcie_noc_rx_buffer_consumed(free_pkt.data);
+			if (free_pkt.data)
+				buffer_ring_push_multi(&g_free_buf_pool,
+						       (mppa_pcie_noc_rx_buf_t **)(uintptr_t)&free_pkt.data,
+						       1, NULL);
 
 			// jump to next packet, rounded to sizeof(uin64_t)
 			pkt_addr += ( ( pkt_size + sizeof(uint64_t) - 1 ) / sizeof(uint64_t) ) *
 				sizeof(uint64_t);
 
-			if (info._.hash_key & END_OF_PACKETS)
+			if (last)
 				break;
 		}
 
 		pkt_count[pcie_eth_if]++;
 		dbg_printf("%d packets handled, total %llu\n", buf->pkt_count, pkt_count[pcie_eth_if]);
+	}
+
+	if (!do_it) {
+		/* Last data push did not trig an IT, flush if required */
+		if (__builtin_k1_lwu(&cfg->interrupt_status))
+			mppa_pcie_send_it_to_host();
 	}
 }
 

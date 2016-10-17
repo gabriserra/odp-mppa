@@ -71,7 +71,19 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 	}
 
 	if (work < budget && !work_pending) {
-		napi_complete(napi);
+		if (!priv->interrupt_status) {
+
+			priv->interrupt_status = 1;
+			writel(1, priv->interrupt_status_addr);
+		} else {
+			napi_complete(napi);
+		}
+	} else {
+	  	work = budget;
+		if (priv->interrupt_status) {
+			priv->interrupt_status = 0;
+			writel(0, priv->interrupt_status_addr);
+		}
 	}
 
 	netdev_dbg(priv->netdev, "netdev_poll OUT\n");
@@ -83,7 +95,6 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 static void mpodp_poll_controller(struct net_device *netdev)
 {
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
-
 	napi_schedule(&priv->napi);
 }
 #endif
@@ -700,9 +711,11 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 
 		priv = netdev_priv(netdev->dev[i]);
 		if (priv->interrupt_status) {
-			netdev_dbg(netdev->dev[i], "Schedule NAPI\n");
-			napi_schedule(&priv->napi);
+			priv->interrupt_status = 0;
+			writel(0, priv->interrupt_status_addr);
 		}
+		netdev_dbg(netdev->dev[i], "Schedule NAPI\n");
+		napi_schedule(&priv->napi);
 
 		if (!netif_queue_stopped(netdev->dev[i])
 		    || atomic_read(&priv->reset)) {
