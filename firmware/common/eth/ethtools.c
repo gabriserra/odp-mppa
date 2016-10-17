@@ -19,6 +19,8 @@
 #include "internal/eth.h"
 #include <odp/rpc/helpers.h>
 
+uint64_t lb_timestamp = 0xFFFFFFFFFFFFFFFULL;
+
 enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
 							mppa_rpc_odp_answer_t *answer)
 {
@@ -42,11 +44,15 @@ enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
 	}
 	return link_speed;
 }
-
+static int first_header = 0;
 int ethtool_init_lane(int eth_if)
 {
 	mppabeth_lb_cfg_header_mode((void *)&(mppa_ethernet[0]->lb),
 				    eth_if, MPPABETHLB_ADD_HEADER);
+	if(first_header == 0){
+		lb_timestamp = __k1_read_dsu_timestamp();
+		first_header = 1;
+	}
 
 	mppabeth_lb_cfg_table_rr_dispatch_trigger((void *)&(mppa_ethernet[0]->lb),
 						  ETH_MATCHALL_TABLE_ID,

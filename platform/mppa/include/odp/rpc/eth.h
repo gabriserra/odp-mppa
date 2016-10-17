@@ -66,6 +66,7 @@ typedef struct {
 	uint8_t  tx_tag;	/* Tag of the IO Cluster rx */
 	uint8_t  mac[ETH_ALEN];
 	uint16_t mtu;
+	uint64_t lb_ts_off;
 } mppa_rpc_odp_ack_eth_open_t;
 
 /**

@@ -111,6 +111,7 @@ typedef struct {
 	uint16_t tx_tag;                /**< Remote DMA tag to forward to
 					 *   Eth Egress */
 
+	uint64_t lb_ts_off;             /** offset between lb timestamp and dsu timestamp */
 	pkt_tx_uc_config tx_config;
 } pkt_eth_t;
 

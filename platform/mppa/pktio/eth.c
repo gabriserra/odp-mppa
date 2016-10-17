@@ -125,6 +125,8 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 
 	eth->tx_if = ack.cmd.eth_open.tx_if;
 	eth->tx_tag = ack.cmd.eth_open.tx_tag;
+	eth->lb_ts_off = ack.cmd.eth_open.lb_ts_off;
+
 	memcpy(eth->mac_addr, ack.cmd.eth_open.mac, 6);
 	eth->mtu = ack.cmd.eth_open.mtu;
 
