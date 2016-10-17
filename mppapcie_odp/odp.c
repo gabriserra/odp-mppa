@@ -691,7 +691,8 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 
 	/* schedule poll call */
 	for (i = 0; i < netdev->if_count; ++i) {
-		if (!netif_running(netdev->dev[i])) {
+		if (!netif_running(netdev->dev[i]) ||
+		    !netif_carrier_ok(netdev->dev[i])) {
 			netdev_dbg(netdev->dev[i],
 				   "netdev[%d] is not running\n", i);
 			continue;
