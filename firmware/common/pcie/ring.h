@@ -8,10 +8,12 @@
 
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
+#include "mppapcie_odp.h"
 
 typedef struct mppa_pcie_noc_rx_buf {
 	void *buf_addr;
 	uint8_t pkt_count;		/* Count of packet in this buffer */
+	struct mpodp_c2h_entry pkts[8];
 } mppa_pcie_noc_rx_buf_t; 
 
 typedef struct {

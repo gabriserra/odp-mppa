@@ -16,7 +16,6 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 {
 	mppa_pcie_noc_rx_buf_t *new_buf;
 	mppa_pcie_noc_rx_buf_t *old_buf;
-	uint32_t left;
 	int ret;
 	uint16_t events;
 	uint16_t pcie_eth_if = iface->rx_cfgs[rx_id].pcie_eth_if;
@@ -29,7 +28,7 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		return -1;
 
 	if ( iface->rx_cfgs[rx_id].broken == 0 ) {
-		ret = buffer_ring_get_multi(&g_free_buf_pool, &new_buf, 1, &left);
+		ret = buffer_ring_get_multi(&g_free_buf_pool, &new_buf, 1, NULL);
 		if (ret != 1) {
 			dbg_printf("No more free buffer available\n");
 			return -1;
@@ -39,8 +38,34 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		old_buf = iface->rx_cfgs[rx_id].mapped_buf;
 		iface->rx_cfgs[rx_id].mapped_buf = new_buf;
 		dbg_printf("Adding buf to eth if %d\n", pcie_eth_if);
+
+		/* Fill the pkt details */
+		{
+			union mpodp_pkt_hdr_info info;
+			void * pkt_addr = old_buf->buf_addr;
+			old_buf->pkt_count = 0;
+			while(1){
+				info.dword = __builtin_k1_ldu(pkt_addr + offsetof(struct mpodp_pkt_hdr, info));
+				pkt_addr += sizeof(struct mpodp_pkt_hdr);
+
+				old_buf->pkts[old_buf->pkt_count].status = 0;
+				old_buf->pkts[old_buf->pkt_count].pkt_addr = (unsigned long)pkt_addr;
+
+				old_buf->pkts[old_buf->pkt_count].len = info._.pkt_size;
+				old_buf->pkts[old_buf->pkt_count].data = 0;
+				old_buf->pkt_count++;
+
+				if (info._.hash_key & END_OF_PACKETS) {
+					old_buf->pkts[old_buf->pkt_count - 1].data = (unsigned long)old_buf;
+					break;
+				}
+				pkt_addr += ( ( info._.pkt_size + sizeof(uint64_t) - 1 ) / sizeof(uint64_t) ) *
+					sizeof(uint64_t);
+			}
+		}
+
 		/* Add previous buffer to full list */
-		buffer_ring_push_multi(&g_full_buf_pool[pcie_eth_if][c2h_q], &old_buf, 1, &left);
+		buffer_ring_push_multi(&g_full_buf_pool[pcie_eth_if][c2h_q], &old_buf, 1, NULL);
 
 		dbg_printf("Reloading rx %d of if %d with buffer %p\n",
 				rx_id, iface->iface_id, new_buf);
