@@ -32,6 +32,8 @@ extern "C" {
 /** Maximum number of threads dedicated for Ethernet */
 #define MAX_RX_THR 6
 
+#define MAX_RX_QUEUES 8
+
 /** Default number of Rx threads */
 #if defined(K1B_EXPLORER)
 #define DEF_N_RX_THR 1
@@ -58,7 +60,7 @@ typedef struct {
 	uint8_t header_sz;
 	uint8_t pkt_offset;
 	rx_if_type_e if_type;
-	odp_buffer_ring_t *ring;
+	odp_buffer_ring_t *ring[MAX_RX_QUEUES];
 	struct {
 		uint8_t flow_controlled : 1;
 	};

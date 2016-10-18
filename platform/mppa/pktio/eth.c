@@ -10,6 +10,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/api/cpu.h>
 
 #ifdef K1_NODEOS
 #include <pthread.h>
@@ -648,8 +649,9 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 {
 	int n_packet;
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+	const unsigned int core = odp_cpu_id();
 
-	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring,
+	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring[core],
 					     (odp_buffer_hdr_t **)pkt_table,
 					     len, 0, NULL);
 

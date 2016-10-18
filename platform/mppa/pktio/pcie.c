@@ -367,7 +367,7 @@ static int pcie_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	int n_packet;
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 
-	n_packet = odp_buffer_ring_get_multi(pcie->rx_config.ring,
+	n_packet = odp_buffer_ring_get_multi(pcie->rx_config.ring[0],
 					     (odp_buffer_hdr_t **)pkt_table,
 					     len, 0, NULL);
 
