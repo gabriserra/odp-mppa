@@ -68,7 +68,7 @@ try:
 						perff.write("PPS " + test_name + match.group(1) + "\n")
 						perff.write("MBPS " + test_name + match.group(2) + "\n")
 					try:
-				 		trafgen_p.terminate()
+				 		trafgen_p.kill()
 						trafgen_p.wait()
 					except OSError:
 				 		pass
@@ -80,7 +80,7 @@ try:
 
 	os.kill(jtag_p.pid, signal.SIGCONT)
 
-	jtag_p.terminate()
+	jtag_p.kill()
 	jtag_p.wait()
 except KeyboardInterrupt:
 	try:

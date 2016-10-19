@@ -62,7 +62,7 @@ for size in packet_sizes:
 
 		os.kill(jtag_p.pid, signal.SIGCONT)
 
-		jtag_p.terminate()
+		jtag_p.kill()
 		jtag_p.wait()
 	except KeyboardInterrupt:
 		try:
