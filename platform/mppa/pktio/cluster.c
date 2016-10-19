@@ -321,6 +321,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		if (rret != MPPA_ROUTING_RET_SUCCESS)
 			return 1;
 
+		pkt_cluster->rx_config.pktio = &pktio_entry->s;
 		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx,
 					  rr_policy, rr_offset, -1, -1);
 		if(ret < 0) {

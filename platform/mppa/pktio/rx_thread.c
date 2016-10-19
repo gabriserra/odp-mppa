@@ -297,6 +297,16 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
 
+	/* Move timestamp to order so it can be sorted in the ring buf */
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
+	const mppa_ethernet_header_t *header;
+	header = (const mppa_ethernet_header_t*)
+		(((uint8_t *)pkt_hdr->buf_hdr.addr) +
+		 rx_config->pkt_offset);
+
+
+	uint64_t pkt_ts = LOAD_U64(header->timestamp);
+
 	if (odp_unlikely(pkt == ODP_PACKET_INVALID)){
 		if (rx_hdl.tag[rx_id].broken) {
 			rx_hdl.tag[rx_id].broken = false;
@@ -305,12 +315,6 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 			if_th->oom_pkts++;
 		}
 	} else {
-		/* Move timestamp to order so it can be sorted in the ring buf */
-		odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
-		const mppa_ethernet_header_t *header;
-		header = (const mppa_ethernet_header_t*)
-			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
-			 rx_config->pkt_offset);
 
 		union mppa_ethernet_header_info_t info;
 		info.dword = LOAD_U64(header->info);
@@ -400,7 +404,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list;
 
-		mppa_tracepoint(odp, rx_thread, pkt);
+		mppa_tracepoint(odp, rx_thread, pkt, pkt_ts + rx_config->pktio->pkt_eth.lb_ts_off);
 
 		if_th->recv_pkts++;
 		*(hdr_list->tail) = (odp_buffer_hdr_t *)pkt;

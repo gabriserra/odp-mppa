@@ -484,6 +484,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		eth->rx_config.flow_controlled = 0;
+		eth->rx_config.pktio = &pktio_entry->s;
 		ret = rx_thread_link_open(&eth->rx_config, nRx, rr_policy,
 					  rr_offset, -1, -1);
 		if(ret < 0)
