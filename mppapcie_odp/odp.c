@@ -103,31 +103,19 @@ static int mpodp_open(struct net_device *netdev)
 	int ready = 1;
 	for (i = 0; i < priv->n_txqs; ++i) {
 		struct mpodp_txq *txq = &priv->txqs[i];
-		atomic_set(&txq->submitted, 0);
-		atomic_set(&txq->head, readl(txq->head_addr));
-		atomic_set(&txq->done, 0);
-		atomic_set(&txq->autoloop_cur, 0);
-
 		/* Check if this txq is ready */
-		if (atomic_read(&txq->head) == 0)
+		if (atomic_read(&txq->head) == 0) {
 			ready = 0;
+			break;
+		}
 	}
-
-	for (i = 0; i < priv->n_rxqs; ++i) {
-		struct mpodp_rxq *rxq = &priv->rxqs[i];
-		rxq->tail = readl(rxq->tail_addr);
-		rxq->head = readl(rxq->head_addr);
-		rxq->used = rxq->head;
-		rxq->avail = rxq->tail;
-	}
-
-	atomic_set(&priv->reset, 0);
 
 	netif_tx_start_all_queues(netdev);
 	napi_enable(&priv->napi);
 
 	priv->interrupt_status = 1;
 	writel(priv->interrupt_status, priv->interrupt_status_addr);
+	napi_schedule(&priv->napi);
 
 	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
@@ -293,6 +281,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	priv->n_rxqs = config->n_rxqs;
 	priv->n_txqs = config->n_txqs;
 	priv->msg_enable = netif_msg_init(-1, MPODP_DEFAULT_MSG);
+	atomic_set(&priv->reset, 0);
 
 	smem_vaddr = mppa_pcie_get_smem_vaddr(pdata);
 	priv->interrupt_status_addr = smem_vaddr
@@ -327,6 +316,8 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		rxq->tail_addr = desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
 		rxq->head = readl(rxq->head_addr);
 		rxq->tail = readl(rxq->tail_addr);
+		rxq->used = rxq->head;
+		rxq->avail = rxq->tail;
 
 		entries_addr =
 			readl(desc_info_addr(smem_vaddr, config->c2h_addr[i],
@@ -415,6 +406,11 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 				+ entries_addr
 				+ j * sizeof(struct mpodp_h2c_entry);
 		}
+
+		atomic_set(&txq->submitted, 0);
+		atomic_set(&txq->head, readl(txq->head_addr));
+		atomic_set(&txq->done, 0);
+		atomic_set(&txq->autoloop_cur, 0);
 
 		txq->cached_head = 0;
 	}
