@@ -118,7 +118,6 @@ static int mpodp_open(struct net_device *netdev)
 
 	priv->interrupt_status = 1;
 	writel(priv->interrupt_status, priv->interrupt_status_addr);
-	napi_schedule(&priv->napi);
 
 	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
@@ -127,6 +126,7 @@ static int mpodp_open(struct net_device *netdev)
 			netdev_info(priv->netdev, "Interface is ready\n");
 		mpodp_tx_update_cache(priv);
 		netif_carrier_on(netdev);
+		napi_schedule(&priv->napi);
 	} else {
 		if (netif_msg_link(priv))
 			netdev_info(priv->netdev, "Interface is not ready\n");
