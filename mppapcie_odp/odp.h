@@ -107,7 +107,7 @@ struct mpodp_if_priv {
 
 	struct mppa_pcie_device *pdata;
 	struct pci_dev *pdev;	/* pointer to device structure */
-
+	const struct mpodp_pdata_priv *pdata_priv;
 	struct dentry *dir;
 
 	struct mpodp_if_config *config;

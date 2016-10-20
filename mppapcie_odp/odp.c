@@ -221,6 +221,7 @@ static void mpodp_remove(struct net_device *netdev)
 }
 
 static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
+				       const struct mpodp_pdata_priv *pdata_priv,
 				       struct mpodp_if_config *config,
 				       uint32_t eth_control_addr, int id)
 {
@@ -282,6 +283,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	/* init priv */
 	priv = netdev_priv(netdev);
 	priv->pdata = pdata;
+	priv->pdata_priv = pdata_priv;
 	priv->pdev = pdev;
 	priv->config = config;
 	priv->netdev = netdev;
@@ -550,8 +552,9 @@ static void mpodp_enable(struct mppa_pcie_device *pdata,
 	/* add net devices */
 	for (i = 0; i < if_count; ++i) {
 		netdev->dev[i] =
-		    mpodp_create(pdata, netdev->control.configs + i,
-			       eth_control_addr, i);
+			mpodp_create(pdata, netdev,
+				     netdev->control.configs + i,
+				     eth_control_addr, i);
 		if (!netdev->dev[i])
 			break;
 	}
