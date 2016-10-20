@@ -37,6 +37,11 @@ ifdef NETDEV_VERBOSE
 _CFLAGS += -DNETDEV_VERBOSE
 endif
 
+ifndef FIRMWARE_VERSION
+include $(FIRM_TOPDIR)/../firmware-version.mk
+endif
+_CFLAGS += -DFIRMWARE_VERSION='"$(FIRMWARE_VERSION)"'
+
 ifndef INCLUDING_FIRMWARE
 
 ifdef BUILD_LIBRARY
