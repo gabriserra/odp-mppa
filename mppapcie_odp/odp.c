@@ -58,8 +58,6 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 
 	priv = container_of(napi, struct mpodp_if_priv, napi);
 
-	netdev_dbg(priv->netdev, "netdev_poll IN\n");
-
 	/* Check for Rx transfer completion and send the SKBs to the
 	 * network stack */
 	for (i = 0; i < priv->n_rxqs; ++i) {
@@ -85,8 +83,6 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 			writel(0, priv->interrupt_status_addr);
 		}
 	}
-
-	netdev_dbg(priv->netdev, "netdev_poll OUT\n");
 
 	return work;
 }
@@ -136,11 +132,13 @@ static int mpodp_open(struct net_device *netdev)
 	mod_timer(&priv->tx_timer, jiffies + MPODP_TX_RECLAIM_PERIOD);
 
 	if (ready) {
-		netdev_dbg(priv->netdev, "Interface is ready\n");
+		if (netif_msg_link(priv))
+			netdev_info(priv->netdev, "Interface is ready\n");
 		mpodp_tx_update_cache(priv);
 		netif_carrier_on(netdev);
 	} else {
-		netdev_dbg(priv->netdev, "Interface is not ready\n");
+		if (netif_msg_link(priv))
+			netdev_info(priv->netdev, "Interface is not ready\n");
 		netif_carrier_off(netdev);
 	}
 
@@ -184,6 +182,10 @@ static void mpodp_remove(struct net_device *netdev)
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
 	int chanidx;
 	int i;
+
+
+	if (netif_msg_probe(priv))
+		printk(KERN_INFO "Removing netdev %s\n", netdev->name);
 
 	if (priv->tx_timer.function)
 		del_timer_sync(&priv->tx_timer);
@@ -289,6 +291,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	priv->netdev = netdev;
 	priv->n_rxqs = config->n_rxqs;
 	priv->n_txqs = config->n_txqs;
+	priv->msg_enable = netif_msg_init(-1, MPODP_DEFAULT_MSG);
 
 	smem_vaddr = mppa_pcie_get_smem_vaddr(pdata);
 	priv->interrupt_status_addr = smem_vaddr
@@ -439,7 +442,8 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 
 	/* register netdev */
 	if (register_netdev(netdev)) {
-		dev_err(&pdev->dev, "failed to register netdev\n");
+		if (netif_msg_probe(priv))
+			dev_err(&pdev->dev, "failed to register netdev\n");
 		goto register_failed;
 	}
 
@@ -447,8 +451,9 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	setup_timer(&priv->tx_timer, mpodp_tx_timer_cb,
 		    (unsigned long) priv);
 
-	printk(KERN_INFO "Registered netdev for %s (txq:%d, rxq:%d)\n",
-	       netdev->name, priv->n_txqs, priv->n_rxqs);
+	if (netif_msg_probe(priv))
+		printk(KERN_INFO "Registered netdev for %s (txq:%d, rxq:%d)\n",
+		       netdev->name, priv->n_txqs, priv->n_rxqs);
 
 	return netdev;
 
@@ -503,17 +508,8 @@ static int mpodp_is_magic_set(struct mppa_pcie_device *pdata)
 		magic = readl(mppa_pcie_get_smem_vaddr(pdata)
 			      + eth_control_addr
 			      + offsetof(struct mpodp_control, magic));
-		if (magic == MPODP_CONTROL_STRUCT_MAGIC) {
-			dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
-				"MPPA netdev control struct (0x%x) ready\n",
-				eth_control_addr);
+		if (magic == MPODP_CONTROL_STRUCT_MAGIC)
 			return 1;
-		} else {
-			dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
-				"MPPA netdev control struct (0x%x) not ready\n",
-				eth_control_addr);
-			return 0;
-		}
 	}
 	return 0;
 }
@@ -544,10 +540,6 @@ static void mpodp_enable(struct mppa_pcie_device *pdata,
 	}
 
 	if_count = netdev->control.if_count;
-
-	dev_dbg(&netdev->pdev->dev,
-		"enable: initialization of %d interface(s)\n",
-		netdev->control.if_count);
 
 	/* add net devices */
 	for (i = 0; i < if_count; ++i) {
@@ -588,8 +580,9 @@ static void mpodp_pre_reset(struct net_device *netdev)
 		       atomic_read(&priv->txqs[i].submitted)) {
 			msleep(10);
 			if (jiffies - now >= msecs_to_jiffies(1000)) {
-				netdev_err(netdev,
-					   "Txq %d stalled. Ignoring for reset\n", i);
+				if (netif_msg_tx_err(priv))
+					netdev_err(netdev,
+						   "Txq %d stalled. Ignoring for reset\n", i);
 				break;
 			}
 		}
@@ -599,8 +592,9 @@ static void mpodp_pre_reset(struct net_device *netdev)
 		while(priv->rxqs[i].used != priv->rxqs[i].avail) {
 			msleep(10);
 			if (jiffies - now >= msecs_to_jiffies(1000)) {
-				netdev_err(netdev,
-					   "Rxq %d stalled. Ignoring for reset\n", i);
+				if (netif_msg_rx_err(priv))
+					netdev_err(netdev,
+						   "Rxq %d stalled. Ignoring for reset\n", i);
 				break;
 			}
 		}
@@ -654,9 +648,6 @@ static void mpodp_disable(struct mpodp_pdata_priv *netdev,
 		}
 	} while (last_state == _MPODP_IF_STATE_ENABLING);
 
-	dev_dbg(&(mppa_pcie_get_pci_dev(pdata)->dev),
-		"disable: remove interface(s)\n");
-
 	eth_control_addr = mpodp_get_eth_control_addr(pdata);
 	writel(0, mppa_pcie_get_smem_vaddr(pdata)
 	       + eth_control_addr + offsetof(struct mpodp_control, magic));
@@ -686,8 +677,6 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 	int i;
 	enum _mpodp_if_state last_state;
 
-	dev_dbg(&netdev->pdev->dev, "netdev interrupt IN\n");
-
 	last_state = atomic_read(&netdev->state);
 
 	/* disabled : try to enable */
@@ -698,8 +687,6 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 	}
 	/* not enabled, stop here */
 	if (last_state != _MPODP_IF_STATE_ENABLED) {
-		dev_dbg(&netdev->pdev->dev,
-			"netdev is disabled. interrupt OUT\n");
 		return IRQ_HANDLED;
 	}
 
@@ -707,8 +694,7 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 	for (i = 0; i < netdev->if_count; ++i) {
 		if (!netif_running(netdev->dev[i]) ||
 		    !netif_carrier_ok(netdev->dev[i])) {
-			netdev_dbg(netdev->dev[i],
-				   "netdev[%d] is not running\n", i);
+			/* Netdev not running */
 			continue;
 		}
 
@@ -717,19 +703,15 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 			priv->interrupt_status = 0;
 			writel(0, priv->interrupt_status_addr);
 		}
-		netdev_dbg(netdev->dev[i], "Schedule NAPI\n");
+		/* Schedule NAPI */
 		napi_schedule(&priv->napi);
 
 		if (!netif_queue_stopped(netdev->dev[i])
 		    || atomic_read(&priv->reset)) {
-			netdev_dbg(netdev->dev[i],
-				   "netdev[%d] is not stopped (%d) or in reset (%d)\n",
-				   i, !netif_queue_stopped(netdev->dev[i]),
-				   atomic_read(&priv->reset));
+			/* Netdev is stopped or in reset */
 			continue;
 		}
 	}
-	dev_dbg(&netdev->pdev->dev, "netdev interrupt OUT\n");
 	return IRQ_HANDLED;
 }
 
@@ -767,13 +749,11 @@ static int mpodp_add_device(struct mppa_pcie_device *pdata)
 
 	netdev->pdata = pdata;
 	netdev->pdev = mppa_pcie_get_pci_dev(pdata);
-	dev_dbg(&netdev->pdev->dev, "Attaching a netdev\n");
 
 	irq = mppa_pcie_get_irq(pdata, MPPA_PCIE_IRQ_USER_IT, 0);
 	if (irq < 0)
 		goto free_netdev;
 
-	dev_dbg(&netdev->pdev->dev, "Registering IRQ %d\n", irq);
 	res = request_irq(irq, mpodp_interrupt, IRQF_SHARED, "mppa", netdev);
 	if (res)
 		goto free_netdev;
@@ -799,7 +779,7 @@ static int mpodp_add_device(struct mppa_pcie_device *pdata)
 
       free_netdev:
 	kfree(netdev);
-	dev_warn(&netdev->pdev->dev, "Failed to attached a netdev\n");
+	dev_warn(&netdev->pdev->dev, "Failed to attach a netdev\n");
 	return -1;
 }
 
@@ -826,7 +806,6 @@ static int mpodp_remove_device(struct mppa_pcie_device *pdata)
 
 	cancel_work_sync(&netdev->enable);
 
-	dev_dbg(&netdev->pdev->dev, "Removing the associated netdev\n");
 	free_irq(mppa_pcie_get_irq(pdata, MPPA_PCIE_IRQ_USER_IT, 0),
 		 netdev);
 
@@ -864,7 +843,6 @@ static int mpodp_init(void)
 {
 	printk(KERN_INFO "mppapcie_odp: loading PCIe ethernet driver\n");
 	mppa_pcie_register_notifier(&mpodp_notifier);
-	printk(KERN_DEBUG "mppapcie_odp: PCIe ethernet driver loaded\n");
 	return 0;
 }
 
@@ -872,7 +850,6 @@ static void mpodp_exit(void)
 {
 	printk(KERN_INFO "mppapcie_odp: unloading PCIe ethernet driver\n");
 	mppa_pcie_unregister_notifier(&mpodp_notifier);
-	printk(KERN_DEBUG "mppapcie_odp: PCIe ethernet driver unloaded\n");
 }
 
 module_init(mpodp_init);

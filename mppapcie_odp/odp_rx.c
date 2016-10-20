@@ -51,8 +51,9 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 			break;
 		}
 
-		netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer done\n",
-			   rxq->id, rxq->used);
+		if (netif_msg_rx_status(priv))
+			netdev_info(netdev, "rxq[%d] rx[%d]: transfer done\n",
+				   rxq->id, rxq->used);
 
 		/* get rx slot */
 		rx = &(rxq->ring[rxq->used]);
@@ -109,9 +110,10 @@ static int mpodp_flush_rx_trans(struct mpodp_if_priv *priv, struct mpodp_rxq *rx
 	if (dmaengine_slave_config(priv->rx_chan, &priv->rx_config.cfg)) {
 		/* board has reset, wait for reset of netdev */
 		netif_carrier_off(netdev);
-		netdev_err(netdev,
-			   "rxq[%d] rx[%d]: cannot configure channel\n",
-			   rxq->id, first_slot);
+		if (netif_msg_rx_err(priv))
+			netdev_err(netdev,
+				   "rxq[%d] rx[%d]: cannot configure channel\n",
+				   rxq->id, first_slot);
 		goto dma_failed;
 	}
 
@@ -120,14 +122,16 @@ static int mpodp_flush_rx_trans(struct mpodp_if_priv *priv, struct mpodp_rxq *rx
 					  rx->sg, rx->dma_len,
 					  DMA_DEV_TO_MEM, 0);
 	if (dma_txd == NULL) {
-		netdev_err(netdev,
-			   "rxq[%d] rx[%d]: cannot get dma descriptor",
-			   rxq->id, first_slot);
+		if (netif_msg_rx_err(priv))
+			netdev_err(netdev,
+				   "rxq[%d] rx[%d]: cannot get dma descriptor",
+				   rxq->id, first_slot);
 		goto dma_failed;
 	}
 
-	netdev_dbg(netdev, "rxq[%d] rx[%d]: transfer start (%d)\n",
-		   rxq->id, rxq->avail, rx->sg_len);
+	if (netif_msg_rx_status(priv))
+		netdev_info(netdev, "rxq[%d] rx[%d]: transfer start (%d)\n",
+			   rxq->id, rxq->avail, rx->sg_len);
 
 	/* submit and issue descriptor */
 	rx->cookie = dmaengine_submit(dma_txd);

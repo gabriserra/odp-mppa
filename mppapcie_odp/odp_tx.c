@@ -27,7 +27,9 @@
 #define TX_POLL_THRESHOLD 32
 void mpodp_tx_timeout(struct net_device *netdev)
 {
-	netdev_err(netdev, "tx timeout\n");
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
+	if (netif_msg_tx_err(priv))
+		netdev_err(netdev, "tx timeout\n");
 }
 
 static int mpodp_tx_is_done(struct mpodp_if_priv *priv, struct mpodp_txq *txq,
@@ -124,8 +126,9 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 			/* We now have buffers */
 			atomic_set(&txq->head, tx_head);
 
-			netdev_dbg(netdev,"txq[%d]  now has Tx (%u).\n",
-				   txq->id, tx_head);
+			if (netif_msg_link(priv))
+				netdev_info(netdev,"txq[%d]  now has Tx (%u).\n",
+					    txq->id, tx_head);
 		}
 		return 0;
 	}
@@ -137,10 +140,11 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 			break;
 		}
 
-		netdev_dbg(netdev,
-			   "txq[%d] tx[%d]: transfer done (head: %d submitted: %d done: %d)\n",
-			   txq->id, tx_done, atomic_read(&txq->head),
-			   tx_submitted, tx_done);
+		if (netif_msg_tx_done(priv))
+			netdev_info(netdev,
+				    "txq[%d] tx[%d]: transfer done (head: %d submitted: %d done: %d)\n",
+				    txq->id, tx_done, atomic_read(&txq->head),
+				    tx_submitted, tx_done);
 
 		/* get TX slot */
 		tx = &(txq->ring[tx_done]);
@@ -162,10 +166,11 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 
 	/* TX: 3rd step: free finished TX slot */
 	while (first_tx_done != last_tx_done) {
-		netdev_dbg(netdev,
-			   "txq[%d] tx[%d]: done (head: %d submitted: %d done: %d)\n",
-			   txq->id, first_tx_done, atomic_read(&txq->head),
-			   tx_submitted, tx_done);
+		if (netif_msg_tx_done(priv))
+			netdev_info(netdev,
+				    "txq[%d] tx[%d]: done (head: %d submitted: %d done: %d)\n",
+				    txq->id, first_tx_done, atomic_read(&txq->head),
+				    tx_submitted, tx_done);
 
 		/* get TX slot */
 		tx = &(txq->ring[first_tx_done]);
@@ -258,17 +263,14 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	/* Check if there are txd available */
 	if (tx_next == atomic_read(&txq->done)) {
 		/* Ring is full */
-		netdev_err(netdev, "txq[%d]: ring full \n", txq->id);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev, "txq[%d]: ring full \n", txq->id);
 		netif_tx_stop_queue(txq->txq);
 		return NETDEV_TX_BUSY;
 	}
 
 	tx = &(txq->ring[tx_submitted]);
 	entry = &(txq->cache[tx_mppa_idx]);
-
-	netdev_vdbg(netdev,
-		    "txq[%d]: alloc TX packet descriptor %p/%d (MPPA Idx = %d)\n",
-		    txq->id, tx, tx_submitted, tx_mppa_idx);
 
 	/* take the time */
 	mppa_pcie_time_get(priv->tx_time, &tx->time);
@@ -281,29 +283,27 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	    mppa_pcie_dma_check_addr(priv->pdata, tx->dst_addr, &fifo_mode,
 				     &requested_engine);
 	if (ret) {
-		netdev_err(netdev, "txq[%d] tx[%d]: invalid send address %llx\n",
-			   txq->id, tx_submitted, tx->dst_addr);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev, "txq[%d] tx[%d]: invalid send address %llx\n",
+				   txq->id, tx_submitted, tx->dst_addr);
 		goto addr_error;
 	}
 	if (!fifo_mode) {
-		netdev_err(netdev, "txq[%d] tx[%d]: %llx is not a PCI2Noc addres\n",
-			   txq->id, tx_submitted, tx->dst_addr);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev, "txq[%d] tx[%d]: %llx is not a PCI2Noc addres\n",
+				   txq->id, tx_submitted, tx->dst_addr);
 		goto addr_error;
 	}
 	if (requested_engine >= MPODP_NOC_CHAN_COUNT) {
-		netdev_err(netdev,
-			   "txq[%d] tx[%d]: address %llx using NoC engine out of range (%d >= %d)\n",
-			   txq->id, tx_submitted, tx->dst_addr,
-			   requested_engine, MPODP_NOC_CHAN_COUNT);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev,
+				   "txq[%d] tx[%d]: address %llx using NoC engine out of range (%d >= %d)\n",
+				   txq->id, tx_submitted, tx->dst_addr,
+				   requested_engine, MPODP_NOC_CHAN_COUNT);
 		goto addr_error;
 	}
 
 	tx->chanidx = requested_engine;
-
-	netdev_vdbg(netdev,
-		    "txq[%d] tx[%d]: sending to 0x%llx. Fifo=%d Engine=%d\n",
-		    txq->id, tx_submitted, (uint64_t) tx->dst_addr, fifo_mode,
-		    requested_engine);
 
 	/* The packet needs a header to determine size,timestamp, etc.
 	 * Add it */
@@ -336,8 +336,9 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 
 	/* prepare sg */
 	if (map_skb(&priv->pdev->dev, skb, tx)){
-		netdev_err(netdev, "tx %d: failed to map skb to dma\n",
-			   tx_submitted);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev, "tx %d: failed to map skb to dma\n",
+				   tx_submitted);
 		goto busy;
 	}
 
@@ -354,8 +355,9 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 		/* board has reset, wait for reset of netdev */
 		netif_tx_stop_queue(txq->txq);
 		netif_carrier_off(netdev);
-		netdev_err(netdev, "txq[%d] tx[%d]: cannot configure channel\n",
-			   txq->id, tx_submitted);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev, "txq[%d] tx[%d]: cannot configure channel\n",
+				   txq->id, tx_submitted);
 		goto busy;
 	}
 
@@ -365,14 +367,16 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 				    tx->sg_len, DMA_MEM_TO_DEV, 0);
 	if (dma_txd == NULL) {
 		/* dmaengine_prep_slave_sg failed, retry */
-		netdev_err(netdev, "txq[%d] tx[%d]: cannot get dma descriptor\n",
-			   txq->id, tx_submitted);
+		if (netif_msg_tx_err(priv))
+			netdev_err(netdev, "txq[%d] tx[%d]: cannot get dma descriptor\n",
+				   txq->id, tx_submitted);
 		goto busy;
 	}
-	netdev_vdbg(netdev,
-		    "txq[%d] tx[%d]: transfer start (submitted: %d done: %d) len=%d, sg_len=%d\n",
-		    txq->id, tx_submitted, tx_next, atomic_read(&txq->done),
-		    tx->len, tx->sg_len);
+	if (netif_msg_tx_queued(priv))
+		netdev_info(netdev,
+			    "txq[%d] tx[%d]: transfer start (submitted: %d done: %d) len=%d, sg_len=%d\n",
+			    txq->id, tx_submitted, tx_next, atomic_read(&txq->done),
+			    tx->len, tx->sg_len);
 
 	skb_orphan(skb);
 
@@ -410,7 +414,8 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 		tx_next = 0;
 
 	if (tx_next == atomic_read(&txq->done)) {
-		netdev_dbg(netdev, "txq[%d]: ring full \n", txq->id);
+		if (netif_msg_tx_queued(priv))
+			netdev_info(netdev, "txq[%d]: ring full \n", txq->id);
 		netif_tx_stop_queue(txq->txq);
 	}
 
@@ -468,7 +473,9 @@ void mpodp_tx_update_cache(struct mpodp_if_priv *priv)
 				continue;
 
 			if (tx_head >= txq->mppa_size) {
-				netdev_err(priv->netdev, "Invalid head %d set in Txq[%d]\n", tx_head, txq->id);
+				if (netif_msg_tx_err(priv))
+					netdev_err(priv->netdev,
+						   "Invalid head %d set in Txq[%d]\n", tx_head, txq->id);
 				return;
 			}
 			/* In autoloop, we need to cache new elements */
@@ -505,7 +512,8 @@ void mpodp_tx_timer_cb(unsigned long data)
 		}
 		if (ready) {
 			mpodp_tx_update_cache(priv);
-			netdev_dbg(priv->netdev, "all queues are ready. Turning carrier ON\n");
+			if (netif_msg_link(priv))
+				netdev_info(priv->netdev, "all queues are ready. Turning carrier ON\n");
 			netif_carrier_on(priv->netdev);
 		}
 	}

@@ -8,6 +8,7 @@
 #define MPODP_NAPI_WEIGHT  NAPI_POLL_WEIGHT
 #define MPODP_MAX_TX_RECLAIM 16
 #define MPODP_TX_RECLAIM_PERIOD (HZ / 2)
+#define MPODP_DEFAULT_MSG (NETIF_MSG_DRV|NETIF_MSG_PROBE)
 
 /* Sufficient for K1B not for K1A but not expected to be used */
 #define MPODP_NOC_CHAN_COUNT 4
@@ -109,6 +110,8 @@ struct mpodp_if_priv {
 	struct pci_dev *pdev;	/* pointer to device structure */
 	const struct mpodp_pdata_priv *pdata_priv;
 	struct dentry *dir;
+
+	int msg_enable;
 
 	struct mpodp_if_config *config;
 	struct net_device *netdev;
