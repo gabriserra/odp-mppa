@@ -315,6 +315,8 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 			dev_err(&pdev->dev, "Failed to allocate consistent memory\n");
 			goto rx_alloc_failed;
 		}
+		*rxq->tail_host_addr = 0;
+
 		writel(rxq->tail_handle, desc_info_addr(smem_vaddr, config->c2h_addr[i], h_tail_addr));
 		rxq->tail_addr = desc_info_addr(smem_vaddr, config->c2h_addr[i], tail);
 		rxq->head = readl(rxq->head_addr);
