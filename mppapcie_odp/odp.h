@@ -5,9 +5,11 @@
 #define DMA_SUCCESS DMA_COMPLETE
 #endif
 
+#define MPODP_VERSION_STR "1.0.0"
 #define MPODP_NAPI_WEIGHT  NAPI_POLL_WEIGHT
 #define MPODP_MAX_TX_RECLAIM 16
 #define MPODP_TX_RECLAIM_PERIOD (HZ / 2)
+#define MPODP_DEFAULT_MSG (NETIF_MSG_DRV|NETIF_MSG_PROBE)
 
 /* Sufficient for K1B not for K1A but not expected to be used */
 #define MPODP_NOC_CHAN_COUNT 4
@@ -107,8 +109,10 @@ struct mpodp_if_priv {
 
 	struct mppa_pcie_device *pdata;
 	struct pci_dev *pdev;	/* pointer to device structure */
-
+	const struct mpodp_pdata_priv *pdata_priv;
 	struct dentry *dir;
+
+	int msg_enable;
 
 	struct mpodp_if_config *config;
 	struct net_device *netdev;
@@ -159,6 +163,7 @@ u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
 #endif
 );
 
+void mpodp_set_ethtool_ops(struct net_device *netdev);
 void mpodp_tx_timeout(struct net_device *netdev);
 void mpodp_tx_update_cache(struct mpodp_if_priv *priv);
 void mpodp_tx_timer_cb(unsigned long data);

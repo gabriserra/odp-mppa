@@ -12,6 +12,10 @@
  */
 
 /**
+ * Max length for a firmware name/version
+ */
+#define MPODP_MAX_FWVERS_LEN            32
+/**
  * Count of interfaces for one PCIe device
  */
 #define MPODP_MAX_IF_COUNT	                16
@@ -73,6 +77,7 @@ struct mpodp_if_config {
 struct mpodp_control {
 	uint32_t magic;		/*< Magic to test presence of control structure */
 	uint32_t if_count;	/*< Count of interfaces for this PCIe device */
+	char fw_version[MPODP_MAX_FWVERS_LEN];
 	struct mpodp_if_config configs[MPODP_MAX_IF_COUNT];
 } __attribute__ ((packed, aligned(8)));
 

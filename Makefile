@@ -115,9 +115,14 @@ $(K1ST_DIR)/share/odp/build/mk/platforms.inc: $(TOP_DIR)/mk/platforms.inc
 	install -D $< $@
 $(K1ST_DIR)/share/odp/build/apps/Makefile.apps: $(TOP_DIR)/apps/Makefile.apps
 	install -D $< $@
-firmware-common-install: $(patsubst %, $(K1ST_DIR)/share/odp/build/%, $(FIRMWARE_FILES))
+firmware-common-install: $(patsubst %, $(K1ST_DIR)/share/odp/build/%, $(FIRMWARE_FILES)) $(K1ST_DIR)/share/odp/build/firmware-version.mk
+
 $(patsubst %, $(K1ST_DIR)/share/odp/build/%, $(FIRMWARE_FILES)):  $(K1ST_DIR)/share/odp/build/%: %
 	install -D $< $@
+.PHONY: $(K1ST_DIR)/share/odp/build/firmware-version.mk
+$(K1ST_DIR)/share/odp/build/firmware-version.mk: 
+	echo  "FIRMWARE_VERSION := $$(scripts/git_hash.sh .)-inst" > $@
+
 template-install: $(patsubst apps/skel/%, $(K1ST_DIR)/share/odp/skel/%, $(TEMPLATE_FILES))
 $(patsubst apps/skel/%, $(K1ST_DIR)/share/odp/skel/%, $(TEMPLATE_FILES)): $(K1ST_DIR)/share/odp/skel/%: apps/skel/%
 	install -D $< $@

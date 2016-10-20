@@ -120,14 +120,14 @@ $(eval $(1)-$(2)-ENV := ODP_FIRMWARE_CONFIG="$(1)" INSTDIR="$(firmware_$(1)_INST
 firmware-$(2)-$(1)-configure: firmware/$(2)/Makefile
 firmware-$(2)-$(1)-build: firmware/$(2)/Makefile extra-install odp-k1b-kalray-mos_developer-install-headers
 	mkdir -p $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2)
-	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile all $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile all $($(1)-$(2)-ENV) FIRMWARE_VERSION=$$$$($(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
 
 firmware-$(2)-$(1)-install: firmware-$(2)-$(1)-build
-	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile install $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile install $($(1)-$(2)-ENV) FIRMWARE_VERSION=$$$$($(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
 firmware-$(2)-$(1)-valid: firmware-$(2)-$(1)-build
-	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile valid $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile valid $($(1)-$(2)-ENV) FIRMWARE_VERSION=$$$$($(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
 firmware-$(2)-$(1)-long: firmware-$(2)-$(1)-build
-	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile long $($(1)-$(2)-ENV)
+	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile long $($(1)-$(2)-ENV) FIRMWARE_VERSION=$$$$($(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
 firmware-$(2)-$(1)-clean:
 	rm -Rf $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2)
 endef
