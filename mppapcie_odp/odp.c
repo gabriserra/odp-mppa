@@ -30,6 +30,9 @@
 LIST_HEAD(netdev_device_list);
 DEFINE_MUTEX(netdev_device_list_mutex);
 
+static int debug = -1;
+module_param(debug, int, 0);
+MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
 static uint32_t mpodp_get_eth_control_addr(struct mppa_pcie_device *pdata)
 {
@@ -280,7 +283,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	priv->netdev = netdev;
 	priv->n_rxqs = config->n_rxqs;
 	priv->n_txqs = config->n_txqs;
-	priv->msg_enable = netif_msg_init(-1, MPODP_DEFAULT_MSG);
+	priv->msg_enable = netif_msg_init(debug, MPODP_DEFAULT_MSG);
 	atomic_set(&priv->reset, 0);
 
 	smem_vaddr = mppa_pcie_get_smem_vaddr(pdata);
