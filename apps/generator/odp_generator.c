@@ -683,7 +683,7 @@ int main(int argc, char * argv[])
 		EXAMPLE_ERR("Error: ODP local init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	my_sleep(5 + __k1_get_cluster_id() / 4);
+	my_sleep(1 + __k1_get_cluster_id() / 4);
 
 	/* init counters */
 	odp_atomic_init_u64(&counters.seq, 0);

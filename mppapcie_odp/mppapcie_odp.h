@@ -12,6 +12,10 @@
  */
 
 /**
+ * Max length for a firmware name/version
+ */
+#define MPODP_MAX_FWVERS_LEN            32
+/**
  * Count of interfaces for one PCIe device
  */
 #define MPODP_MAX_IF_COUNT	                16
@@ -73,6 +77,7 @@ struct mpodp_if_config {
 struct mpodp_control {
 	uint32_t magic;		/*< Magic to test presence of control structure */
 	uint32_t if_count;	/*< Count of interfaces for this PCIe device */
+	char fw_version[MPODP_MAX_FWVERS_LEN];
 	struct mpodp_if_config configs[MPODP_MAX_IF_COUNT];
 } __attribute__ ((packed, aligned(8)));
 
@@ -87,8 +92,8 @@ struct mpodp_h2c_entry {
  * RX (MPPA2Host) single entry descriptor (Updated by MPPA)
  */
 struct mpodp_c2h_entry {
-	uint64_t pkt_addr;	/*< Packet Address */
 	uint64_t data;		/*< Data for MPPA use */
+	uint32_t pkt_addr;	/*< Packet Address */
 	uint16_t len;		/*< Packet length */
 	uint16_t status;	/*< Packet status (errors, etc) */
 } __attribute__ ((packed, aligned(8)));
