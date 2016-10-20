@@ -142,6 +142,7 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 {
 	struct mpodp_rx *rx;
 	int limit, work_done = 0;
+	int early_exit = 0;
 
 	if (atomic_read(&priv->reset) == 1) {
 		/* Interface is reseting, do not start new transfers */
@@ -198,10 +199,11 @@ int mpodp_start_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq)
 		dev_kfree_skb_any(rx->skb);
 	      skb_failed:
 		/* napi will be rescheduled */
+		early_exit = 1;
 		break;
 	}
 
-	if (limit != rxq->tail) {
+	if (!early_exit && limit != rxq->tail) {
 		/* make the second part of the ring */
 		limit = rxq->tail;
 		rxq->avail = 0;
