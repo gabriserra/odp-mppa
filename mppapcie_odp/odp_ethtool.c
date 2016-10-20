@@ -70,10 +70,19 @@ static void mpodp_set_msglevel(struct net_device *netdev, u32 data)
 
 static u32 mpodp_get_link(struct net_device *netdev)
 {
-	struct mpodp_if_priv *priv = netdev_priv(netdev);
 	if (!netif_carrier_ok(netdev))
 		return 0;
 	return 1;
+}
+
+static void mpodp_get_ringparam(struct net_device *netdev,
+				struct ethtool_ringparam *ring)
+{
+	struct mpodp_if_priv *priv = netdev_priv(netdev);
+	ring->rx_pending =
+		ring->rx_max_pending = priv->rxqs[0].size;
+	ring->tx_pending = priv->txqs[0].size;
+	ring->tx_max_pending = MPODP_AUTOLOOP_DESC_COUNT;
 }
 
 static const struct ethtool_ops mpodp_ethtool_ops = {
@@ -84,6 +93,7 @@ static const struct ethtool_ops mpodp_ethtool_ops = {
 	.get_msglevel		= mpodp_get_msglevel,
 	.set_msglevel		= mpodp_set_msglevel,
 	.get_link               = mpodp_get_link,
+	.get_ringparam		= mpodp_get_ringparam,
 };
 
 void mpodp_set_ethtool_ops(struct net_device *netdev)
