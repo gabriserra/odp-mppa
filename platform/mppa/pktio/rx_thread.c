@@ -309,13 +309,6 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 
 
 	uint64_t pkt_ts = LOAD_U64(header->timestamp);
-
-	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
-	const mppa_ethernet_header_t *header;
-	header = (const mppa_ethernet_header_t*)
-		(((uint8_t *)pkt_hdr->buf_hdr.addr) +
-		 rx_config->pkt_offset);
-
 	union mppa_ethernet_header_info_t info;
 	info.dword = LOAD_U64(header->info);
 
