@@ -21,8 +21,8 @@
 static int mpodp_get_settings(struct net_device *netdev,
 			      struct ethtool_cmd *ecmd)
 {
-	ecmd->supported = SUPPORTED_40000baseSR4_Full | SUPPORTED_Autoneg;
-	ecmd->advertising = ADVERTISED_40000baseSR4_Full;
+	ecmd->supported = SUPPORTED_40000baseCR4_Full | SUPPORTED_Autoneg | SUPPORTED_Backplane;
+	ecmd->advertising = ADVERTISED_40000baseCR4_Full | ADVERTISED_Backplane | ADVERTISED_Autoneg;
 	ecmd->speed = SPEED_40000;
 	ecmd->duplex = DUPLEX_FULL;
 	ecmd->transceiver = XCVR_INTERNAL;
