@@ -9,10 +9,12 @@
 
 int odp_buffer_ring_get_multi(odp_buffer_ring_t *ring,
 			      odp_buffer_hdr_t *buffers[],
-			      unsigned n_buffers, uint32_t *left)
+			      unsigned n_buffers, unsigned divisor,
+			      uint32_t *left)
 {
 	uint32_t cons_head, prod_tail, cons_next;
 	unsigned n_bufs;
+	unsigned mask = (~0) << divisor;
 	if(n_buffers > POOL_MULTI_MAX)
 		n_buffers = POOL_MULTI_MAX;
 
@@ -35,6 +37,7 @@ int odp_buffer_ring_get_multi(odp_buffer_ring_t *ring,
 			if(avail < n_bufs)
 				n_bufs = avail;
 		}
+		n_bufs &= mask;
 		cons_next = cons_head + n_bufs;
 		if(cons_next > ring->buf_num)
 			cons_next = cons_next - ring->buf_num;

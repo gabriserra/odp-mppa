@@ -647,7 +647,7 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 
 	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring,
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	for (int i = 0; i < n_packet; ++i) {
 		odp_packet_t pkt = pkt_table[i];

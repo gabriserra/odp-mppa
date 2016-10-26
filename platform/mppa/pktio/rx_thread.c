@@ -758,7 +758,7 @@ int rx_thread_link_close(uint8_t pktio_id)
 			odp_buffer_hdr_t * buffers[10];
 			int nbufs;
 			while ((nbufs = odp_buffer_ring_get_multi(&ifce->ring,
-								  buffers, 10,
+								  buffers, 10, 0,
 								  NULL)) > 0) {
 				odp_buffer_free_multi((odp_buffer_t*)buffers,
 						      nbufs);
