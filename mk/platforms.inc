@@ -200,9 +200,3 @@ ioeth_CONFIGS += k1b-kalray_developer
 ioeth_CONFIGS += k1b-kalray_simu
 ioeth_CONFIGS += k1b-kalray_konic80
 ioeth_CONFIGS += k1b-kalray_emb01
-
-#
-# Netdev loopback
-#
-_netdev-loopback_CONFIGS += k1b-kalray_developer
-_netdev-loopback_CONFIGS += k1b-kalray_konic80
