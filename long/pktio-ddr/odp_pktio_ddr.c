@@ -173,7 +173,7 @@ static void *pktio_queue_thread(void *arg)
 		for (i = 0; i < pkts; i++) {
 			pkt_tbl[i] = odp_packet_from_event(ev_tbl[i]);
 			if (odp_packet_is_segmented(pkt_tbl[i])) {
-				odp_packet_t sub_pkts[_ODP_MAX_SUBPACKETS + 1];
+				odp_packet_t sub_pkts[_ODP_MAX_FRAGS];
 				int sub_count;
 
 				sub_count = _odp_packet_fragment(pkt_tbl[i], sub_pkts);
@@ -184,8 +184,8 @@ static void *pktio_queue_thread(void *arg)
 				}
 				pkt_tbl[i] = sub_pkts[0];
 				odp_packet_free_multi(sub_pkts + 1, sub_count - 1);
-			} else {
-				fprintf(stderr, "Packet is NOT fragmented\n");
+			} else if (_ODP_MAX_FRAGS > 1){
+				fprintf(stderr, "Packet is NOT fragmented %d\n", _ODP_MAX_FRAGS);
 				exit(1);
 			}
 		}
@@ -324,7 +324,7 @@ static void *pktio_direct_recv_thread(void *arg)
 				/* } */
 				pkt_tbl[i] = sub_pkts[0];
 				odp_packet_free_multi(sub_pkts + 1, sub_count - 1);
-			} else {
+			} else if (_ODP_MAX_FRAGS > 1){
 				fprintf(stderr, "Packet is NOT fragmented\n");
 				exit(1);
 			}
@@ -498,7 +498,7 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 		printf("TEST RESULT: %" PRIu64 " maximum packets per second.\n",
 		       maximum_pps);
 	printf("%lld packets total\n", pkts);
-	return pkts ==  300000 ? 0 : -1;
+	return (pkts ==  1200000 / _ODP_MAX_FRAGS) ? 0 : -1;
 }
 
 /**

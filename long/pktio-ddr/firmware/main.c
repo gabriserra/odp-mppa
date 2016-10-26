@@ -7,13 +7,15 @@
 #include <HAL/hal/hal.h>
 #include <mppa_routing.h>
 #include <mppa_noc.h>
+#include <odp.h>
 
 #include "rpc-server.h"
 #include "boot.h"
 
 /* If you change this, make sure to change the nfragments paremeter of the pktio */
-#define DATA_SIZE 2048
+
 #define PKTIO_MTU 512
+#define DATA_SIZE (PKTIO_MTU * _ODP_MAX_FRAGS)
 #define CNOC_RX 2
 #define MIN_TAG 200
 #define MAX_TAG 219
@@ -95,7 +97,8 @@ int main()
 			"pktio-ddr",
 			"-i", "ioddr0:min_rx=" TOSTRING(MIN_TAG)
 			":max_rx=" TOSTRING(MAX_TAG)
-			":log2fragments=2:cnoc=2:rrpolicy=20:rroffset=20:fc=1,drop",
+			":log2fragments=" TOSTRING(_ODP_LOG2MAX_FRAGS)
+			":cnoc=2:rrpolicy=20:rroffset=20:fc=1,drop",
 			"-m", "0",
 			"-s", "0",
 			"-t", "15",
