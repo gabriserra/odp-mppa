@@ -445,8 +445,9 @@ static void _poll_masks(int th_id)
 
 				/* Do not sort if there is more than 1 rx thread.
 				 * order will be broken anyway */
-				_sort_buffers(&hdr_list->head, &hdr_list->tail,
-					      hdr_list->count);
+				if (odp_global_data.sort_buffers)
+					_sort_buffers(&hdr_list->head, &hdr_list->tail,
+						      hdr_list->count);
 				hdr_list->count =
 					odp_buffer_ring_push_list(&rx_hdl.ifce[i].ring,
 								  &hdr_list->head,
