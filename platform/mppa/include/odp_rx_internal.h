@@ -23,7 +23,11 @@ extern "C" {
 
 #define RX_C2C_IF_BASE (RX_PCIE_IF_BASE + MAX_RX_PCIE_IF)
 #define MAX_RX_C2C_IF 16
-#define MAX_RX_IF (MAX_RX_ETH_IF + MAX_RX_PCIE_IF + MAX_RX_C2C_IF)
+
+#define RX_IODDR_IF_BASE (RX_C2C_IF_BASE + MAX_RX_C2C_IF)
+#define MAX_RX_IODDR_IF 2
+
+#define MAX_RX_IF (MAX_RX_ETH_IF + MAX_RX_PCIE_IF + MAX_RX_C2C_IF + MAX_RX_IODDR_IF)
 
 /** Maximum number of threads dedicated for Ethernet */
 #define MAX_RX_THR 6
@@ -39,6 +43,7 @@ typedef enum {
 	RX_IF_TYPE_ETH,
 	RX_IF_TYPE_PCI,
 	RX_IF_TYPE_C2C,
+	RX_IF_TYPE_IODDR,
 } rx_if_type_e;
 
 typedef struct {

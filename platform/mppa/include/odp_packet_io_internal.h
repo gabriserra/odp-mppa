@@ -115,6 +115,26 @@ typedef struct {
 	pkt_tx_uc_config tx_config;
 } pkt_eth_t;
 
+
+typedef struct {
+	odp_pool_t pool;                /**< pool to alloc packets from */
+	uint8_t mac_addr[ETH_ALEN];     /**< Interface Mac address */
+	uint16_t mtu;                   /**< Interface MTU */
+
+	/* Rx Data */
+	rx_config_t rx_config;
+	int promisc;
+	int log2_fragments;
+
+	uint8_t slot_id;                /**< IO Eth Id */
+
+	mppa_cnoc_config_t config;
+	mppa_cnoc_header_t header;
+	uint64_t pkt_count;
+
+	pkt_tx_uc_config tx_config;
+} pkt_ioddr_t;
+
 typedef struct {
 	odp_pool_t pool;                /**< pool to alloc packets from */
 	odp_spinlock_t wlock;           /**< Tx lock */
@@ -163,6 +183,7 @@ struct pktio_entry {
 		pkt_cluster_t pkt_cluster;
 		pkt_eth_t pkt_eth;
 		pkt_pcie_t pkt_pcie;
+		pkt_ioddr_t pkt_ioddr;
 	};
 	enum {
 		STATE_START = 0,
@@ -234,6 +255,7 @@ extern const pktio_if_ops_t cluster_pktio_ops;
 extern const pktio_if_ops_t eth_pktio_ops;
 extern const pktio_if_ops_t pcie_pktio_ops;
 extern const pktio_if_ops_t drop_pktio_ops;
+extern const pktio_if_ops_t ioddr_pktio_ops;
 extern const pktio_if_ops_t * const pktio_if_ops[];
 
 typedef struct _odp_pkt_iovec {
