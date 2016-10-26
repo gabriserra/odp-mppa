@@ -3,6 +3,16 @@
 
 #include <mppapcie_odp.h>
 
+/**
+ * Default MTU
+ */
+#define MPODP_DEFAULT_MTU		1500
+
+/**
+ * MAX MTU
+ */
+#define MPODP_MAX_MTU    		9000
+
 typedef struct {
 	uint8_t if_id;
 	uint8_t mac_addr[MAC_ADDR_LEN];	/*< Mac address */

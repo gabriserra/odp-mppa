@@ -25,12 +25,6 @@
  */
 #define MAC_ADDR_LEN				6
 
-/**
- * Default MTU
- */
-#define MPODP_DEFAULT_MTU		1500
-
-
 #define MPODP_CONTROL_STRUCT_MAGIC	0xCAFEBABE
 
 /**

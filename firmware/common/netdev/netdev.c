@@ -11,6 +11,7 @@
 #include <mppa/osconfig.h>
 #include <HAL/hal/hal.h>
 #include "netdev.h"
+#include "internal/netdev.h"
 #include "internal/cache.h"
 
 extern uint64_t RamBase;
@@ -202,6 +203,11 @@ static int netdev_setup_c2h(struct mpodp_if_config *if_cfg,
 		fprintf(stderr, "[netdev] MTU not configured\n");
 		return -1;
 	}
+	if (if_cfg->mtu > MPODP_MAX_MTU){
+		fprintf(stderr, "[netdev] MTU is too large\n");
+		return -1;
+	}
+
 	c2h = calloc (1, sizeof(*c2h));
 	if (!c2h)
 		return -1;
