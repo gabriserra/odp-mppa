@@ -23,6 +23,7 @@ extern "C" {
 typedef struct odp_platform_init_t {
 	unsigned n_rx_thr;              /**< Number of PE dedicated to handle
 					 *   incoming Rx packets */
+	unsigned enable_pkt_nofree;     /**< Enable usage of the nofree refcount in packets */
 } odp_platform_init_t;
 
 #ifdef __cplusplus
