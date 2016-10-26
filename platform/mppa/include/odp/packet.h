@@ -33,6 +33,8 @@ int _odp_packet_fragment(odp_packet_t pkt,
 			 odp_packet_t sub_pkts[_ODP_MAX_SUBPACKETS + 1]);
 void _odp_packet_mark_nofree(odp_packet_t pkt);
 
+void _odp_packet_mark_nofree(odp_packet_t pkt);
+
 static inline odp_packet_t odp_packet_from_event(odp_event_t ev)
 {
 	return (odp_packet_t)ev;
