@@ -203,6 +203,7 @@ int odp_packet_reset(odp_packet_t pkt, uint32_t len)
  *
  */
 
+#if _ODP_LOG2MAX_FRAGS != 0
 int odp_packet_is_segmented(odp_packet_t pkt)
 {
 	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
@@ -220,9 +221,8 @@ int odp_packet_num_segs(odp_packet_t pkt)
 	}
 	return 1 ;
 }
-
 int _odp_packet_fragment(odp_packet_t pkt,
-			 odp_packet_t sub_pkts[_ODP_MAX_SUBPACKETS + 1])
+			 odp_packet_t sub_pkts[_ODP_MAX_FRAGS])
 {
 	int i, count = 1;
 	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
@@ -240,6 +240,7 @@ int _odp_packet_fragment(odp_packet_t pkt,
 
 	return count;
 }
+#endif
 
 void *odp_packet_head(odp_packet_t pkt)
 {
