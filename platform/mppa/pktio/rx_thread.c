@@ -500,7 +500,7 @@ static void *_rx_thread_start(void *arg)
 	return NULL;
 }
 
-int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
+int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy, int min_rx, int max_rx)
 {
 	const int dma_if = 0;
 	if (rx_config->pktio_id >= MAX_RX_IF) {
@@ -515,17 +515,25 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 	rx_ifce_t *ifce =
 		&rx_hdl.ifce[rx_config->pktio_id];
 	char loopq_name[ODP_QUEUE_NAME_LEN];
+	int n_rx = 0, first_rx;
 
 	snprintf(loopq_name, sizeof(loopq_name), "%d-pktio_rx",
 		 rx_config->pktio_id);
 
+	if (min_rx >= 0 || max_rx >= 0) {
+		ODP_ASSERT(min_rx >= 0);
+		ODP_ASSERT(max_rx >= 0);
+		ODP_ASSERT(n_ports == max_rx - min_rx + 1);
+	}
+
 	/*
 	 * Allocate contiguous RX ports
 	 */
-	int n_rx, first_rx;
-
-	for (first_rx = 0; first_rx <  MPPA_DNOC_RX_QUEUES_NUMBER - n_ports;
-	     ++first_rx) {
+	if (min_rx < 0)
+		min_rx = 0;
+	if (max_rx < 0)
+		max_rx = MPPA_DNOC_RX_QUEUES_NUMBER - 1;
+	for (first_rx = min_rx; first_rx < max_rx + 2 - n_ports; ++first_rx) {
 		for (n_rx = 0; n_rx < n_ports; ++n_rx) {
 			mppa_noc_ret_t ret;
 			ret = mppa_noc_dnoc_rx_alloc(dma_if,
@@ -544,8 +552,8 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 		}
 	}
 	if (n_rx < n_ports) {
-		ODP_ASSERT(n_rx == 0);
 		ODP_ERR("failed to allocate %d contiguous Rx ports\n", n_ports);
+		ODP_ASSERT(n_rx == 0);
 		return -1;
 	}
 

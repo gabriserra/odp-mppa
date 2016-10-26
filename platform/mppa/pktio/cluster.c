@@ -302,7 +302,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		if (rret != MPPA_ROUTING_RET_SUCCESS)
 			return 1;
 
-		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx, rr_policy);
+		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx, rr_policy, -1, -1);
 		if(ret < 0) {
 			ODP_ERR("Failed to setup rx threads\n");
 			return -1;
