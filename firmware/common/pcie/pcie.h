@@ -5,9 +5,10 @@
 
 /**
  * Create and start if_count PCI interfaces with default settings
- * For custom settings, use netdev_init and then call pcie_start
+ * For custom settings, use netdev_init and then call pcie_start.
+ * If mtu is 0, default MTU is used
  */
-int pcie_init(int if_count);
+int pcie_init(int if_count, int mtu);
 
 /**
  * Start the PCI/netdev handler.

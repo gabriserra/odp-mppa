@@ -13,7 +13,7 @@ int main (int argc, char *argv[])
 
 	int ret, status;
 
-	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX, 0);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
 		exit(1);

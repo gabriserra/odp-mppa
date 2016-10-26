@@ -98,7 +98,7 @@ int pcie_start()
 	return 0;
 }
 
-int pcie_init(int if_count)
+int pcie_init(int if_count, int mtu)
 {
 #if defined(MAGIC_SCALL)
 	return 0;
@@ -111,7 +111,7 @@ int pcie_init(int if_count)
 
 	eth_if_cfg_t if_cfgs[if_count];
 	for (int i = 0; i < if_count; ++i){
-		if_cfgs[i].mtu = MPODP_DEFAULT_MTU;
+		if_cfgs[i].mtu = mtu ?: MPODP_DEFAULT_MTU;
 		if_cfgs[i].n_c2h_entries = C2H_RING_BUFFER_ENTRIES;
 		if_cfgs[i].n_h2c_entries = H2C_RING_BUFFER_ENTRIES;
 		if_cfgs[i].flags = 0;
