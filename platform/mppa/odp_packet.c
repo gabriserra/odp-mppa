@@ -49,6 +49,12 @@ void packet_parse_reset(odp_packet_hdr_t *pkt_hdr)
 	pkt_hdr->l4_protocol      = 0;
 }
 
+void _odp_packet_mark_nofree(odp_packet_t pkt)
+{
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	odp_atomic_store_u32(&pkt_hdr->nofree, 1);
+}
+
 /**
  * Initialize packet buffer
  */
@@ -75,6 +81,7 @@ void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 	pkt_hdr->l3_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->l4_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->payload_offset = ODP_PACKET_OFFSET_INVALID;
+	odp_atomic_init_u32(&pkt_hdr->nofree, 0);
 
  	/* Disable lazy parsing on user allocated packets */
 	if (!parse)
@@ -145,6 +152,10 @@ int odp_packet_alloc_multi(odp_pool_t pool_hdl, uint32_t len,
 void odp_packet_free(odp_packet_t pkt)
 {
 	odp_packet_hdr_t *const pkt_hdr = (odp_packet_hdr_t *)(pkt);
+	if (odp_global_data.enable_pkt_nofree)
+		if (_odp_atomic_u32_fetch_sub_mm(&pkt_hdr->nofree, 1, 0) != 0)
+			return;
+
 	if (pkt_hdr->input != ODP_PKTIO_INVALID){
 		ret_buf(&((pool_entry_t*)pkt_hdr->buf_hdr.pool_hdl)->s,
 			(odp_buffer_hdr_t **)&pkt_hdr, 1);
@@ -155,7 +166,21 @@ void odp_packet_free(odp_packet_t pkt)
 
 void odp_packet_free_multi(const odp_packet_t pkt[], int num)
 {
-	odp_buffer_free_multi((const odp_buffer_t *)pkt, num);
+	int free_base = 0;
+	if (odp_global_data.enable_pkt_nofree) {
+		for (int i = 0; i < num; ++i) {
+			/* If it's 1 someone else will free it. If it's -1 someone else freed
+			 * it and it should not have happened. */
+			if (_odp_atomic_u32_fetch_sub_mm(&odp_packet_hdr(pkt[i])->nofree, 1, 0) == 0)
+				continue;
+
+			/* We should not free this one. Free previous ones and skip to next */
+			odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), i - free_base);
+			free_base = i + 1;
+		}
+	}
+	if (free_base < num)
+		odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), num - free_base);
 }
 
 int odp_packet_reset(odp_packet_t pkt, uint32_t len)

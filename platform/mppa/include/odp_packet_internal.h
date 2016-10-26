@@ -134,6 +134,7 @@ typedef struct {
 	odp_pktio_t input;
 
 	uint32_t has_hash:1;      /**< Flow hash present */
+	odp_atomic_u32_t nofree;
 	uint32_t flow_hash;      /**< Flow hash value */
 
 	odp_crypto_generic_op_result_t op_result;  /**< Result for crypto */
@@ -223,11 +224,6 @@ static inline int packet_parse_l2_not_done(odp_packet_hdr_t *pkt_hdr)
 static inline int packet_parse_not_complete(odp_packet_hdr_t *pkt_hdr)
 {
 	return !pkt_hdr->input_flags.parsed_all;
-}
-
-static inline void packet_free_multi(odp_packet_t pkt_tbl[], unsigned len)
-{
-	odp_buffer_free_multi((odp_buffer_t *)pkt_tbl, len);
 }
 
 /* Forward declarations */

@@ -29,6 +29,8 @@ extern "C" {
  */
 #define _ODP_LOG2MAX_FRAGS         0
 
+void _odp_packet_mark_nofree(odp_packet_t pkt);
+
 static inline odp_packet_t odp_packet_from_event(odp_event_t ev)
 {
 	return (odp_packet_t)ev;
