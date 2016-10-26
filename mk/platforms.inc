@@ -200,3 +200,8 @@ ioeth_CONFIGS += k1b-kalray_developer
 ioeth_CONFIGS += k1b-kalray_simu
 ioeth_CONFIGS += k1b-kalray_konic80
 ioeth_CONFIGS += k1b-kalray_emb01
+
+#
+# IOETH storage
+#
+ioeth-storage_CONFIGS += k1b-kalray_konic80
