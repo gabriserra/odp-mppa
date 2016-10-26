@@ -51,6 +51,9 @@ typedef struct {
 	uint8_t pkt_offset;
 	rx_if_type_e if_type;
 	odp_buffer_ring_t *ring;
+	struct {
+		uint8_t flow_controlled : 1;
+	};
 } rx_config_t;
 
 union mppa_ethernet_header_info_t {
