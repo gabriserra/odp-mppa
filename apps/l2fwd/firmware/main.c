@@ -60,7 +60,7 @@ int main(int argc, char *const argv[])
 		{
 			static char const * _argv[] = {
 				"odp_l2fwd.kelf",
-				"-i", "e0:tags=120,e1:tags=120",
+				"-i", "e0:tags=120:rrpolicy=120:rroffset=120,e1:tags=120:rrpolicy=120",
 				"-m", "0",
 				"-s", "0",
 				"-c", "10", NULL
