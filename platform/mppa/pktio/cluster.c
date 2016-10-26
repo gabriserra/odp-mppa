@@ -287,8 +287,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		/* Setup Rx threads */
 		pkt_cluster->rx_config.dma_if = 0;
 		pkt_cluster->rx_config.pool = pool;
-		pkt_cluster->rx_config.pktio_id = MAX_RX_ETH_IF +
-			MAX_RX_PCIE_IF + cluster_id;
+		pkt_cluster->rx_config.pktio_id = RX_C2C_IF_BASE + cluster_id;
 		pkt_cluster->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 
 		if (cluster_init_cnoc_tx()) {
