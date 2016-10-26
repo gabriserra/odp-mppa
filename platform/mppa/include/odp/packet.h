@@ -27,6 +27,7 @@ extern "C" {
 /** @ingroup odp_packet
  *  @{
  */
+#define _ODP_LOG2MAX_FRAGS         0
 
 static inline odp_packet_t odp_packet_from_event(odp_event_t ev)
 {
@@ -38,17 +39,33 @@ static inline odp_event_t odp_packet_to_event(odp_packet_t pkt)
 	return (odp_event_t)pkt;
 }
 
+#if _ODP_LOG2MAX_FRAGS == 0
+#define _ODP_MAX_FRAGS                  1
+
+static inline int _odp_packet_fragment(odp_packet_t pkt,
+				       odp_packet_t sub_pkts[1]) {
+	sub_pkts[0] = pkt;
+	return 1;
+}
+
 static inline int odp_packet_is_segmented(odp_packet_t pkt)
 {
-	(void)pkt;
-	return 0;
+   (void)pkt;
+   return 0;
 }
 
 static inline int odp_packet_num_segs(odp_packet_t pkt)
 {
-	(void)pkt;
-	return 1;
+   (void)pkt;
+   return 1;
 }
+#else
+#define _ODP_MAX_FRAGS                  (1 << _ODP_LOG2MAX_FRAGS)
+int _odp_packet_fragment(odp_packet_t pkt,
+			 odp_packet_t sub_pkts[_ODP_MAX_FRAGS]);
+#endif
+
+#define _ODP_MAX_SUBPACKETS (_ODP_MAX_FRAGS - 1)
 
 static inline odp_packet_seg_t odp_packet_first_seg(odp_packet_t pkt)
 {

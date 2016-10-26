@@ -110,7 +110,7 @@ typedef union {
 typedef struct {
 	/* common buffer header */
 	odp_buffer_hdr_t buf_hdr;
-
+	odp_packet_t  sub_packets[_ODP_MAX_SUBPACKETS];
 	input_flags_t  input_flags;
 	error_flags_t  error_flags;
 	output_flags_t output_flags;
