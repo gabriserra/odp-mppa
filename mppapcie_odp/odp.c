@@ -281,7 +281,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	netdev->needed_headroom = sizeof(struct mpodp_pkt_hdr);
 	netdev->mtu = config->mtu < 1500 ? config->mtu : 1500;
 	memcpy(netdev->dev_addr, &(config->mac_addr), 6);
-	netdev->features |= NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_HW_CSUM;
+	netdev->features |= NETIF_F_SG | NETIF_F_HIGHDMA;
 	mpodp_set_ethtool_ops(netdev);
 
 	/* init priv */
