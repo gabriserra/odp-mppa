@@ -37,7 +37,8 @@ extern "C" {
 
 typedef enum {
 	RX_IF_TYPE_ETH,
-	RX_IF_TYPE_PCI
+	RX_IF_TYPE_PCI,
+	RX_IF_TYPE_C2C,
 } rx_if_type_e;
 
 typedef struct {
