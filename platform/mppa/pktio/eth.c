@@ -111,7 +111,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, rules);
 
-	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 30 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
