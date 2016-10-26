@@ -93,6 +93,7 @@ odprpcinclude_HEADERS = \
 		  $(srcdir)/include/odp/rpc/helpers.h \
 		  $(srcdir)/include/odp/rpc/pcie.h \
 		  $(srcdir)/include/odp/rpc/rnd.h \
+		  $(srcdir)/include/odp/rpc/fp.h \
 		  $(srcdir)/include/odp/rpc/rpc.h
 
 
