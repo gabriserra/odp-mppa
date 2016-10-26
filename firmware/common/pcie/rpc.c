@@ -107,6 +107,8 @@ static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
 	struct mppa_pcie_eth_dnoc_tx_cfg *tx_cfg;
 	int if_id = remoteClus % MPPA_PCIE_USABLE_DNOC_IF;
 	unsigned int tx_id;
+	const struct mpodp_if_config * cfg =
+		netdev_get_eth_if_config(open_cmd.pcie_eth_if_id);
 
 	dbg_printf("Received request to open PCIe\n");
 	if (!netdev_initialized) {
@@ -116,13 +118,18 @@ static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
 		}
 		netdev_initialized = 1;
 	}
+
+	if (open_cmd.pkt_size < cfg->mtu) {
+		PCIE_RPC_ERR_MSG(answer, "Cluster MTU %d is smaller than PCI MTU %d\n",
+				 open_cmd.pkt_size, cfg->mtu);
+		return;
+	}
 	int ret = pcie_setup_tx(if_id, &tx_id, remoteClus,
 							open_cmd.min_rx, open_cmd.max_rx);
 	if (ret) {
 		PCIE_RPC_ERR_MSG(answer, "Failed to setup tx on if %d\n", if_id);
 		return;
 	}
-
 	/*
 	 * Allocate contiguous RX ports
 	 */
@@ -195,7 +202,7 @@ static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
 	tx_cfg->cluster = remoteClus;
 	tx_cfg->fifo_addr = &mppa_dnoc[if_id]->tx_ports[tx_id].push_data;
 	tx_cfg->pcie_eth_if = open_cmd.pcie_eth_if_id;
-	tx_cfg->mtu = open_cmd.pkt_size;
+	tx_cfg->mtu = cfg->mtu;
 	tx_cfg->h2c_q = pcie_cluster_to_h2c_q(open_cmd.pcie_eth_if_id,
 					      remoteClus);
 
@@ -207,7 +214,7 @@ static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
 	answer->ack.cmd.pcie_open.max_tx_tag = max_tx_tag; /* RX ID ! */
 	answer->ack.cmd.pcie_open.tx_if = mppa_rpc_odp_get_cluster_id(if_id);
 	/* FIXME, we send the same MTU as the one received */
-	answer->ack.cmd.pcie_open.mtu = open_cmd.pkt_size;
+	answer->ack.cmd.pcie_open.mtu = cfg->mtu;
 	memcpy(answer->ack.cmd.pcie_open.mac,
 	       eth_ctrl->configs[open_cmd.pcie_eth_if_id].mac_addr,
 	       MAC_ADDR_LEN);

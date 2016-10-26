@@ -35,8 +35,6 @@ _ODP_STATIC_ASSERT(MAX_PCIE_INTERFACES * MAX_PCIE_SLOTS <= MAX_RX_PCIE_IF,
 #define NOC_PCIE_UC_COUNT	2
 #define DNOC_CLUS_IFACE_ID	0
 
-#define PKTIO_PKT_MTU	1500
-
 #include <mppa_bsp.h>
 #include <mppa_noc.h>
 #include <mppa_routing.h>
@@ -108,7 +106,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	mppa_rpc_odp_cmd_pcie_open_t open_cmd = {
 		{
 			.pcie_eth_if_id = pcie->pcie_eth_if_id,
-			.pkt_size = PKTIO_PKT_MTU,
+			.pkt_size = pcie->mtu,
 			.min_rx = pcie->rx_config.min_port,
 			.max_rx = pcie->rx_config.max_port,
 			.cnoc_rx = pcie->cnoc_rx,
@@ -249,6 +247,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	pcie->tx_config.nofree = nofree;
 	pcie->tx_config.add_end_marker = 1;
 
+	pcie->mtu = ((pool_entry_t*)pool)->s.params.pkt.len;
 	/* Setup Rx threads */
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
 		pcie->rx_config.dma_if = 0;
