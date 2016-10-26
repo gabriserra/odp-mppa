@@ -106,6 +106,8 @@ void eth_open(unsigned remoteClus, mppa_rpc_odp_t *msg,
 		memcpy(answer->ack.cmd.eth_open.mac, status[eth_if].mac_address[1], ETH_ALEN);
 	}
 
+	answer->ack.cmd.eth_open.lb_ts_off = lb_timestamp;
+
 	return;
  err:
 	ethtool_close_cluster(remoteClus, data.ifId, NULL);
