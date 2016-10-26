@@ -242,6 +242,8 @@ int odp_rpc_server_thread()
 			msg->rpc_err = -ret;
 			mppa_rpc_odp_server_ack(&answer);
 		}
+		uint64_t current_ts = __k1_read_dsu_timestamp();
+		while(__k1_read_dsu_timestamp() - current_ts < 20000);
 	}
 	return 0;
 }
