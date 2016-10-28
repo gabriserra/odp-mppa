@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
-#include <HAL/hal/hal.h>
 #include <mppa_routing.h>
 #include <mppa_noc.h>
 #include <odp.h>

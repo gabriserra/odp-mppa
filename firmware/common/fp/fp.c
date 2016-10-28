@@ -1,6 +1,5 @@
 #include <string.h>
 #include <inttypes.h>
-#include <HAL/hal/hal.h>
 #include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
 #include <mppa_noc.h>
