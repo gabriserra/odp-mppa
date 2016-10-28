@@ -43,6 +43,7 @@ $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)
 	--datarootdir=$(K1ST_DIR)share/odp-debug/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
+	--oldincludedir=$(K1ST_DIR)kalray_internal/odp/$($(1)_INC_DIR)/include \
 	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS) \
 	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-debug-config.cache
 
@@ -62,6 +63,7 @@ $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/l
 	--datarootdir=$(K1ST_DIR)share/odp/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
+	--oldincludedir=$(K1ST_DIR)kalray_internal/odp/$($(1)_INC_DIR)/include \
 	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) \
 	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-config.cache
 
