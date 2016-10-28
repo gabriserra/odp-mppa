@@ -20,7 +20,8 @@ int odp_init_global(const odp_init_t *params,
 	odp_global_data.log_fn = odp_override_log;
 	odp_global_data.abort_fn = odp_override_abort;
 	odp_global_data.n_rx_thr = DEF_N_RX_THR;
-
+	odp_global_data.enable_pkt_nofree = 0;
+	odp_global_data.sort_buffers = 0;
 	if (params != NULL) {
 		if (params->log_fn != NULL)
 			odp_global_data.log_fn = params->log_fn;
@@ -34,7 +35,13 @@ int odp_init_global(const odp_init_t *params,
 				platform_params->n_rx_thr > MAX_RX_THR ?
 				MAX_RX_THR : platform_params->n_rx_thr;
 		}
+		if (platform_params->sort_buffers)
+			odp_global_data.sort_buffers = 1;
+		odp_global_data.enable_pkt_nofree =
+			platform_params->enable_pkt_nofree;
 	}
+	if (odp_global_data.n_rx_thr == 1)
+		odp_global_data.sort_buffers = 1;
 
 	if (odp_time_global_init()) {
 		ODP_ERR("ODP time init failed.\n");

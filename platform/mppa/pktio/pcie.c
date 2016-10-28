@@ -34,8 +34,6 @@ _ODP_STATIC_ASSERT(MAX_PCIE_INTERFACES * MAX_PCIE_SLOTS <= MAX_RX_PCIE_IF,
 #define NOC_PCIE_UC_COUNT	2
 #define DNOC_CLUS_IFACE_ID	0
 
-#define PKTIO_PKT_MTU	1500
-
 #include <mppa_bsp.h>
 #include <mppa_noc.h>
 #include <mppa_routing.h>
@@ -107,7 +105,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	mppa_rpc_odp_cmd_pcie_open_t open_cmd = {
 		{
 			.pcie_eth_if_id = pcie->pcie_eth_if_id,
-			.pkt_size = PKTIO_PKT_MTU,
+			.pkt_size = pcie->mtu,
 			.min_rx = pcie->rx_config.min_port,
 			.max_rx = pcie->rx_config.max_port,
 			.cnoc_rx = pcie->cnoc_rx,
@@ -154,6 +152,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int ret = 0;
 	int nRx = N_RX_P_PCIE;
 	int rr_policy = -1;
+	int rr_offset = 0;
 	int port_id, slot_id;
 	int nofree = 0;
 
@@ -203,7 +202,15 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -239,15 +246,20 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	pcie->tx_config.nofree = nofree;
 	pcie->tx_config.add_end_marker = 1;
 
+	pcie->mtu = ((pool_entry_t*)pool)->s.params.pkt.len;
 	/* Setup Rx threads */
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
 		pcie->rx_config.dma_if = 0;
 		pcie->rx_config.pool = pool;
-		pcie->rx_config.pktio_id = slot_id * MAX_PCIE_INTERFACES + port_id +
+		pcie->rx_config.if_type = RX_IF_TYPE_PCI;
+		pcie->rx_config.pktio_id = RX_PCIE_IF_BASE +
+			slot_id * MAX_PCIE_INTERFACES + port_id +
 			MAX_RX_ETH_IF;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
+		pcie->rx_config.flow_controlled = 0;
+		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy,
+				    rr_offset, -1, -1);
 	}
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
@@ -354,7 +366,7 @@ static int pcie_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 
 	n_packet = odp_buffer_ring_get_multi(pcie->rx_config.ring,
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	for (int i = 0; i < n_packet; ++i) {
 		odp_packet_t pkt = pkt_table[i];

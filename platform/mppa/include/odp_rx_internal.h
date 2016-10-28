@@ -16,10 +16,20 @@ extern "C" {
 #include <HAL/hal/cluster/dnoc.h>
 
 #define N_EV_MASKS 4
+
+#define RX_ETH_IF_BASE 0
 #define MAX_RX_ETH_IF 10
+
+#define RX_PCIE_IF_BASE (RX_ETH_IF_BASE + MAX_RX_ETH_IF)
 #define MAX_RX_PCIE_IF 8
+
+#define RX_C2C_IF_BASE (RX_PCIE_IF_BASE + MAX_RX_PCIE_IF)
 #define MAX_RX_C2C_IF 16
-#define MAX_RX_IF (MAX_RX_ETH_IF + MAX_RX_PCIE_IF + MAX_RX_C2C_IF)
+
+#define RX_IODDR_IF_BASE (RX_C2C_IF_BASE + MAX_RX_C2C_IF)
+#define MAX_RX_IODDR_IF 2
+
+#define MAX_RX_IF (MAX_RX_ETH_IF + MAX_RX_PCIE_IF + MAX_RX_C2C_IF + MAX_RX_IODDR_IF)
 
 /** Maximum number of threads dedicated for Ethernet */
 #define MAX_RX_THR 6
@@ -33,7 +43,9 @@ extern "C" {
 
 typedef enum {
 	RX_IF_TYPE_ETH,
-	RX_IF_TYPE_PCI
+	RX_IF_TYPE_PCI,
+	RX_IF_TYPE_C2C,
+	RX_IF_TYPE_IODDR,
 } rx_if_type_e;
 
 typedef struct {
@@ -46,6 +58,9 @@ typedef struct {
 	uint8_t pkt_offset;
 	rx_if_type_e if_type;
 	odp_buffer_ring_t *ring;
+	struct {
+		uint8_t flow_controlled : 1;
+	};
 } rx_config_t;
 
 union mppa_ethernet_header_info_t {
@@ -81,7 +96,9 @@ static inline void mppa_ethernet_header_print(const mppa_ethernet_header_t *hdr)
 }
 
 int rx_thread_init(void);
-int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy);
+int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
+			int rr_policy, int rr_offset,
+			int min_rx, int max_rx);
 int rx_thread_link_close(uint8_t pktio_id);
 int rx_thread_destroy(void);
 int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,

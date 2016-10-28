@@ -218,7 +218,9 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int cluster_id;
 	int nRx = 3;
 	int rr_policy = -1;
+	int rr_offset = 0;
 	int nofree = 0;
+	int flow_controlled = 0;
 
 	/* String should in the following format: "cluster<cluster_id>" */
 	if(strncmp("cluster", devname, strlen("cluster")))
@@ -246,13 +248,29 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		}  else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
 		} else if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
 			nofree = 1;
+		} else if (!strncmp(pptr, "fc=", strlen("fc="))){
+			pptr += strlen("fc=");
+			flow_controlled = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid fc %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -286,10 +304,10 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		/* Setup Rx threads */
 		pkt_cluster->rx_config.dma_if = 0;
 		pkt_cluster->rx_config.pool = pool;
-		pkt_cluster->rx_config.pktio_id = MAX_RX_ETH_IF +
-			MAX_RX_PCIE_IF + cluster_id;
+		pkt_cluster->rx_config.pktio_id = RX_C2C_IF_BASE + cluster_id;
 		pkt_cluster->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-
+		pkt_cluster->rx_config.if_type = RX_IF_TYPE_C2C;
+		pkt_cluster->rx_config.flow_controlled = flow_controlled;
 		if (cluster_init_cnoc_tx()) {
 			ODP_ERR("Failed to initialize CNoC Rx\n");
 			return -1;
@@ -302,7 +320,8 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		if (rret != MPPA_ROUTING_RET_SUCCESS)
 			return 1;
 
-		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx, rr_policy);
+		ret = rx_thread_link_open(&pkt_cluster->rx_config, nRx,
+					  rr_policy, rr_offset, -1, -1);
 		if(ret < 0) {
 			ODP_ERR("Failed to setup rx threads\n");
 			return -1;
@@ -454,7 +473,7 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 
 	n_packet = odp_buffer_ring_get_multi(clus->rx_config.ring,
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	if (!n_packet)
 		return 0;

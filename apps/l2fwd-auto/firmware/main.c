@@ -34,7 +34,7 @@ int main(int argc, char *const argv[])
 	if (!n_clusters) n_clusters = 1;
 	if (n_clusters > 14) n_clusters = 14;
 
-	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX, 0);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
 		exit(1);

@@ -26,14 +26,14 @@ bindir      = $(datarootdir)/$(subst $(top_srcdir)/,,$(srcdir))
 
 install-exec-local:
 	mkdir -p $(DESTDIR)/$(bindir)
-	( echo "#!/bin/bash -ex"; \
+	@( echo "#!/bin/bash -ex"; \
 	  echo "export $(TESTS_ENVIRONMENT)";\
 	  echo 'cd $$(readlink -e $$(dirname $$0))';\
 	  for test in $(TESTS); do \
 		echo "$$(echo $(subst $(top_srcdir)/,,$(srcdir)) | sed -e 's/[a-zA-Z0-9]*/../g')/../../ktest-wrapper.sh $${test}"; \
 	  done) > $(DESTDIR)/$(bindir)/runtests.sh
 	chmod +x $(DESTDIR)/$(bindir)/runtests.sh
-	( \
+	@( \
 	  echo '# Generated test file'; \
 	  echo 'SET(ENV{LD_LIBRARY_PATH} ../lib/host/:$$ENV{LD_LIBRARY_PATH})'; \
 	  echo 'SET(ENV{PATH} ./:$$ENV{PATH})'; \
@@ -52,7 +52,7 @@ install-exec-local:
 		  echo 'SET_TESTS_PROPERTIES($$test_name PROPERTIES COST "0")';\
 	  done \
 	 ) > $(DESTDIR)/$(bindir)/CTestTestfile.cmake
-	 ( \
+	 @( \
 	   echo 'Name: odp'; \
 	   echo 'BuildName: odp'; \
 	   echo "Site: $$(hostname)" \

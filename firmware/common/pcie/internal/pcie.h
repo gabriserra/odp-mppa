@@ -8,6 +8,7 @@
 #include "internal/rpc-server.h"
 #include "ring.h"
 #include "mppapcie_odp.h"
+#include "netdev.h"
 #include "internal/netdev.h"
 
 #define MPPA_PCIE_USABLE_DNOC_IF	4
@@ -17,7 +18,7 @@
 /**
  * PKT size
  */
-#define MPPA_PCIE_MULTIBUF_PKT_SIZE	(9*1024)
+#define MPPA_PCIE_MULTIBUF_PKT_SIZE	(MPODP_MAX_MTU + sizeof(struct mpodp_pkt_hdr) + 8)
 
 /**
  * Packets per multi buffer
@@ -57,13 +58,13 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 static inline unsigned pcie_cluster_to_h2c_q(unsigned pcie_eth_if_id,
 					     unsigned remoteClus)
 {
-	return remoteClus % eth_control.configs[pcie_eth_if_id].n_txqs;
+	return remoteClus % eth_ctrl->configs[pcie_eth_if_id].n_txqs;
 }
 
 static inline unsigned pcie_cluster_to_c2h_q(unsigned pcie_eth_if_id,
 					     unsigned remoteClus)
 {
-	return remoteClus % eth_control.configs[pcie_eth_if_id].n_rxqs;
+	return remoteClus % eth_ctrl->configs[pcie_eth_if_id].n_rxqs;
 }
 
 static inline

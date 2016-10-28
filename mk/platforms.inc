@@ -240,7 +240,6 @@ ioeth_CONFIGS += k1b-kalray_ab04
 ioeth_CONFIGS += k1b-kalray_emb01
 
 #
-# Netdev loopback
+# IOETH storage
 #
-_netdev-loopback_CONFIGS += k1b-kalray_developer
-_netdev-loopback_CONFIGS += k1b-kalray_konic80
+ioeth-storage_CONFIGS += k1b-kalray_konic80

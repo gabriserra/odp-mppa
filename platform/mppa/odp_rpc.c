@@ -99,12 +99,17 @@ static const char * const rpc_cmd_rnd_names[MPPA_RPC_ODP_CMD_RND_N_CMD] = {
 	MPPA_RPC_ODP_CMD_NAMES_RND
 };
 
+static const char * const rpc_cmd_fp_names[MPPA_RPC_ODP_CMD_FP_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_FP
+};
+
 static const char * const * const rpc_cmd_names[MPPA_RPC_ODP_N_CLASS] = {
 	[MPPA_RPC_ODP_CLASS_BAS] = rpc_cmd_bas_names,
 	[MPPA_RPC_ODP_CLASS_ETH] = rpc_cmd_eth_names,
 	[MPPA_RPC_ODP_CLASS_PCIE] = rpc_cmd_pcie_names,
 	[MPPA_RPC_ODP_CLASS_C2C] = rpc_cmd_c2c_names,
 	[MPPA_RPC_ODP_CLASS_RND] = rpc_cmd_rnd_names,
+	[MPPA_RPC_ODP_CLASS_FP] = rpc_cmd_fp_names,
 };
 
 static const int rpc_n_cmds[MPPA_RPC_ODP_N_CLASS] = {
@@ -113,6 +118,7 @@ static const int rpc_n_cmds[MPPA_RPC_ODP_N_CLASS] = {
 	[MPPA_RPC_ODP_CLASS_PCIE] = MPPA_RPC_ODP_CMD_PCIE_N_CMD,
 	[MPPA_RPC_ODP_CLASS_C2C] = MPPA_RPC_ODP_CMD_C2C_N_CMD,
 	[MPPA_RPC_ODP_CLASS_RND] = MPPA_RPC_ODP_CMD_RND_N_CMD,
+	[MPPA_RPC_ODP_CLASS_FP] = MPPA_RPC_ODP_CMD_FP_N_CMD,
 };
 
 void mppa_rpc_odp_print_msg(const mppa_rpc_odp_t * cmd, const uint8_t *payload)
