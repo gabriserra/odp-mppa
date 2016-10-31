@@ -299,19 +299,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
-
-	/* Move timestamp to order so it can be sorted in the ring buf */
-	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
-	const mppa_ethernet_header_t *header;
-	header = (const mppa_ethernet_header_t*)
-		(((uint8_t *)pkt_hdr->buf_hdr.addr) +
-		 rx_config->pkt_offset);
-
-
-	uint64_t pkt_ts = LOAD_U64(header->timestamp);
+	uint64_t pkt_ts = 0ULL;
 	union mppa_ethernet_header_info_t info;
-	info.dword = LOAD_U64(header->info);
-
 
 	if (odp_unlikely(pkt == ODP_PACKET_INVALID)){
 		if (rx_hdl.tag[rx_id].broken) {
@@ -321,6 +310,15 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 			if_th->oom_pkts++;
 		}
 	} else {
+		odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
+		const mppa_ethernet_header_t *header;
+		header = (const mppa_ethernet_header_t*)
+			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
+			 rx_config->pkt_offset);
+
+		LOAD_U64(header->timestamp);
+		info.dword = LOAD_U64(header->info);
+
 		/* Move timestamp to order so it can be sorted in the ring buf */
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
 		if (info._.pkt_size < sizeof(*header)) {
