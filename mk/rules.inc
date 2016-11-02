@@ -47,7 +47,7 @@ $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)
 	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-debug-config.cache
 
 odp-debug-$(1)-build: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
-	$$(MAKE) -C$$$$(basename $$@)V=1 all
+	$$(MAKE) -C$$$$(dirname $$<) V=1 all
 odp-debug-$(1)-clean:
 	rm -Rf $(ODP_$(1)_DEBUG_BUILDDIR)
 
