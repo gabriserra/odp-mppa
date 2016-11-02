@@ -39,8 +39,9 @@ static inline void odp_atomic_store_u32(odp_atomic_u32_t *atom,
 
 static inline void odp_atomic_init_u32(odp_atomic_u32_t *atom, uint32_t val)
 {
-	STORE_U64(atom->_u64, 0ULL);
-	STORE_U32(atom->v, val);
+	odp_atomic_u32_t new = { ._u64 = 0ULL };
+	new.v = val;
+	STORE_U64(atom->_u64, new._u64);
 }
 
 static inline uint32_t odp_atomic_fetch_add_u32(odp_atomic_u32_t *atom,
