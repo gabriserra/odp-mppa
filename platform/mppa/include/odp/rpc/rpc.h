@@ -14,6 +14,7 @@ typedef struct {
 #include <odp/rpc/pcie.h>
 #include <odp/rpc/c2c.h>
 #include <odp/rpc/rnd.h>
+#include <odp/rpc/fp.h>
 
 typedef enum {
 	MPPA_RPC_ODP_ERR_NONE = 0,
@@ -53,6 +54,7 @@ typedef enum {
 	MPPA_RPC_ODP_CLASS_PCIE,
 	MPPA_RPC_ODP_CLASS_C2C,
 	MPPA_RPC_ODP_CLASS_RND,
+	MPPA_RPC_ODP_CLASS_FP,
 	MPPA_RPC_ODP_N_CLASS
 } mppa_rpc_odp_class_e;
 
@@ -67,6 +69,7 @@ typedef union {
 			MPPA_RPC_ODP_ACK_LIST_PCIE
 			MPPA_RPC_ODP_ACK_LIST_C2C
 			MPPA_RPC_ODP_ACK_LIST_RND
+			MPPA_RPC_ODP_ACK_LIST_FP
 		} cmd;
 	};
 	mppa_rpc_odp_inl_data_t inl_data;

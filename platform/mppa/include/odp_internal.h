@@ -37,6 +37,8 @@ struct odp_global_data_s {
 	odp_abort_func_t abort_fn;
 	odp_system_info_t system_info;
 	uint32_t n_rx_thr;
+	uint32_t enable_pkt_nofree;
+	uint32_t sort_buffers;
 };
 
 extern struct odp_global_data_s odp_global_data;

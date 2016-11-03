@@ -581,7 +581,7 @@ int get_buf_multi(struct pool_entry_s *pool, odp_buffer_hdr_t *buffers[],
 	if(n_buffers > POOL_MULTI_MAX)
 		n_buffers = POOL_MULTI_MAX;
 
-	n_bufs = odp_buffer_ring_get_multi(&pool->ring, buffers, n_buffers,
+	n_bufs = odp_buffer_ring_get_multi(&pool->ring, buffers, n_buffers, 0,
 					   POOL_HAS_LOCAL_CACHE ?
 					   &bufcount : NULL);
 	/* Check for low watermark condition */

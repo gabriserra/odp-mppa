@@ -173,5 +173,6 @@ static inline void _eth_lb_status_init(eth_lb_status_t * status)
 }
 extern eth_status_t status[N_ETH_LANE];
 extern eth_lb_status_t lb_status;
+extern uint64_t lb_timestamp;
 
 #endif /* __FIRMWARE__IOETH__ETH__H__ */

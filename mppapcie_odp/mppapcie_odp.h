@@ -18,18 +18,12 @@
 /**
  * Count of interfaces for one PCIe device
  */
-#define MPODP_MAX_IF_COUNT	                16
+#define MPODP_MAX_IF_COUNT	                1
 
 /**
  * Mac address length
  */
 #define MAC_ADDR_LEN				6
-
-/**
- * Default MTU
- */
-#define MPODP_DEFAULT_MTU		1500
-
 
 #define MPODP_CONTROL_STRUCT_MAGIC	0xCAFEBABE
 

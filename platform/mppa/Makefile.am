@@ -93,6 +93,7 @@ odprpcinclude_HEADERS = \
 		  $(srcdir)/include/odp/rpc/helpers.h \
 		  $(srcdir)/include/odp/rpc/pcie.h \
 		  $(srcdir)/include/odp/rpc/rnd.h \
+		  $(srcdir)/include/odp/rpc/fp.h \
 		  $(srcdir)/include/odp/rpc/rpc.h
 
 
@@ -144,6 +145,7 @@ __LIB__libodp_la_SOURCES = \
 			   pktio/io_ops.c \
 			   pktio/eth.c \
 			   pktio/pcie.c \
+			   pktio/ioddr.c \
 			   pktio/cluster.c \
 			   pktio/drop.c \
 			   pktio/magic.c \

@@ -111,7 +111,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, rules);
 
-	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 30 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
@@ -125,6 +125,8 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 
 	eth->tx_if = ack.cmd.eth_open.tx_if;
 	eth->tx_tag = ack.cmd.eth_open.tx_tag;
+	eth->lb_ts_off = ack.cmd.eth_open.lb_ts_off;
+
 	memcpy(eth->mac_addr, ack.cmd.eth_open.mac, 6);
 	eth->mtu = ack.cmd.eth_open.mtu;
 
@@ -325,6 +327,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int ret = 0;
 	int nRx = N_RX_P_ETH;
 	int rr_policy = -1;
+	int rr_offset = 0;
 	int port_id, slot_id;
 	int loopback = 0;
 	int nofree = 0;
@@ -381,7 +384,15 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -467,9 +478,12 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		/* Setup Rx threads */
 		eth->rx_config.dma_if = 0;
 		eth->rx_config.pool = pool;
-		eth->rx_config.pktio_id = slot_id * MAX_ETH_PORTS + port_id;
+		eth->rx_config.if_type = RX_IF_TYPE_ETH;
+		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		ret = rx_thread_link_open(&eth->rx_config, nRx, rr_policy);
+		eth->rx_config.flow_controlled = 0;
+		ret = rx_thread_link_open(&eth->rx_config, nRx, rr_policy,
+					  rr_offset, -1, -1);
 		if(ret < 0)
 			return -1;
 	}
@@ -634,7 +648,7 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 
 	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring,
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	for (int i = 0; i < n_packet; ++i) {
 		odp_packet_t pkt = pkt_table[i];

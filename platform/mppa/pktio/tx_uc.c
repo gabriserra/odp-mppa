@@ -42,12 +42,28 @@ uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 	for (uint64_t pos = head; pos < head + count; pos++) {
 		if(pos >= MAX_JOB_PER_UC){
 			tx_uc_job_ctx_t *job = &ctx->job_ctxs[pos % MAX_JOB_PER_UC];
+			unsigned free_base = 0;
+
 			INVALIDATE(job);
 			if (!job->pkt_count || job->nofree)
 				continue;
 
-			packet_free_multi(job->pkt_table,
-					  job->pkt_count);
+			for (unsigned i = 0; i < job->pkt_count; ++i) {
+				/* If it's 1 someone else will free it. If it's -1 someone else freed
+				 * it and it should not have happened. */
+				if (_odp_atomic_u32_fetch_sub_mm(&odp_packet_hdr(job->pkt_table[i])->nofree, 1, 0) == 0)
+					continue;
+
+				/* We have a nofree. Free the previous ones */
+				odp_packet_free_multi(job->pkt_table + free_base,
+						  i - free_base);
+				/* Switch free base to the next.
+				 * This one is not to be freed */
+				free_base = i + 1;
+			}
+			if (free_base < job->pkt_count)
+				odp_packet_free_multi(job->pkt_table + free_base,
+						      job->pkt_count  - free_base);
 		}
 	}
 	return head;

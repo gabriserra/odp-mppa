@@ -42,7 +42,7 @@ int main(int argc, char *const argv[])
 	}
 
 
-	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX);
+	ret = pcie_init(MPPA_PCIE_ETH_IF_MAX, 0);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to initialize PCIe eth interface\n");
 		exit(1);
@@ -59,7 +59,7 @@ int main(int argc, char *const argv[])
 		{
 			static char const * _argv[] = {
 				"odp_l2fwd.kelf",
-				"-i", "e0:tags=120,e1:tags=120",
+				"-i", "e0:tags=120:rrpolicy=120:rroffset=120,e1:tags=120:rrpolicy=120",
 				"-m", "0",
 				"-s", "0",
 				"-c", "10", NULL

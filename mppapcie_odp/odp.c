@@ -156,6 +156,15 @@ static int mpodp_close(struct net_device *netdev)
 	return 0;
 }
 
+static int mpodp_change_mtu(struct net_device *dev, int new_mtu)
+{
+	struct mpodp_if_priv *priv = netdev_priv(dev);
+	if (new_mtu < 68 || new_mtu > priv->config->mtu)
+		return -EINVAL;
+	dev->mtu = new_mtu;
+	return 0;
+}
+
 static const struct net_device_ops mpodp_ops = {
 	.ndo_open = mpodp_open,
 	.ndo_stop = mpodp_close,
@@ -163,6 +172,7 @@ static const struct net_device_ops mpodp_ops = {
 	.ndo_select_queue = mpodp_select_queue,
 	.ndo_get_stats = mpodp_get_stats,
 	.ndo_tx_timeout = mpodp_tx_timeout,
+	.ndo_change_mtu = mpodp_change_mtu,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller = mpodp_poll_controller,
 #endif
@@ -269,9 +279,9 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	/* init netdev */
 	netdev->netdev_ops = &mpodp_ops;
 	netdev->needed_headroom = sizeof(struct mpodp_pkt_hdr);
-	netdev->mtu = config->mtu;
+	netdev->mtu = config->mtu < 1500 ? config->mtu : 1500;
 	memcpy(netdev->dev_addr, &(config->mac_addr), 6);
-	netdev->features |= NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_HW_CSUM;
+	netdev->features |= NETIF_F_SG | NETIF_F_HIGHDMA;
 	mpodp_set_ethtool_ops(netdev);
 
 	/* init priv */
