@@ -9,7 +9,8 @@
 $LOAD_PATH.push('metabuild/lib')
 require 'metabuild'
 include Metabuild
-CONFIGS = `make list-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
+BUILD_CONFIGS = `make list-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
+VALID_CONFIGS = `make list-long-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
 
 APP_NAME = "ODP-perf"
 
@@ -17,15 +18,15 @@ options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path t
                         "local-run"     => {"type" => "string", "default" => "0", "help" => "Run target locally"},
                         "debug"         => {"type" => "boolean", "default" => false, "help" => "Debug mode." },
                         "list-configs"  => {"type" => "boolean", "default" => false, "help" => "List all targets" },
-                        "configs"       => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
-                        "valid-configs" => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
+                        "configs"       => {"type" => "string", "default" => BUILD_CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{BUILD_CONFIGS.keys.join(" ")}" },
+                        "valid-configs" => {"type" => "string", "default" => VALID_CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{VALID_CONFIGS.keys.join(" ")}" },
                         "output-dir"    => [nil, "Output directory for RPMs."],
                         "k1version"     => ["unknown", "K1 Tools version required for building ODP applications"],
                         "librariesversion" => ["", "k1-libraries version required for building ODP applications"],
                      })
 
 if options["list-configs"] == true then
-    puts CONFIGS.map(){|n, i| n}.join("\n")
+    puts BUILD_CONFIGS.map(){|n, i| n}.join("\n")
     exit 0
 end
 workspace  = options["workspace"]
@@ -120,7 +121,7 @@ end
 if configs == nil then
     configs = (options["configs"].split(" ")).uniq
     configs.each(){|conf|
-        raise ("Invalid config '#{conf}'") if CONFIGS[conf] == nil
+        raise ("Invalid config '#{conf}'") if BUILD_CONFIGS[conf] == nil
     }
 end
 
@@ -153,6 +154,10 @@ end
 
 b.target("valid") do
     b.logtitle = "Report for odp tests."
+    if valid_type == "jtag" then
+	b.run(:cmd => "(/usr/sbin/lsmod | grep mppapcie_odp) ||"+
+		      " (sudo /usr/sbin/modprobe mppapcie_odp)", :env => $env)
+    end
     cd odp_path
 
     b.valid(:cmd => "make valid CONFIGS='#{valid_configs.join(" ")}'")
@@ -166,16 +171,48 @@ b.target("valid") do
     end
 end
 
+b.target("valid-packages") do
+    b.logtitle = "Report for odp tests."
+
+    valid_configs.each(){|conf|
+	cd odp_path
+	cmd = "make --no-print-directory valid-packages-dir-#{conf}"
+	b.run(:cmd => cmd,
+	      :end => $env)
+
+	odp_valid_name = `#{cmd}`.chomp()
+        platform, board = odp_valid_name.split("_")
+	p odp_valid_name
+	p platform
+	p board
+        [ "platform/mppa/test", "test/performance", "helper/test"].each(){|dir|
+            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/tests", board,
+                         platform, dir)
+            testEnv = $env.merge({ :test_name => "valid-#{conf}-#{dir}"})
+          b.ctest( {
+                        :ctest_args => "",
+                        :fail_msg => "Failed to validate #{conf}",
+                        :success_msg => "Successfully validated #{conf}",
+                        :env => testEnv,
+                    })
+        }
+    }
+end
 
 b.target("long-build") do
     b.logtitle = "Report for odp tests."
     cd odp_path
 
-    b.run(:cmd => "make long-install CONFIGS='#{configs.join(" ")}' LONG_CONFIGS='#{configs.join(" ")}'")
+    b.run(:cmd => "make long-install CONFIGS='#{configs.join(" ")}'")
 end
 
 b.target("long") do
     b.logtitle = "Report for odp tests."
+    if valid_type == "jtag" then
+	b.run(:cmd => "(/usr/sbin/lsmod | grep mppapcie_odp) ||"+
+		      " (sudo /usr/sbin/modprobe mppapcie_odp)", :env => $env)
+    end
+
     cd odp_path
 
     valid_configs.each(){|conf|
@@ -209,27 +246,6 @@ b.target("long") do
     end
 end
 
-
-b.target("valid-packages") do
-    b.logtitle = "Report for odp tests."
-
-    valid_configs.each(){|conf|
-        board=conf.split("_")[1]
-        platform=conf.split("_")[0]
-        [ "platform/mppa/test", "test/performance", "helper/test"].each(){|dir|
-            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/tests", board,
-                         platform, dir)
-            testEnv = $env.merge({ :test_name => "valid-#{conf}-#{dir}"})
-           b.ctest( {
-                         :ctest_args => "",
-                         :fail_msg => "Failed to validate #{conf}",
-                         :success_msg => "Successfully validated #{conf}",
-                         :env => testEnv,
-                     })
-        }
-    }
-end
-
 b.target("apps") do
     b.logtitle = "Report for odp apps."
     cd odp_path
@@ -255,6 +271,7 @@ b.target("package") do
     b.run(:cmd => "cd install/; tar cf ../odp-tests.tar local/k1tools/share/odp/tests local/k1tools/share/odp/long local/k1tools/share/odp/perf", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-apps-internal.tar local/k1tools/share/odp/apps", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-headers-internal.tar local/k1tools/kalray_internal/odp", :env => $env)
 
     (version,releaseID,sha1) = repo.describe()
     release_info = b.release_info(version,releaseID,sha1)
@@ -303,6 +320,16 @@ b.target("package") do
     package_description = "K1 ODP CUnit (k1-odp-cunit-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp-cunit", release_info,
                            package_description,
+                           depends, "/usr", workspace)
+    b.create_package(tar_package, pinfo)
+
+    #K1 ODP Internal Headers
+    tar_package = File.expand_path("odp-headers-internal.tar")
+    depends = []
+    depends.push b.depends_info_struct.new("k1-odp","=", release_info.full_version)
+    package_description = "K1 ODP Internal Headers  (k1-odp-headers-internal-#{version}-#{releaseID} sha1 #{sha1})."
+    pinfo = b.package_info("k1-odp-headers-internal", release_info,
+                           package_description, 
                            depends, "/usr", workspace)
     b.create_package(tar_package, pinfo)
 

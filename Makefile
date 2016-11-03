@@ -67,9 +67,9 @@ $(foreach APP, $(APPS), \
 		$(eval $(call APP_RULE,$(APP))))
 
 #
-# Define firmware rules for all firmwares and all their targets
+# Define long rules for all boards and all their targets
 #
-$(foreach CONFIG, $(_CONFIGS) $(CONFIGS), \
+$(foreach CONFIG, $(_LONG_CONFIGS), \
 	$(eval $(call LONG_CONFIG_RULE,$(CONFIG))))
 
 #
@@ -194,6 +194,8 @@ junits:
 
 list-configs:
 	@echo $(CONFIGS)
+list-long-configs:
+	@echo $(LONG_CONFIGS)
 
 
 distclean: clean

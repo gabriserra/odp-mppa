@@ -1,6 +1,10 @@
 CONFIGS :=
 K1_CONFIGS :=
 _CONFIGS :=
+BOARDS :=
+_BOARDS :=
+OSs :=
+_OSs :=
 
 $(foreach FIRM, $(FIRMWARES), $(eval $(FIRM)_CONFIGS := ))
 $(foreach FIRM, $(FIRMWARES), $(eval _$(FIRM)_CONFIGS := ))
@@ -13,16 +17,16 @@ CCACHE := $(shell which ccache 2>/dev/null)
 #
 #
 #
-k1b-kalray-nodeos_developer_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-nodeos_developer_CONF_OPTS   :=
-k1b-kalray-nodeos_developer_CFLAGS      := -march=k1b -DK1_NODEOS
-k1b-kalray-nodeos_developer_LDFLAGS     :=
-k1b-kalray-nodeos_developer_PLATFORM    := mppa
-k1b-kalray-nodeos_developer_INC_DIR     := k1-nodeos
-k1b-kalray-nodeos_developer_MAKE_VALID  := -j1
-k1b-kalray-nodeos_developer_INSTALL     := true
-k1b-kalray-nodeos_developer_VALID_TYPE  := jtag
-K1_CONFIGS += k1b-kalray-nodeos_developer
+k1b-kalray-nodeos_hw_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
+k1b-kalray-nodeos_hw_CONF_OPTS   :=
+k1b-kalray-nodeos_hw_CFLAGS      := -march=k1b -DK1_NODEOS
+k1b-kalray-nodeos_hw_LDFLAGS     :=
+k1b-kalray-nodeos_hw_PLATFORM    := mppa
+k1b-kalray-nodeos_hw_INC_DIR     := k1-nodeos
+k1b-kalray-nodeos_hw_MAKE_VALID  := -j1
+k1b-kalray-nodeos_hw_INSTALL     := true
+k1b-kalray-nodeos_hw_VALID_TYPE  := jtag
+K1_CONFIGS += k1b-kalray-nodeos_hw
 
 k1b-kalray-nodeos_explorer_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
 k1b-kalray-nodeos_explorer_CONF_OPTS   :=
@@ -46,50 +50,18 @@ k1b-kalray-nodeos_simu_INSTALL     := true
 k1b-kalray-nodeos_simu_VALID_TYPE  := simu
 K1_CONFIGS += k1b-kalray-nodeos_simu
 
-k1b-kalray-nodeos_konic80_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-nodeos_konic80_CONF_OPTS   :=
-k1b-kalray-nodeos_konic80_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=konic80
-k1b-kalray-nodeos_konic80_LDFLAGS     :=
-k1b-kalray-nodeos_konic80_PLATFORM    := mppa
-k1b-kalray-nodeos_konic80_INC_DIR     := k1-nodeos
-k1b-kalray-nodeos_konic80_MAKE_VALID  := -j1
-k1b-kalray-nodeos_konic80_INSTALL     := true
-k1b-kalray-nodeos_konic80_VALID_TYPE  := jtag
-K1_CONFIGS += k1b-kalray-nodeos_konic80
-
-k1b-kalray-nodeos_ab04_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-nodeos_ab04_CONF_OPTS   :=
-k1b-kalray-nodeos_ab04_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=ab04
-k1b-kalray-nodeos_ab04_LDFLAGS     :=
-k1b-kalray-nodeos_ab04_PLATFORM    := mppa
-k1b-kalray-nodeos_ab04_INC_DIR     := k1-nodeos
-k1b-kalray-nodeos_ab04_MAKE_VALID  := -j1
-k1b-kalray-nodeos_ab04_INSTALL     := true
-K1_CONFIGS += k1b-kalray-nodeos_ab04
-
-k1b-kalray-nodeos_emb01_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-nodeos_emb01_CONF_OPTS   :=
-k1b-kalray-nodeos_emb01_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=emb01
-k1b-kalray-nodeos_emb01_LDFLAGS     :=
-k1b-kalray-nodeos_emb01_PLATFORM    := mppa
-k1b-kalray-nodeos_emb01_INC_DIR     := k1-nodeos
-k1b-kalray-nodeos_emb01_MAKE_VALID  := -j1
-k1b-kalray-nodeos_emb01_INSTALL     := true
-k1b-kalray-nodeos_emb01_VALID_TYPE  := remote
-K1_CONFIGS += k1b-kalray-nodeos_emb01
-
-k1b-kalray-mos_developer_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-mos_developer_CONF_OPTS   :=
-k1b-kalray-mos_developer_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS
-k1b-kalray-mos_developer_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
+k1b-kalray-mos_hw_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
+k1b-kalray-mos_hw_CONF_OPTS   :=
+k1b-kalray-mos_hw_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS
+k1b-kalray-mos_hw_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
 				   -Wl,--undefined=DEBUGGER_HAVE_USER_MODE_SUPPORT
-k1b-kalray-mos_developer_PLATFORM    := mppa
-k1b-kalray-mos_developer_INC_DIR     := k1-elf
-k1b-kalray-mos_developer_MAKE_VALID  := -j1
-k1b-kalray-mos_developer_INSTALL     := true
-k1b-kalray-mos_developer_INSTALL_DOC := true
-k1b-kalray-mos_developer_VALID_TYPE  := jtag
-K1_CONFIGS += k1b-kalray-mos_developer
+k1b-kalray-mos_hw_PLATFORM    := mppa
+k1b-kalray-mos_hw_INC_DIR     := k1-elf
+k1b-kalray-mos_hw_MAKE_VALID  := -j1
+k1b-kalray-mos_hw_INSTALL     := true
+k1b-kalray-mos_hw_INSTALL_DOC := true
+k1b-kalray-mos_hw_VALID_TYPE  := jtag
+K1_CONFIGS += k1b-kalray-mos_hw
 
 k1b-kalray-mos_explorer_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
 k1b-kalray-mos_explorer_CONF_OPTS   :=
@@ -102,41 +74,6 @@ k1b-kalray-mos_explorer_MAKE_VALID  := -j1
 k1b-kalray-mos_explorer_INSTALL     := true
 k1b-kalray-mos_explorer_VALID_TYPE  := jtag
 _CONFIGS += k1b-kalray-mos_explorer
-
-k1b-kalray-mos_konic80_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-mos_konic80_CONF_OPTS   :=
-k1b-kalray-mos_konic80_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -mboard=konic80
-k1b-kalray-mos_konic80_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
-				   -Wl,--undefined=DEBUGGER_HAVE_USER_MODE_SUPPORT
-k1b-kalray-mos_konic80_PLATFORM    := mppa
-k1b-kalray-mos_konic80_INC_DIR     := k1-elf
-k1b-kalray-mos_konic80_MAKE_VALID  := -j1
-k1b-kalray-mos_konic80_INSTALL     := true
-k1b-kalray-mos_konic80_VALID_TYPE  := jtag
-K1_CONFIGS += k1b-kalray-mos_konic80
-
-k1b-kalray-mos_ab04_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-mos_ab04_CONF_OPTS   :=
-k1b-kalray-mos_ab04_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -mboard=ab04
-k1b-kalray-mos_ab04_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
-				   -Wl,--undefined=DEBUGGER_HAVE_USER_MODE_SUPPORT
-k1b-kalray-mos_ab04_PLATFORM    := mppa
-k1b-kalray-mos_ab04_INC_DIR     := k1-elf
-k1b-kalray-mos_ab04_MAKE_VALID  := -j1
-k1b-kalray-mos_ab04_INSTALL     := true
-K1_CONFIGS += k1b-kalray-mos_ab04
-
-k1b-kalray-mos_emb01_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-mos_emb01_CONF_OPTS   :=
-k1b-kalray-mos_emb01_CFLAGS      := -march=k1b -mhypervisor -DK1_MOS -mboard=emb01
-k1b-kalray-mos_emb01_LDFLAGS     := -mhypervisor -lvbsp -lutask -Wl,--defsym=USER_STACK_SIZE=5120 \
-				   -Wl,--undefined=DEBUGGER_HAVE_USER_MODE_SUPPORT
-k1b-kalray-mos_emb01_PLATFORM    := mppa
-k1b-kalray-mos_emb01_INC_DIR     := k1-elf
-k1b-kalray-mos_emb01_MAKE_VALID  := -j1
-k1b-kalray-mos_emb01_INSTALL     := true
-k1b-kalray-mos_emb01_VALID_TYPE  := remote
-K1_CONFIGS += k1b-kalray-mos_emb01
 
 k1b-kalray-mos_simu_CONF_ENV    := CC="$(CCACHE) k1-gcc"  CXX="$(CCACHE) k1-g++" STRIP="k1-strip --strip-debug"
 k1b-kalray-mos_simu_CONF_OPTS   :=
@@ -153,8 +90,6 @@ K1_CONFIGS += k1b-kalray-mos_simu
 
 CONFIGS += $(K1_CONFIGS)
 
-# Buid long for all BUT x86_64
-LONG_CONFIGS ?= $(K1_CONFIGS)
 #
 #
 #
@@ -243,3 +178,52 @@ ioeth_CONFIGS += k1b-kalray_emb01
 # IOETH storage
 #
 ioeth-storage_CONFIGS += k1b-kalray_konic80
+
+#
+#
+#
+# Board Definitions
+#
+#
+#
+BOARD_developer     := developer
+BOARD_developer_VER := hw
+BOARDS              += developer
+
+BOARD_simu          := developer
+BOARD_simu_VER      := simu
+BOARDS              += simu
+
+BOARD_explorer      := explorer
+BOARD_explorer_VER  := explorer
+_BOARDS              += explorer
+
+BOARD_konic80       := konic80
+BOARD_konic80_VER   := hw
+BOARDS              += konic80
+
+BOARD_emb01         := emb01
+BOARD_emb01_VER     := hw
+BOARDS              += emb01
+
+BOARD_ab04          := ab04
+BOARD_ab04_VER      := hw
+BOARDS              += ab04
+
+#
+#
+#
+# OS Definitions
+#
+#
+#
+OS_mos := bare
+OSs += mos
+
+OS_nodeods := nodeos
+OSs += nodeos
+
+LONG_CONFIGS ?= $(foreach OS, $(OSs),\
+					 $(foreach BOARD, $(BOARDS), k1b-kalray-$(OS)_$(BOARD)))
+_LONG_CONFIGS ?= $(foreach OS, $(OSs) $(_OSs),\
+					 $(foreach BOARD, $(BOARDS) $(_BOARDS), k1b-kalray-$(OS)_$(BOARD)))
