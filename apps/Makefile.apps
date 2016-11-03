@@ -8,28 +8,20 @@ APST_DIR ?= $(shell pwd)/install
 ODP_TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
 include $(ODP_TOOLCHAIN_DIR)/share/odp/build/mk/platforms.inc
 
-INCLUDE_DIR=$($(ODP_ARCH)_INC_DIR)
 # Kalray internal system name
 SYSTEM_NAME = $(subst -kalray,,$(ODP_ARCH))
 CORE_ARCH = $(firstword $(subst -, ,$(ODP_ARCH)))
 OS_PLAT_NAME  = $(firstword $(subst _, ,$(ODP_ARCH)))
 OS_BOARD_NAME = $(lastword $(subst _, ,$(ODP_ARCH)))
 
-# -mos option according to real os name
-OS_mos := bare
-OS_nodeos := nodeos
-OS_rtems := rtems
-BOARD_developer := developer
-BOARD_simu := developer
-BOARD_explorer := explorer
-BOARD_konic80 := konic80
-BOARD_ab04 := ab04
-
 # extract OS name and board name
 REAL_OS_NAME = $(lastword $(subst -, ,$(OS_PLAT_NAME)))
 OS_NAME = $(OS_$(REAL_OS_NAME))
 BOARD_NAME = $(BOARD_$(lastword $(subst _, ,$(OS_BOARD_NAME))))
+ODP_FLAVOUR = $(BOARD_$(lastword $(subst _, ,$(OS_BOARD_NAME)))_VER)
 
+REAL_ODP_ARCH = $(OS_PLAT_NAME)_$(ODP_FLAVOUR)
+INCLUDE_DIR=$($(REAL_ODP_ARCH)_INC_DIR)
 
 cluster-system := $(OS_NAME)
 arch = $(CORE_ARCH)
@@ -45,8 +37,8 @@ endif
 FIRMWARE_DIR = $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/
 
 cluster-cflags := -I$(ODP_TOOLCHAIN_DIR)/$(INCLUDE_DIR)/include
-cluster-lflags := -L$(ODP_TOOLCHAIN_DIR)/lib/odp/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/
-cluster-lflags += -lodphelper -lodp -lcrypto  $(LIB_NOC_LFLAGS) $($(ODP_ARCH)_LDFLAGS) -Wl,--gc-sections
+cluster-lflags := -L$(ODP_TOOLCHAIN_DIR)/lib/odp/$(ODP_FLAVOUR)/$(OS_PLAT_NAME)/
+cluster-lflags += -lodphelper -lodp -lcrypto  $(LIB_NOC_LFLAGS) $($(REAL_ODP_ARCH)_LDFLAGS) -Wl,--gc-sections
 
 # Empty direct assignement to allows += to work in included Makefiles
 io-bin :=

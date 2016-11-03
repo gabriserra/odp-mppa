@@ -9,7 +9,8 @@
 $LOAD_PATH.push('metabuild/lib')
 require 'metabuild'
 include Metabuild
-CONFIGS = `make list-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
+BUILD_CONFIGS = `make list-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
+VALID_CONFIGS = `make list-long-configs`.split(" ").inject({}){|x, c| x.merge({ c => {} })}
 
 APP_NAME = "ODP-perf"
 
@@ -17,15 +18,15 @@ options = Options.new({ "k1tools"       => [ENV["K1_TOOLCHAIN_DIR"].to_s,"Path t
                         "local-run"     => {"type" => "string", "default" => "0", "help" => "Run target locally"},
                         "debug"         => {"type" => "boolean", "default" => false, "help" => "Debug mode." },
                         "list-configs"  => {"type" => "boolean", "default" => false, "help" => "List all targets" },
-                        "configs"       => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
-                        "valid-configs" => {"type" => "string", "default" => CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{CONFIGS.keys.join(" ")}" },
+                        "configs"       => {"type" => "string", "default" => BUILD_CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{BUILD_CONFIGS.keys.join(" ")}" },
+                        "valid-configs" => {"type" => "string", "default" => VALID_CONFIGS.keys.join(" "), "help" => "Build configs. Default = #{VALID_CONFIGS.keys.join(" ")}" },
                         "output-dir"    => [nil, "Output directory for RPMs."],
                         "k1version"     => ["unknown", "K1 Tools version required for building ODP applications"],
                         "librariesversion" => ["", "k1-libraries version required for building ODP applications"],
                      })
 
 if options["list-configs"] == true then
-    puts CONFIGS.map(){|n, i| n}.join("\n")
+    puts BUILD_CONFIGS.map(){|n, i| n}.join("\n")
     exit 0
 end
 workspace  = options["workspace"]
@@ -120,7 +121,7 @@ end
 if configs == nil then
     configs = (options["configs"].split(" ")).uniq
     configs.each(){|conf|
-        raise ("Invalid config '#{conf}'") if CONFIGS[conf] == nil
+        raise ("Invalid config '#{conf}'") if BUILD_CONFIGS[conf] == nil
     }
 end
 
@@ -170,12 +171,39 @@ b.target("valid") do
     end
 end
 
+b.target("valid-packages") do
+    b.logtitle = "Report for odp tests."
+
+    valid_configs.each(){|conf|
+	cd odp_path
+	cmd = "make --no-print-directory valid-packages-dir-#{conf}"
+	b.run(:cmd => cmd,
+	      :end => $env)
+
+	odp_valid_name = `#{cmd}`.chomp()
+        platform, board = odp_valid_name.split("_")
+	p odp_valid_name
+	p platform
+	p board
+        [ "platform/mppa/test", "test/performance", "helper/test"].each(){|dir|
+            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/tests", board,
+                         platform, dir)
+            testEnv = $env.merge({ :test_name => "valid-#{conf}-#{dir}"})
+          b.ctest( {
+                        :ctest_args => "",
+                        :fail_msg => "Failed to validate #{conf}",
+                        :success_msg => "Successfully validated #{conf}",
+                        :env => testEnv,
+                    })
+        }
+    }
+end
 
 b.target("long-build") do
     b.logtitle = "Report for odp tests."
     cd odp_path
 
-    b.run(:cmd => "make long-install CONFIGS='#{configs.join(" ")}' LONG_CONFIGS='#{configs.join(" ")}'")
+    b.run(:cmd => "make long-install CONFIGS='#{configs.join(" ")}'")
 end
 
 b.target("long") do
@@ -216,27 +244,6 @@ b.target("long") do
         b.run("tar -cvf perffiles.tar *.perf")
         b.run("mv perffiles.tar #{artifacts}")
     end
-end
-
-
-b.target("valid-packages") do
-    b.logtitle = "Report for odp tests."
-
-    valid_configs.each(){|conf|
-        board=conf.split("_")[1]
-        platform=conf.split("_")[0]
-        [ "platform/mppa/test", "test/performance", "helper/test"].each(){|dir|
-            cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/tests", board,
-                         platform, dir)
-            testEnv = $env.merge({ :test_name => "valid-#{conf}-#{dir}"})
-           b.ctest( {
-                         :ctest_args => "",
-                         :fail_msg => "Failed to validate #{conf}",
-                         :success_msg => "Successfully validated #{conf}",
-                         :env => testEnv,
-                     })
-        }
-    }
 end
 
 b.target("apps") do

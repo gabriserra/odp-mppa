@@ -120,7 +120,7 @@ define FIRMWARE_RULE
 #$(2) Firmware type
 $(eval $(1)-$(2)-ENV := ODP_FIRMWARE_CONFIG="$(1)" INSTDIR="$(firmware_$(1)_INSTDIR)" ODP_TOOLCHAIN_DIR="$(K1ST_DIR)" FIRMWARE_VERSION="$(FIRMWARE_VERSION)")
 firmware-$(2)-$(1)-configure: firmware/$(2)/Makefile
-firmware-$(2)-$(1)-build: firmware/$(2)/Makefile extra-install odp-k1b-kalray-mos_developer-install-headers
+firmware-$(2)-$(1)-build: firmware/$(2)/Makefile extra-install odp-k1b-kalray-mos_hw-install-headers
 	mkdir -p $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2)
 	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile all $($(1)-$(2)-ENV)
 
@@ -158,7 +158,7 @@ CHECK_LIST +=  $(foreach APP, $(LONGS), $(foreach CONFIG, $(LONG_CONFIGS), long-
 
 # Generate per config rules (clean/build/etc) for each arch specific component
 $(foreach ARCH_COMPONENT, $(ARCH_COMPONENTS), \
-$(ARCH_COMPONENT)-$(1): $(foreach CONFIG, $(CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
+$(ARCH_COMPONENT)-$(1): $(foreach CONFIG, $(LONG_CONFIGS), $(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1))
 CHECK_LIST += $(foreach CONFIG, $(CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
 )
 endef
@@ -196,19 +196,19 @@ define LONG_RULE
 
 long-$(1)-$(2)-configure: long/$(2)/Makefile
 long-$(1)-$(2)-install: long-$(1)-$(2)-build
-	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
+	cd $(ARCH_DIR)/long/$(LONG_$(1)_BOARD_NAME)/$(LONG_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile install \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1)
 
 long-$(1)-$(2)-valid: long-$(1)-$(2)-install extra-install
-	cd $(LONT_DIR)/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && ctest -L $($(1)_VALID_TYPE)
+	cd $(LONT_DIR)/$(LONG_$(1)_BOARD_NAME)/$(LONG_$(1)_OS_NAME)/$(2) && ctest -L $($(1)_VALID_TYPE)
 
 long-$(1)-$(2)-build: long-$(1)-$(2)-configure
-	mkdir -p $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
-	cd $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile \
+	mkdir -p $(ARCH_DIR)/long/$(LONG_$(1)_BOARD_NAME)/$(LONG_$(1)_OS_NAME)/$(2)
+	cd $(ARCH_DIR)/long/$(LONG_$(1)_BOARD_NAME)/$(LONG_$(1)_OS_NAME)/$(2) && $$(MAKE) -f $(TOP_DIR)/long/$(2)/Makefile \
 	LONT_DIR=$(LONT_DIR) ODP_TOOLCHAIN_DIR=$(K1ST_DIR)/ ODP_ARCH=$(1) all
 
 long-$(1)-$(2)-clean:
-	rm -Rf $(ARCH_DIR)/long/$(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME)/$(2)
+	rm -Rf $(ARCH_DIR)/long/$(LONG_$(1)_BOARD_NAME)/$(LONG_$(1)_OS_NAME)/$(2)
 endef
 
 #
@@ -216,6 +216,10 @@ endef
 #
 define LONG_CONFIG_RULE
 #$(1) CONFIG
+
+$(eval LONG_$(1)_OS_NAME := $(firstword $(subst _, ,$(1))))
+$(eval LONG_$(1)_BOARD_NAME := $(lastword $(subst _, ,$(1))))
+$(eval LONG_$(1)_ARCH_BUILDDIR := $(LONG_$(1)_BOARD_NAME)/$(LONG_$(1)_OS_NAME))
 
 long-$(1)-configure:
 long-$(1)-install: $(foreach APP, $(LONGS), long-$(1)-$(APP)-install)
@@ -227,15 +231,18 @@ long-$(1)-install: $(foreach APP, $(LONGS), long-$(1)-$(APP)-install)
 	  	  	   	   find . -mindepth 2 -name CTestTestfile.cmake -exec dirname {} \;); do \
 		  echo "SUBDIRS($$$$test)"; \
 	  done \
-	 ) > $(LONT_DIR)/$(ODP_$(1)_ARCH_BUILDDIR)/CTestTestfile.cmake
+	 ) > $(LONT_DIR)/$(LONG_$(1)_ARCH_BUILDDIR)/CTestTestfile.cmake
 
 long-$(1)-valid: $(foreach APP, $(LONGS), long-$(1)-$(APP)-install) extra-install
-	cd $(LONT_DIR)/$(ODP_$(1)_ARCH_BUILDDIR) && ctest -L $(if $(findstring simu,$(1)),sim,jtag)
+	cd $(LONT_DIR)/$(LONG_$(1)_ARCH_BUILDDIR) && ctest -L $(if $(findstring simu,$(1)),sim,jtag)
 
 long-$(1)-build: $(foreach APP, $(LONGS), long-$(1)-$(APP)-build)
 
 long-$(1)-clean: $(foreach APP, $(LONGS), long-$(1)-$(APP)-clean)
 	rm -Rf $(ARCH_DIR)/long/$(1)
+
+valid-packages-dir-$(1):
+	@echo $(LONG_$(1)_OS_NAME)_$(BOARD_$(LONG_$(1)_BOARD_NAME)_VER)
 
 $(foreach APP, $(LONGS), $(eval $(call LONG_RULE,$(1),$(APP))))
 endef
