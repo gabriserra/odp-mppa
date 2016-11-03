@@ -153,6 +153,10 @@ end
 
 b.target("valid") do
     b.logtitle = "Report for odp tests."
+    if valid_type == "jtag" then
+	b.run(:cmd => "(/usr/sbin/lsmod | grep mppapcie_odp) ||"+
+		      " (sudo /usr/sbin/modprobe mppapcie_odp)", :env => $env)
+    end
     cd odp_path
 
     b.valid(:cmd => "make valid CONFIGS='#{valid_configs.join(" ")}'")
@@ -176,6 +180,11 @@ end
 
 b.target("long") do
     b.logtitle = "Report for odp tests."
+    if valid_type == "jtag" then
+	b.run(:cmd => "(/usr/sbin/lsmod | grep mppapcie_odp) ||"+
+		      " (sudo /usr/sbin/modprobe mppapcie_odp)", :env => $env)
+    end
+
     cd odp_path
 
     valid_configs.each(){|conf|
