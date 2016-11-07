@@ -64,10 +64,11 @@ for size in packet_sizes:
 
 		jtag_p.kill()
 		jtag_p.wait()
-	except KeyboardInterrupt:
+	except:
 		try:
 			jtag_p.kill()
 			jtag_p.wait()
+			exit(1)
 		except OSError:
-			pass
+			exit(1)
 
