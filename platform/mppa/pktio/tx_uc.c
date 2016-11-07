@@ -67,7 +67,8 @@ void tx_uc_commit(tx_uc_ctx_t *ctx, uint64_t slot,
 }
 
 int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
-	       uintptr_t ucode, int add_header)
+	       uintptr_t ucode, int add_header,
+	       uint32_t pointer_mask)
 {
 	int i;
 	mppa_noc_ret_t ret;
@@ -112,7 +113,7 @@ int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
 				& _scoreboard_start.SCB_UC.trs[uc_ctx_table[i].dnoc_uc_id][j];
 			trs->notify._word = 0;
 			trs->desc.param_set = 0xff;
-			trs->desc.pointer_set = 0xf;
+			trs->desc.pointer_set = pointer_mask;
 			trs->desc.path_updt = 1;
 			trs->desc.vid = COLOR_ID;
 		}
