@@ -38,7 +38,8 @@ typedef struct {
 } tx_uc_ctx_t;
 
 int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
-	       uintptr_t ucode, int add_header);
+	       uintptr_t ucode, int add_header,
+	       uint32_t pointer_mask);
 uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 			      unsigned int count);
 
