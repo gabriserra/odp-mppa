@@ -73,12 +73,12 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 
 	if (work < budget && !work_pending) {
 		if (!priv->interrupt_status) {
-
 			priv->interrupt_status = 1;
 			writel(1, priv->interrupt_status_addr);
-		} else {
+			/* Force one more round in case we missed an IT */
+			work = budget;
+		} else
 			napi_complete(napi);
-		}
 	} else {
 	  	work = budget;
 		if (priv->interrupt_status) {
