@@ -315,8 +315,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		header = (const mppa_ethernet_header_t*)
 			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			 rx_config->pkt_offset);
-
-		LOAD_U64(header->timestamp);
+		
+		pkt_ts = LOAD_U64(header->timestamp);
 		info.dword = LOAD_U64(header->info);
 
 		/* Move timestamp to order so it can be sorted in the ring buf */
@@ -432,8 +432,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list[queue];
 		if_th->queue_mask |= (1 << queue);
 
-
-		mppa_tracepoint(odp, rx_thread, pkt, pkt_ts + rx_config->pktio->pkt_eth.lb_ts_off);
+		mppa_tracepoint(odp, rx_thread, pkt, pkt_ts + rx_config->pktio->pkt_eth.lb_ts_off, ((uint32_t) info._.pkt_size));
 
 		if_th->recv_pkts++;
 		*(hdr_list->tail) = (odp_buffer_hdr_t *)pkt;
