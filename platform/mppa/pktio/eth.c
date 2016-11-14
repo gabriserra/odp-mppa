@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <odp/thread.h>
+#include <odp/cpu.h>
 #include <odp/cpumask.h>
 #include <HAL/hal/hal.h>
 #include <odp/errno.h>
@@ -19,6 +19,7 @@
 
 #include <odp_classification_internal.h>
 #include "odp_pool_internal.h"
+#include "odp_macros_internal.h"
 #include "odp_rx_internal.h"
 #include "odp_tx_uc_internal.h"
 
@@ -630,8 +631,9 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 {
 	int n_packet;
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+	odp_buffer_ring_t *ring = rx_get_ring(&eth->rx_config);
 
-	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring,
+	n_packet = odp_buffer_ring_get_multi(ring,
 					     (odp_buffer_hdr_t **)pkt_table,
 					     len, 0, NULL);
 

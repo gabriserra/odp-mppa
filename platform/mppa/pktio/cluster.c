@@ -438,6 +438,7 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 {
 	int n_packet;
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
+	odp_buffer_ring_t *ring;
 
 	if (clus->remote.cnoc_rx < 0) {
 		/* We need to sync with the target first */
@@ -446,7 +447,9 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 		}
 	}
 
-	n_packet = odp_buffer_ring_get_multi(clus->rx_config.ring,
+
+	ring = rx_get_ring(&clus->rx_config);
+	n_packet = odp_buffer_ring_get_multi(ring,
 					     (odp_buffer_hdr_t **)pkt_table,
 					     len, 0, NULL);
 
