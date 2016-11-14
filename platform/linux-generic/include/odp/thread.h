@@ -17,9 +17,8 @@
 extern "C" {
 #endif
 
-#include <odp/plat/thread_types.h>
-
 #include <odp/api/thread.h>
+#include <odp/plat/thread_types.h>
 
 #ifdef __cplusplus
 }

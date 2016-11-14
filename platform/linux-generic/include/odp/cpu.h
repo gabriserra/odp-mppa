@@ -17,6 +17,13 @@
 extern "C" {
 #endif
 
+#include <odp/thread.h>
+
+static inline int odp_cpu_id(void)
+{
+	return this_thread->cpu;
+}
+
 #include <odp/api/cpu.h>
 
 #ifdef __cplusplus
