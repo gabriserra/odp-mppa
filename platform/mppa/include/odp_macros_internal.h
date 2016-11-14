@@ -42,4 +42,18 @@
  */
 #define MAX(x,y) _MAX(x,y, __COUNTER__)
 
+/**
+ * Macro to convert a DEFINE label to a boolean.
+ * @return Macro value.
+ * @retval 1 The macro is set to 1.
+ * @retval 0 The macro is not set to 1 or undefined.
+ */
+#define IS_SET(macro) is_set_(macro)
+
+#define EXPAND(x) #x
+#define macrotest_1 ,
+#define is_set_(value) is_set__(macrotest_ ## value)
+#define is_set__(comma) is_set___(comma 1, 0)
+#define is_set___(_, v, ...) v
+
 #endif /* ODP_MACROS_INTERNAL_H__ */

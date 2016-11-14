@@ -187,6 +187,9 @@ static inline int odp_config_shm_blocks(void)
 	return ODP_CONFIG_SHM_BLOCKS;
 }
 
+/* #define ODP_CONFIG_ENABLE_PKTIO_MQUEUE 1 */
+#define ODP_CONFIG_PKTIO_MAX_MQUEUES 8
+
 #include <odp/api/config.h>
 
 /**

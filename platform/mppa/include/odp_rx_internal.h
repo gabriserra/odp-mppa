@@ -12,6 +12,8 @@ extern "C" {
 #endif
 
 #include <odp_buffer_ring_internal.h>
+#include <odp_macros_internal.h>
+#include <odp/cpu.h>
 
 #define N_EV_MASKS 4
 
@@ -39,6 +41,8 @@ extern "C" {
 #define DEF_N_RX_THR 2
 #endif
 
+#define MAX_MQUEUES (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE) ? ODP_CONFIG_PKTIO_MAX_MQUEUES : 1)
+
 typedef enum {
 	RX_IF_TYPE_ETH,
 	RX_IF_TYPE_PCI,
@@ -55,7 +59,8 @@ typedef struct {
 	uint8_t header_sz;
 	uint8_t pkt_offset;
 	rx_if_type_e if_type;
-	odp_buffer_ring_t *ring;
+	uint8_t n_rings;
+	odp_buffer_ring_t *rings[MAX_MQUEUES];
 	struct {
 		uint8_t flow_controlled : 1;
 	};
@@ -89,6 +94,7 @@ typedef struct {
 	int flow_controlled;
 	int min_rx;
 	int max_rx;
+	int n_rings;
 } rx_opts_t;
 
 static inline void mppa_ethernet_header_print(const mppa_ethernet_header_t *hdr)
@@ -111,6 +117,15 @@ int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
 			  uint64_t *oom);
 void rx_options_default(rx_opts_t *options);
 int rx_parse_options(const char **str, rx_opts_t *options);
+
+static inline odp_buffer_ring_t * rx_get_ring(rx_config_t *rx_config)
+{
+	int mqueue_id = 0;
+	if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE)) {
+		mqueue_id = odp_cpu_id() & (rx_config->n_rings - 1);
+	}
+	return rx_config->rings[mqueue_id];
+}
 
 #ifdef __cplusplus
 }
