@@ -88,21 +88,19 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		    const char *devname, odp_pool_t pool)
 {
 	int ret = 0;
-	int nRx = N_RX_P_IODDR;
-	int min_rx = -1;
-	int max_rx = -1;
+	rx_opts_t rx_opts;
 	int slot_id;
-	int rr_policy = -1;
-	int rr_offset = -1;
 	int log2_fragments = 0;
 	int cnoc_port = -1;
-	int flow_controlled = 0;
 
 	/*
 	 * Check device name and extract slot/port
 	 */
 	const char* pptr = devname;
 	char * eptr;
+
+	rx_options_default(&rx_opts);
+	rx_opts.nRx = N_RX_P_IODDR;
 
 	if (strncmp(pptr, "ioddr", strlen("ioddr")))
 		return -1;
@@ -117,39 +115,14 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
-		if (!strncmp(pptr, "min_rx=", strlen("min_rx="))){
-			pptr += strlen("min_rx=");
-			min_rx = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid min_rx %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "max_rx=", strlen("max_rx="))){
-			pptr += strlen("max_rx=");
-			max_rx = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid max_rx %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "rrpolicy=", strlen("rrpolicy="))){
-			pptr += strlen("rrpolicy=");
-			rr_policy = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid rrpolicy %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
-			pptr += strlen("rroffset=");
-			rr_offset = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid rroffset %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "log2fragments=", strlen("log2fragments="))){
+
+		ret = rx_parse_options(&pptr, &rx_opts);
+		if (ret < 0)
+			return -1;
+		if (ret > 0)
+			continue;
+
+		if (!strncmp(pptr, "log2fragments=", strlen("log2fragments="))){
 			pptr += strlen("log2fragments=");
 			log2_fragments = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
@@ -162,14 +135,6 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			cnoc_port = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
 				ODP_ERR("Invalid cnoc %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		}  else if (!strncmp(pptr, "fc=", strlen("fc="))){
-			pptr += strlen("fc=");
-			flow_controlled = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid fc %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -195,7 +160,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->log2_fragments = log2_fragments;
 	ioddr->tx_config.nofree = 0;
 	ioddr->tx_config.add_end_marker = 0;
-	if (min_rx == -1 || max_rx == -1) {
+	if (rx_opts.min_rx == -1 || rx_opts.max_rx == -1) {
 		ODP_ERR("min_rx and max_rx options must be specified\n");
 		return -1;
 	}
@@ -213,10 +178,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
 	ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 	ioddr->rx_config.if_type = RX_IF_TYPE_IODDR;
-	ioddr->rx_config.flow_controlled = flow_controlled;
-	nRx = max_rx - min_rx + 1;
-	ret = rx_thread_link_open(&ioddr->rx_config, nRx, rr_policy,
-				  rr_offset, min_rx, max_rx);
+	ret = rx_thread_link_open(&ioddr->rx_config, &rx_opts);
 	if(ret < 0)
 		return -1;
 
