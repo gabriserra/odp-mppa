@@ -150,9 +150,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		    const char *devname, odp_pool_t pool)
 {
 	int ret = 0;
-	int nRx = N_RX_P_PCIE;
-	int rr_policy = -1;
-	int rr_offset = 0;
+	rx_opts_t rx_opts;
 	int port_id, slot_id;
 	int nofree = 0;
 
@@ -161,6 +159,9 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	 */
 	const char* pptr = devname;
 	char * eptr;
+
+	rx_options_default(&rx_opts);
+	rx_opts.nRx = N_RX_P_PCIE;
 
 	if (*(pptr++) != 'p')
 		return -1;
@@ -190,31 +191,14 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
-		if (!strncmp(pptr, "tags=", strlen("tags="))){
-			pptr += strlen("tags=");
-			nRx = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid tag count %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "rrpolicy=", strlen("rrpolicy="))){
-			pptr += strlen("rrpolicy=");
-			rr_policy = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid rrpolicy %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
-			pptr += strlen("rroffset=");
-			rr_offset = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid rroffset %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "nofree", strlen("nofree"))){
+
+		ret = rx_parse_options(&pptr, &rx_opts);
+		if (ret < 0)
+			return -1;
+		if (ret > 0)
+			continue;
+
+		if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
 			nofree = 1;
 		} else {
@@ -233,6 +217,10 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	return 1;
 #endif
 
+	if (rx_opts.flow_controlled) {
+		ODP_ERR("Cannot enable fc=1 on a PCIE interface");
+		return -1;
+	}
 
 	uintptr_t ucode;
 	ucode = (uintptr_t)ucode_pcie_v2;
@@ -257,9 +245,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			MAX_RX_ETH_IF;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		pcie->rx_config.flow_controlled = 0;
-		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy,
-				    rr_offset, -1, -1);
+		rx_thread_link_open(&pcie->rx_config, &rx_opts);
 	}
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();

@@ -325,9 +325,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		    const char *devname, odp_pool_t pool)
 {
 	int ret = 0;
-	int nRx = N_RX_P_ETH;
-	int rr_policy = -1;
-	int rr_offset = 0;
+	rx_opts_t rx_opts;
 	int port_id, slot_id;
 	int loopback = 0;
 	int nofree = 0;
@@ -343,6 +341,9 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	 */
 	const char* pptr = devname;
 	char * eptr;
+
+	rx_options_default(&rx_opts);
+	rx_opts.nRx = N_RX_P_ETH;
 
 	if (*(pptr++) != 'e')
 		return -1;
@@ -372,31 +373,12 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
-		if (!strncmp(pptr, "tags=", strlen("tags="))){
-			pptr += strlen("tags=");
-			nRx = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid tag count %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "rrpolicy=", strlen("rrpolicy="))){
-			pptr += strlen("rrpolicy=");
-			rr_policy = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid rrpolicy %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
-			pptr += strlen("rroffset=");
-			rr_offset = strtoul(pptr, &eptr, 10);
-			if(pptr == eptr){
-				ODP_ERR("Invalid rroffset %s\n", pptr);
-				return -1;
-			}
-			pptr = eptr;
-		} else if (!strncmp(pptr, "hashpolicy=", strlen("hashpolicy="))){
+		ret = rx_parse_options(&pptr, &rx_opts);
+		if (ret < 0)
+			return -1;
+		if (ret > 0)
+			continue;
+		if (!strncmp(pptr, "hashpolicy=", strlen("hashpolicy="))){
 			if ( rules ) {
 				ODP_ERR("hashpolicy can only be set once\n");
 				return -1;
@@ -456,6 +438,11 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	return 1;
 #endif
 
+	if (rx_opts.flow_controlled) {
+		ODP_ERR("Cannot enable fc=1 on an ETH interface");
+		return -1;
+	}
+
 	uintptr_t ucode;
 	ucode = (uintptr_t)ucode_eth_v2;
 
@@ -481,9 +468,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		eth->rx_config.if_type = RX_IF_TYPE_ETH;
 		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		eth->rx_config.flow_controlled = 0;
-		ret = rx_thread_link_open(&eth->rx_config, nRx, rr_policy,
-					  rr_offset, -1, -1);
+		ret = rx_thread_link_open(&eth->rx_config, &rx_opts);
 		if(ret < 0)
 			return -1;
 	}

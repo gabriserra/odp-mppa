@@ -520,11 +520,13 @@ static void *_rx_thread_start(void *arg)
 	return NULL;
 }
 
-int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
-			int rr_policy, int rr_offset,
-			int min_rx, int max_rx)
+int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 {
 	const int dma_if = 0;
+	int n_ports = opts->nRx;
+	int min_rx = opts->min_rx;
+	int max_rx = opts->max_rx;
+
 	if (rx_config->pktio_id >= MAX_RX_IF) {
 		ODP_ERR("Pktio ID too large\n");
 		return -1;
@@ -605,7 +607,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
 		}
 	}
 
-	if(rr_policy < 0) {
+	if(opts->rr_policy < 0) {
 		const uint64_t full_mask = 0xffffffffffffffffULL;
 
 		/* Each thread has a contiguous 1 / odp_global_data.n_rx_thr
@@ -643,7 +645,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
 		/* Each thread picks rr_policy Rx every odp_global_data.n_rx_thr */
 		for (int port = rx_config->min_port, th_id = 0;
 		     port <= rx_config->max_port; ++port, ++th_id){
-			int th = ((th_id + rr_offset) / rr_policy) % odp_global_data.n_rx_thr;
+			int th = ((th_id + opts->rr_offset) / opts->rr_policy) % odp_global_data.n_rx_thr;
 
 			const unsigned word = port / (8 * sizeof(ev_masks[0][0]));
 			const unsigned offset = port % ( 8 * sizeof(ev_masks[0][0]));
@@ -668,6 +670,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
 
 	odp_buffer_ring_init(&ifce->ring, addr, ring_size);
 	rx_config->ring = &ifce->ring;
+	rx_config->flow_controlled = opts->flow_controlled;
 
 	/* Copy config to Thread data */
 	memcpy(&ifce->rx_config, rx_config, sizeof(*rx_config));
@@ -890,4 +893,75 @@ int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
 	}
 
 	return 0;
+}
+
+
+void rx_options_default(rx_opts_t *options)
+{
+	options->nRx = 0;
+	options->rr_policy = -1;
+	options->rr_offset = 0;
+	options->flow_controlled = 0;
+	options->min_rx = -1;
+	options->max_rx = -1;
+}
+
+int rx_parse_options(const char **str, rx_opts_t *options)
+{
+	const char* pptr = *str;
+	char * eptr;
+	if (!strncmp(pptr, "tags=", strlen("tags="))){
+		pptr += strlen("tags=");
+		options->nRx = strtoul(pptr, &eptr, 10);
+		if(pptr == eptr){
+			ODP_ERR("Invalid tag count %s\n", pptr);
+			return -1;
+		}
+		pptr = eptr;
+	} else if (!strncmp(pptr, "rrpolicy=", strlen("rrpolicy="))){
+		pptr += strlen("rrpolicy=");
+		options->rr_policy = strtoul(pptr, &eptr, 10);
+		if(pptr == eptr){
+			ODP_ERR("Invalid rrpolicy %s\n", pptr);
+			return -1;
+		}
+		pptr = eptr;
+	} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+		pptr += strlen("rroffset=");
+		options->rr_offset = strtoul(pptr, &eptr, 10);
+		if(pptr == eptr){
+			ODP_ERR("Invalid rroffset %s\n", pptr);
+			return -1;
+		}
+		pptr = eptr;
+	} else if (!strncmp(pptr, "fc=", strlen("fc="))){
+		pptr += strlen("fc=");
+		options->flow_controlled = strtoul(pptr, &eptr, 10);
+		if(pptr == eptr){
+			ODP_ERR("Invalid fc %s\n", pptr);
+			return -1;
+		}
+		pptr = eptr;
+	} else 	if (!strncmp(pptr, "min_rx=", strlen("min_rx="))){
+		pptr += strlen("min_rx=");
+		options->min_rx = strtoul(pptr, &eptr, 10);
+		if(pptr == eptr){
+			ODP_ERR("Invalid min_rx %s\n", pptr);
+			return -1;
+		}
+		pptr = eptr;
+	} else if (!strncmp(pptr, "max_rx=", strlen("max_rx="))){
+		pptr += strlen("max_rx=");
+		options->max_rx = strtoul(pptr, &eptr, 10);
+		if(pptr == eptr){
+			ODP_ERR("Invalid max_rx %s\n", pptr);
+			return -1;
+		}
+		pptr = eptr;
+	} else {
+		/* Not a rx_thread option */
+		return 0;
+	}
+	*str = pptr;
+	return 1;
 }
