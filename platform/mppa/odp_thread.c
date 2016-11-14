@@ -23,12 +23,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct {
-	int thr;
-	int cpu;
-	odp_thread_type_t type;
-} thread_state_t;
-
 
 typedef struct {
 	thread_state_t thr[ODP_THREAD_COUNT_MAX];
@@ -53,7 +47,7 @@ static thread_globals_t *thread_globals;
 
 
 /* Thread local */
-static __thread thread_state_t *this_thread;
+__thread const thread_state_t * const this_thread;
 
 
 int odp_thread_init_global(void)
@@ -176,7 +170,8 @@ int odp_thread_init_local(odp_thread_type_t type)
 	thread_globals->thr[id].cpu  = cpu;
 	thread_globals->thr[id].type = type;
 
-	this_thread = &thread_globals->thr[id];
+	const thread_state_t **ptr = (const thread_state_t**)&this_thread;
+	*ptr = &thread_globals->thr[id];
 	return 0;
 }
 
@@ -215,11 +210,6 @@ int odp_thread_count_max(void)
 odp_thread_type_t odp_thread_type(void)
 {
 	return this_thread->type;
-}
-
-int odp_cpu_id(void)
-{
-	return this_thread->cpu;
 }
 
 int odp_thrmask_worker(odp_thrmask_t *mask)
