@@ -19,6 +19,7 @@
 #define CNOC_RX 2
 #define MIN_TAG 200
 #define MAX_TAG 219
+#define N_RX 20
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -97,6 +98,7 @@ int main()
 			"pktio-ddr",
 			"-i", "ioddr0:min_rx=" TOSTRING(MIN_TAG)
 			":max_rx=" TOSTRING(MAX_TAG)
+			":tags=" TOSTRING(N_RX)
 			":log2fragments=" TOSTRING(_ODP_LOG2MAX_FRAGS)
 			":cnoc=2:rrpolicy=20:rroffset=20:fc=1,drop",
 			"-m", "0",
