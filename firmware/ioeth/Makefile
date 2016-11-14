@@ -6,7 +6,6 @@ _LDFLAGS = -lmppapower -lmppanoc -lmpparouting
 EXTRA_BINS += $(BUILDDIR)/$(FIRMDIR).bin
 
 include $(SRCDIR)/../common/rpc/include.mk
-include $(SRCDIR)/../common/pcie/include.mk
 include $(SRCDIR)/../common/c2c/include.mk
 include $(SRCDIR)/../common/eth/include.mk
 include $(SRCDIR)/../common/rnd/include.mk
