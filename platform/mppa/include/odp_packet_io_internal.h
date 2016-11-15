@@ -289,6 +289,9 @@ uint32_t _rx_pkt_to_iovec(odp_packet_t pkt,
 	return 1;
 }
 
+struct pkt_rule;
+const char* parse_hashpolicy(const char* pptr, int *nb_rules,
+			     struct pkt_rule *rules, int max_rules);
 #ifdef __cplusplus
 }
 #endif

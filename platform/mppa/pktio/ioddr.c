@@ -260,10 +260,12 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	const unsigned wanted_segs = len << log2_frag_per_pkt;
 	odp_packet_t tmp_table[wanted_segs];
 	uint64_t pkt_count;
+	odp_buffer_ring_t *ring = rx_get_ring(&ioddr->rx_config);
 
-	total_packet = odp_buffer_ring_get_multi(ioddr->rx_config.ring,
-					     (odp_buffer_hdr_t **)(&tmp_table[total_packet]),
-					     wanted_segs, log2_frag_per_pkt, NULL);
+	total_packet =
+		odp_buffer_ring_get_multi(ring,
+					  (odp_buffer_hdr_t **)(&tmp_table[total_packet]),
+					  wanted_segs, log2_frag_per_pkt, NULL);
 
 	if (!total_packet)
 		return 0;

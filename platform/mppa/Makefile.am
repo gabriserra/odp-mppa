@@ -156,6 +156,7 @@ __LIB__libodp_la_SOURCES = \
 			   pktio/loop.c \
 			   pktio/rx_thread.c \
 			   pktio/tx_uc.c \
+			   pktio/parse.c \
 			   odp_pool.c \
 			   odp_queue.c \
 			   odp_rpc.c \

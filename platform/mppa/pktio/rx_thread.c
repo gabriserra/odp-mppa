@@ -28,6 +28,11 @@
 #define MIN_RING_SIZE (2 * PKT_BURST_SZ)
 #define BUFFER_ORDER_BITS 25
 
+#ifdef ODP_CONFIG_ENABLE_PKTIO_MQUEUE
+#if ODP_CONFIG_ENABLE_PKTIO_MQUEUE != 1
+#error "ODP_CONFIG_ENABLE_PKTIO_MQUEUE must be either 1 or unset"
+#endif
+#endif
 typedef struct {
 	odp_packet_t pkt;
 	uint8_t broken;
@@ -42,7 +47,8 @@ typedef struct {
 } rx_buffer_list_t;
 
 typedef struct {
-	rx_buffer_list_t hdr_list;
+	rx_buffer_list_t hdr_list[MAX_MQUEUES];
+	uint32_t queue_mask;
 	uint64_t recv_pkts;
 	uint64_t dropped_pkts;
 	uint64_t oom_pkts;
@@ -53,7 +59,7 @@ typedef struct {
 					   * belong to us */
 	uint8_t pool_id;
 	rx_config_t rx_config;
-	odp_buffer_ring_t ring;
+	odp_buffer_ring_t rings[MAX_MQUEUES];
 
 	enum {
 		RX_IFCE_DOWN,
@@ -118,16 +124,6 @@ static inline void _print_eth_header(const mppa_ethernet_header_t * _hdr)
 	       hdr.info._.pkt_size, hdr.info._.hash_key,
 	       hdr.info._.lane_id, hdr.info._.io_id,
 	       hdr.info._.rule_id, hdr.info._.pkt_id);
-}
-
-static inline int MIN(int a, int b)
-{
-	return a > b ? b : a;
-}
-
-static inline int MAX(int a, int b)
-{
-	return b > a ? b : a;
 }
 
 static int _configure_rx(rx_config_t *rx_config, int rx_id)
@@ -243,7 +239,6 @@ static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
 	*tail = &(sorted->next);
 }
 
-
 static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 {
 	const int dma_if = 0;
@@ -256,7 +251,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	int mapped_pkt = 0;
 	uint64_t _mask = (*mask) & ifce->ev_masks[rx_id / 64];
 	int n_events = __builtin_k1_cbs(_mask & 0xFFFFFFFF) + __builtin_k1_cbs(_mask >> 32) + 1;
-
+	uint16_t hash_key;
 
 	if (rx_config->flow_controlled) {
 		if (n_events > rx_pool->n_spares) {
@@ -307,6 +302,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		union mppa_ethernet_header_info_t info;
 		info.dword = LOAD_U64(header->info);
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
+		hash_key = info._.hash_key;
 		if (info._.pkt_size < sizeof(*header)) {
 			/* Probably a spurious EOT. */
 			STORE_U64(header->info, 0ULL);
@@ -389,9 +385,15 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	}
 
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
-		rx_buffer_list_t * hdr_list = &if_th->hdr_list;
+		int queue = 0;
 
+		if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE))
+			queue = hash_key % rx_config->n_rings;
+
+		rx_buffer_list_t * hdr_list = &if_th->hdr_list[queue];
+		if_th->queue_mask |= (1 << queue);
 		if_th->recv_pkts++;
+
 		*(hdr_list->tail) = (odp_buffer_hdr_t *)pkt;
 		hdr_list->tail = &((odp_buffer_hdr_t *)pkt)->next;
 		hdr_list->count++;
@@ -401,6 +403,54 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	return 0;
 }
 
+static uint64_t flush_ifce_queue(int th_id, int iface_id, int queue_id)
+{
+	rx_buffer_list_t * hdr_list =
+		&rx_hdl.th[th_id].ifce[iface_id].hdr_list[queue_id];
+
+	if (hdr_list->tail == &hdr_list->head)
+		return 0ULL;
+
+	/* Do not sort if there is more than 1 rx thread.
+	 * order will be broken anyway */
+	if (odp_global_data.sort_buffers)
+		_sort_buffers(&hdr_list->head, &hdr_list->tail,
+			      hdr_list->count);
+	hdr_list->count =
+		odp_buffer_ring_push_list(&rx_hdl.ifce[iface_id].rings[queue_id],
+					  &hdr_list->head,
+					  hdr_list->count);
+	if (!hdr_list->count) {
+		/* All were flushed */
+		hdr_list->tail = &hdr_list->head;
+		return 0ULL;
+	} else {
+		/* Not all buffers were flushed to the ring */
+		return 1ULL << iface_id;
+	}
+}
+
+static uint64_t flush_ifce_mqueues(int th_id, int iface_id)
+{
+	int queue;
+	uint32_t queue_incomplete = 0;
+	while(rx_hdl.th[th_id].ifce[iface_id].queue_mask) {
+		queue = __builtin_k1_ctz(rx_hdl.th[th_id].ifce[iface_id].queue_mask);
+		rx_hdl.th[th_id].ifce[iface_id].queue_mask ^= (1ULL << queue);
+
+		/* Try to flush a specific queue and mark if it
+		 * could not be entirely flushed */
+		if(flush_ifce_queue(th_id, iface_id, queue))
+			queue_incomplete |= (1 << queue);
+	}
+	/* If there are remaining queues, set the bits back
+	 * and return a mask for this iface */
+	if (queue_incomplete) {
+		rx_hdl.th[th_id].ifce[iface_id].queue_mask = queue_incomplete;
+		return 1ULL << iface_id;
+	}
+	return 0;
+}
 static void _poll_masks(int th_id)
 {
 	int i;
@@ -434,32 +484,17 @@ static void _poll_masks(int th_id)
 		if ((iter & FLUSH_PERIOD) == FLUSH_PERIOD) {
 			uint64_t if_mask_incomplete = 0ULL;
 			while (if_mask) {
+				uint64_t ret_mask;
 				i = __builtin_k1_ctzdl(if_mask);
 				if_mask ^= (1ULL << i);
 
-				rx_buffer_list_t * hdr_list =
-					&rx_hdl.th[th_id].ifce[i].hdr_list;
-
-				if (hdr_list->tail == &hdr_list->head)
-					continue;
-
-				/* Do not sort if there is more than 1 rx thread.
-				 * order will be broken anyway */
-				if (odp_global_data.sort_buffers)
-					_sort_buffers(&hdr_list->head, &hdr_list->tail,
-						      hdr_list->count);
-				hdr_list->count =
-					odp_buffer_ring_push_list(&rx_hdl.ifce[i].ring,
-								  &hdr_list->head,
-								  hdr_list->count);
-				if (!hdr_list->count) {
-					/* All were flushed */
-					hdr_list->tail = &hdr_list->head;
+				if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE)) {
+					ret_mask = flush_ifce_mqueues(th_id, i);
 				} else {
-					/* Not all buffers were flushed to the ring */
-					if_mask_incomplete = 1ULL << i;
+					ret_mask = flush_ifce_queue(th_id, i, 0);
 				}
-
+				/* Not all buffers were flushed to the ring */
+				if_mask_incomplete |= ret_mask;
 			}
 			if_mask = if_mask_incomplete;
 		}
@@ -472,10 +507,12 @@ static void *_rx_thread_start(void *arg)
 {
 	int th_id = (unsigned long)(arg);
 	for (int i = 0; i < MAX_RX_IF; ++i) {
-		rx_buffer_list_t * hdr_list =
-			&rx_hdl.th[th_id].ifce[i].hdr_list;
-		hdr_list->tail = &hdr_list->head;
-		hdr_list->count = 0;
+		for (uint32_t j = 0; j < MAX_MQUEUES; ++j) {
+			rx_buffer_list_t * hdr_list =
+				&rx_hdl.th[th_id].ifce[i].hdr_list[j];
+			hdr_list->tail = &hdr_list->head;
+			hdr_list->count = 0;
+		}
 	}
 	uint64_t last_update= -1LL;
 
@@ -658,18 +695,22 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 		}
 	}
 
+	rx_config->n_rings = opts->n_rings;
 	/* Setup buffer ring */
 	int ring_size = 2 * n_rx;
 	if (ring_size < MIN_RING_SIZE)
 		ring_size = MIN_RING_SIZE;
-	void * addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*));
+	odp_buffer_hdr_t * addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*) * rx_config->n_rings);
 	if (!addr) {
 		ODP_ERR("Failed to allocate Ring buffer");
 		return -1;
 	}
+	for (i = 0; i < rx_config->n_rings; ++i) {
+		odp_buffer_ring_init(&ifce->rings[i], addr, ring_size);
+		rx_config->rings[i] = &ifce->rings[i];
+		addr += ring_size;
+	}
 
-	odp_buffer_ring_init(&ifce->ring, addr, ring_size);
-	rx_config->ring = &ifce->ring;
 	rx_config->flow_controlled = opts->flow_controlled;
 
 	/* Copy config to Thread data */
@@ -781,19 +822,19 @@ int rx_thread_link_close(uint8_t pktio_id)
 
 		odp_atomic_add_u64(&rx_hdl.update_id, 1ULL);
 
-		{
+		for (uint32_t i = 0; i < ifce->rx_config.n_rings; ++i){
 			/** free all the buffers */
 			odp_buffer_hdr_t * buffers[10];
 			int nbufs;
-			while ((nbufs = odp_buffer_ring_get_multi(&ifce->ring,
+			while ((nbufs = odp_buffer_ring_get_multi(&ifce->rings[i],
 								  buffers, 10, 0,
 								  NULL)) > 0) {
 				odp_buffer_free_multi((odp_buffer_t*)buffers,
 						      nbufs);
 			}
-			free(ifce->ring.buf_ptrs);
-
 		}
+		free(ifce->rings[0].buf_ptrs);
+		ifce->rx_config.n_rings = 1;
 		ifce->status = RX_IFCE_DOWN;
 		rx_hdl.if_opened--;
 		/* No more interface open. */
@@ -893,75 +934,4 @@ int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
 	}
 
 	return 0;
-}
-
-
-void rx_options_default(rx_opts_t *options)
-{
-	options->nRx = 0;
-	options->rr_policy = -1;
-	options->rr_offset = 0;
-	options->flow_controlled = 0;
-	options->min_rx = -1;
-	options->max_rx = -1;
-}
-
-int rx_parse_options(const char **str, rx_opts_t *options)
-{
-	const char* pptr = *str;
-	char * eptr;
-	if (!strncmp(pptr, "tags=", strlen("tags="))){
-		pptr += strlen("tags=");
-		options->nRx = strtoul(pptr, &eptr, 10);
-		if(pptr == eptr){
-			ODP_ERR("Invalid tag count %s\n", pptr);
-			return -1;
-		}
-		pptr = eptr;
-	} else if (!strncmp(pptr, "rrpolicy=", strlen("rrpolicy="))){
-		pptr += strlen("rrpolicy=");
-		options->rr_policy = strtoul(pptr, &eptr, 10);
-		if(pptr == eptr){
-			ODP_ERR("Invalid rrpolicy %s\n", pptr);
-			return -1;
-		}
-		pptr = eptr;
-	} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
-		pptr += strlen("rroffset=");
-		options->rr_offset = strtoul(pptr, &eptr, 10);
-		if(pptr == eptr){
-			ODP_ERR("Invalid rroffset %s\n", pptr);
-			return -1;
-		}
-		pptr = eptr;
-	} else if (!strncmp(pptr, "fc=", strlen("fc="))){
-		pptr += strlen("fc=");
-		options->flow_controlled = strtoul(pptr, &eptr, 10);
-		if(pptr == eptr){
-			ODP_ERR("Invalid fc %s\n", pptr);
-			return -1;
-		}
-		pptr = eptr;
-	} else 	if (!strncmp(pptr, "min_rx=", strlen("min_rx="))){
-		pptr += strlen("min_rx=");
-		options->min_rx = strtoul(pptr, &eptr, 10);
-		if(pptr == eptr){
-			ODP_ERR("Invalid min_rx %s\n", pptr);
-			return -1;
-		}
-		pptr = eptr;
-	} else if (!strncmp(pptr, "max_rx=", strlen("max_rx="))){
-		pptr += strlen("max_rx=");
-		options->max_rx = strtoul(pptr, &eptr, 10);
-		if(pptr == eptr){
-			ODP_ERR("Invalid max_rx %s\n", pptr);
-			return -1;
-		}
-		pptr = eptr;
-	} else {
-		/* Not a rx_thread option */
-		return 0;
-	}
-	*str = pptr;
-	return 1;
 }
