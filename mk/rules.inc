@@ -1,3 +1,5 @@
+#-*- mode: makefile -*-
+
 #
 # Add a dependency rules and automatically add the dependencies to CHECK_LIST
 #

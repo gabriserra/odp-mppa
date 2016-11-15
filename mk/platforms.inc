@@ -1,3 +1,5 @@
+#-*- mode: makefile -*-
+
 CONFIGS :=
 HOST_CONFIGS :=
 K1_CONFIGS :=
