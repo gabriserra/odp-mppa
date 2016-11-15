@@ -1,4 +1,14 @@
 #
+# Add a dependency rules and automatically add the dependencies to CHECK_LIST
+#
+define ADD_DEPRULE
+#Arg1 = Rule name
+#Arg2 = Dep list
+$(1): $(2)
+CHECK_LIST += $(2)
+endef
+
+#
 # Define all rules for a given config for odp and CUNIT
 #
 define CONFIG_RULE
@@ -98,14 +108,14 @@ odp-$(1)-install-doc: odp-$(1)-build
 		true; \
 	else true; fi
 
-odp-$(1)-install: odp-$(1)-install-lib odp-$(1)-install-doc
+$(call ADD_DEPRULE, odp-$(1)-install, odp-$(1)-install-lib odp-$(1)-install-doc)
 
 odp-$(1)-valid: odp-$(1)-build extra-install firmware-install
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/test/validation $($(1)_MAKE_VALID) check
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/platform/$($(1)_PLATFORM)/test/ check
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/test/performance $($(1)_MAKE_VALID) check
 
-odp-$(1)-perf: odp-$(1)-build extra-install firmware-install
+$(call ADD_DEPRULE, odp-$(1)-perf, odp-$(1)-build extra-install firmware-install)
 
 odp-$(1)-clean:
 	rm -Rf $(ODP_$(1)_BUILDDIR)
@@ -141,25 +151,33 @@ endef
 define SUB_RULES
 # $(1) = RULE
 # Generate per config rules (clean/build/etc) for each firmware type
-$(foreach FIRMWARE, $(FIRMWARES),
-firmware-$(FIRMWARE)-$(1): $(foreach CONFIG, $($(FIRMWARE)_CONFIGS), firmware-$(FIRMWARE)-$(CONFIG)-$(1))
-CHECK_LIST += $(foreach CONFIG, $($(FIRMWARE)_CONFIGS), firmware-$(FIRMWARE)-$(CONFIG)-$(1))
+$(foreach FIRMWARE, $(FIRMWARES),                  \
+	$(call ADD_DEPRULE, firmware-$(FIRMWARE)-$(1), \
+		$(foreach CONFIG, $($(FIRMWARE)_CONFIGS),  \
+			firmware-$(FIRMWARE)-$(CONFIG)-$(1)    \
+		)                                          \
+	)                                              \
 )
 
-firmware-$(1): $(foreach FIRMWARE, $(FIRMWARES), firmware-$(FIRMWARE)-$(1)) $(firmware-$(1)_DEPS)
-CHECK_LIST += $(foreach FIRMWARE, $(FIRMWARES), firmware-$(FIRMWARE)-$(1))
+$(call ADD_DEPRULE, firmware-$(1), \
+	 $(foreach FIRMWARE, $(FIRMWARES), firmware-$(FIRMWARE)-$(1)) $(firmware-$(1)_DEPS) \
+)
 
-apps-$(1): $(foreach APP, $(APPS), app-$(APP)-$(1))
-CHECK_LIST += $(foreach APP, $(APPS), app-$(APP)-$(1))
+$(call ADD_DEPRULE, apps-$(1), \
+	$(foreach APP, $(APPS), app-$(APP)-$(1)) \
+)
 
-long-$(1): $(foreach CONFIG, $(filter-out x86_64-unknown-linux-gnu,$(LONG_CONFIGS)), long-$(CONFIG)-$(1))
-CHECK_LIST +=  $(foreach CONFIG, $(LONG_CONFIGS), long-$(CONFIG)-$(1))
-CHECK_LIST +=  $(foreach APP, $(LONGS), $(foreach CONFIG, $(LONG_CONFIGS), long-$(CONFIG)-$(APP)-$(1)))
+$(call ADD_DEPRULE, long-$(1), \
+	$(foreach CONFIG, $(filter-out x86_64-unknown-linux-gnu,$(LONG_CONFIGS)), long-$(CONFIG)-$(1)) \
+)
 
 # Generate per config rules (clean/build/etc) for each arch specific component
 $(foreach ARCH_COMPONENT, $(ARCH_COMPONENTS), \
-$(ARCH_COMPONENT)-$(1): $(foreach CONFIG, $(LONG_CONFIGS), $(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1)) $(foreach CONFIG, $(HOST_CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
-CHECK_LIST +=  $(foreach CONFIG, $(LONG_CONFIGS), $(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1)) $(foreach CONFIG, $(HOST_CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
+	$(call ADD_DEPRULE, $(ARCH_COMPONENT)-$(1), \
+		$(foreach CONFIG, $(LONG_CONFIGS), \
+			$(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1)) \
+		 $(foreach CONFIG, $(HOST_CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1)) \
+	) \
 )
 endef
 
@@ -237,7 +255,8 @@ CHECK_LIST +=  $(foreach APP, $(LONGS), long-$(1)-$(APP)-install)
 long-$(1)-valid: $(foreach APP, $(LONGS), long-$(1)-$(APP)-install) extra-install
 	cd $(LONT_DIR)/$(LONG_$(1)_ARCH_BUILDDIR) && ctest -L $(if $(findstring simu,$(1)),sim,jtag)
 
-long-$(1)-build: $(foreach APP, $(LONGS), long-$(1)-$(APP)-build)
+$(call ADD_DEPRULE, long-$(1)-build, \
+	$(foreach APP, $(LONGS), long-$(1)-$(APP)-build))
 
 long-$(1)-clean: $(foreach APP, $(LONGS), long-$(1)-$(APP)-clean)
 	rm -Rf $(ARCH_DIR)/long/$(1)
@@ -253,8 +272,8 @@ endef
 #
 define DO_RULES_PAR
 # $(1) = RULE
-$(1): $(foreach COMPONENT, $(COMPONENTS), $(COMPONENT)-$(1)) $($(1)_DEPS)
-CHECK_LIST += $(foreach COMPONENT, $(COMPONENTS),$(COMPONENT)-$(1))
+$(call ADD_DEPRULE, $(1), \
+	$(foreach COMPONENT, $(COMPONENTS), $(COMPONENT)-$(1)) $($(1)_DEPS))
 endef
 
 #

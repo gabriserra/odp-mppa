@@ -147,7 +147,7 @@ $(foreach RULE, $(RULE_LIST_SERIAL), $(eval $(call DO_RULES_SEQ,$(RULE))))
 
 
 check-rules:
-	@echo $(CHECK_LIST)
+#	@echo $(CHECK_LIST)
 	@RULES=$$(valid/gen-rules.sh); MISSING=0 && \
 	for rule in $(CHECK_LIST); do \
 		echo $${RULES} | egrep -q "( |^)$${rule}( |$$)" || \
