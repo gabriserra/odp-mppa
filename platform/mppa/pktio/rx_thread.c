@@ -239,7 +239,6 @@ static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
 	*tail = &(sorted->next);
 }
 
-
 static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 {
 	const int dma_if = 0;
@@ -252,7 +251,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	int mapped_pkt = 0;
 	uint64_t _mask = (*mask) & ifce->ev_masks[rx_id / 64];
 	int n_events = __builtin_k1_cbs(_mask & 0xFFFFFFFF) + __builtin_k1_cbs(_mask >> 32) + 1;
-
+	uint16_t hash_key;
 
 	if (rx_config->flow_controlled) {
 		if (n_events > rx_pool->n_spares) {
@@ -303,6 +302,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		union mppa_ethernet_header_info_t info;
 		info.dword = LOAD_U64(header->info);
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
+		hash_key = info._.hash_key;
 		if (info._.pkt_size < sizeof(*header)) {
 			/* Probably a spurious EOT. */
 			STORE_U64(header->info, 0ULL);
@@ -387,8 +387,10 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
 		int queue = 0;
-		if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE)) {
-		}
+
+		if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE))
+			queue = hash_key % rx_config->n_rings;
+
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list[queue];
 		if_th->queue_mask |= (1 << queue);
 		if_th->recv_pkts++;
