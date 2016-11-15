@@ -122,7 +122,7 @@ static inline odp_buffer_ring_t * rx_get_ring(rx_config_t *rx_config)
 {
 	int mqueue_id = 0;
 	if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE)) {
-		mqueue_id = odp_cpu_id() & (rx_config->n_rings - 1);
+		mqueue_id = odp_cpu_id() % rx_config->n_rings;
 	}
 	return rx_config->rings[mqueue_id];
 }
