@@ -158,8 +158,8 @@ CHECK_LIST +=  $(foreach APP, $(LONGS), $(foreach CONFIG, $(LONG_CONFIGS), long-
 
 # Generate per config rules (clean/build/etc) for each arch specific component
 $(foreach ARCH_COMPONENT, $(ARCH_COMPONENTS), \
-$(ARCH_COMPONENT)-$(1): $(foreach CONFIG, $(LONG_CONFIGS), $(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1))
-CHECK_LIST += $(foreach CONFIG, $(CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
+$(ARCH_COMPONENT)-$(1): $(foreach CONFIG, $(LONG_CONFIGS), $(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1)) $(foreach CONFIG, $(HOST_CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
+CHECK_LIST +=  $(foreach CONFIG, $(LONG_CONFIGS), $(ARCH_COMPONENT)-$(LONG_$(CONFIG)_OS_NAME)_$(BOARD_$(LONG_$(CONFIG)_BOARD_NAME)_VER)-$(1)) $(foreach CONFIG, $(HOST_CONFIGS), $(ARCH_COMPONENT)-$(CONFIG)-$(1))
 )
 endef
 
@@ -232,6 +232,7 @@ long-$(1)-install: $(foreach APP, $(LONGS), long-$(1)-$(APP)-install)
 		  echo "SUBDIRS($$$$test)"; \
 	  done \
 	 ) > $(LONT_DIR)/$(LONG_$(1)_ARCH_BUILDDIR)/CTestTestfile.cmake
+CHECK_LIST +=  $(foreach APP, $(LONGS), long-$(1)-$(APP)-install)
 
 long-$(1)-valid: $(foreach APP, $(LONGS), long-$(1)-$(APP)-install) extra-install
 	cd $(LONT_DIR)/$(LONG_$(1)_ARCH_BUILDDIR) && ctest -L $(if $(findstring simu,$(1)),sim,jtag)
