@@ -6,6 +6,7 @@
 #include <HAL/hal/hal.h>
 
 #include <odp/rpc/rpc.h>
+#include <odp/rpc/eth.h>
 #include <mppa_eth_core.h>
 #include <mppa_eth_loadbalancer_core.h>
 #include <mppa_eth_phy.h>

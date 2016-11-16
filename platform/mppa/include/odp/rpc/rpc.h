@@ -10,11 +10,6 @@ typedef struct {
 
 /* Command modules */
 #include <odp/rpc/bas.h>
-#include <odp/rpc/eth.h>
-#include <odp/rpc/pcie.h>
-#include <odp/rpc/c2c.h>
-#include <odp/rpc/rnd.h>
-#include <odp/rpc/fp.h>
 
 typedef enum {
 	MPPA_RPC_ODP_ERR_NONE = 0,
@@ -58,25 +53,22 @@ typedef enum {
 	MPPA_RPC_ODP_N_CLASS
 } mppa_rpc_odp_class_e;
 
+#define _MPPA_RPC_ODP_DEFINE_ACK(name, cmds)		\
+	typedef union {					\
+		struct {				\
+			uint8_t status;			\
+			cmds;				\
+		};					\
+		mppa_rpc_odp_inl_data_t inl_data;	\
+	} mppa_rpc_odp_ack##name##t;			\
+	MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_ack##name##t)
 
-typedef union {
-	struct {
-		uint8_t status;
-		union {
-			uint8_t foo;                    /* Dummy entry for init */
-			MPPA_RPC_ODP_ACK_LIST_BAS
-			MPPA_RPC_ODP_ACK_LIST_ETH
-			MPPA_RPC_ODP_ACK_LIST_PCIE
-			MPPA_RPC_ODP_ACK_LIST_C2C
-			MPPA_RPC_ODP_ACK_LIST_RND
-			MPPA_RPC_ODP_ACK_LIST_FP
-		} cmd;
-	};
-	mppa_rpc_odp_inl_data_t inl_data;
-} mppa_rpc_odp_ack_t;
-MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_ack_t);
+/* Default* Ack struct */
+_MPPA_RPC_ODP_DEFINE_ACK(_, uint8_t data[31];);
+#define MPPA_RPC_ODP_CMD_ACK_INITIALIZER { .inl_data = { .data = { 0 }}, .data = { 0 }, .status = 0}
 
-#define MPPA_RPC_ODP_CMD_ACK_INITIALIZER { .inl_data = { .data = { 0 }}, .cmd = { 0 }, .status = 0}
+/* Macro for each module to define its Ack. */
+#define MPPA_RPC_ODP_DEFINE_ACK(name, cmds) _MPPA_RPC_ODP_DEFINE_ACK(_##name##_, union { cmds } cmd)
 
 /** RPC client status */
 extern int g_rpc_init;

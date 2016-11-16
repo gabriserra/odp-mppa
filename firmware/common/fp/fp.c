@@ -3,6 +3,7 @@
 #include <HAL/hal/hal.h>
 #include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/fp.h>
 #include <mppa_noc.h>
 #include <stdio.h>
 

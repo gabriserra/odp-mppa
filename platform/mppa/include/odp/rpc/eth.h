@@ -31,10 +31,6 @@ typedef enum {
 		"ETH SET STATE",		\
 		"ETH GET STATS"
 
-#define MPPA_RPC_ODP_ACK_LIST_ETH				\
-	mppa_rpc_odp_ack_eth_open_t eth_open;		\
-	mppa_rpc_odp_ack_eth_get_stat_t eth_get_stat;
-
 /**
  * Command for MPPA_RPC_ODP_CMD_ETH_OPEN
  */
@@ -215,6 +211,8 @@ typedef struct {
 }  mppa_rpc_odp_payload_eth_get_stat_t;
 
 
+MPPA_RPC_ODP_DEFINE_ACK(eth, mppa_rpc_odp_ack_eth_open_t eth_open;
+			mppa_rpc_odp_ack_eth_get_stat_t eth_get_stat;);
 
 /*
  *

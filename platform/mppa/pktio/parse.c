@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/eth.h>
 #include <odp_packet_io_internal.h>
 #include "odp_rx_internal.h"
 

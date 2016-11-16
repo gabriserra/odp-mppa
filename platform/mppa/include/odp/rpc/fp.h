@@ -14,6 +14,4 @@ typedef enum {
 #define MPPA_RPC_ODP_CMD_NAMES_FP \
 	"CLI",
 
-#define MPPA_RPC_ODP_ACK_LIST_FP
-
 #endif /* __ODP_RPC_FP_H__ */

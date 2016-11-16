@@ -10,6 +10,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/pcie.h>
 
 #ifdef K1_NODEOS
 #include <pthread.h>
@@ -97,7 +98,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_pcie_t ack;
 	int ret;
 	uint8_t *payload;
 	/*
@@ -141,7 +142,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 	pcie->min_tx_tag = ack.cmd.pcie_open.min_tx_tag;
 	pcie->max_tx_tag = ack.cmd.pcie_open.max_tx_tag;
 	pcie->nb_tx_tags = ack.cmd.pcie_open.max_tx_tag - ack.cmd.pcie_open.min_tx_tag + 1;
-	memcpy(pcie->mac_addr, ack.cmd.pcie_open.mac, ETH_ALEN);
+	memcpy(pcie->mac_addr, ack.cmd.pcie_open.mac, PCIE_ALEN);
 	pcie->mtu = ack.cmd.pcie_open.mtu;
 
 	return 0;
@@ -293,7 +294,7 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 	int slot_id = pcie->slot_id;
 	int pcie_eth_if_id = pcie->pcie_eth_if_id;
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_pcie_t ack;
 	int ret;
 	mppa_rpc_odp_cmd_pcie_clos_t close_cmd = {
 		{
@@ -341,8 +342,8 @@ static int pcie_mac_addr_get(pktio_entry_t *pktio_entry ODP_UNUSED,
 			    void *mac_addr ODP_UNUSED)
 {
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
-	memcpy(mac_addr, pcie->mac_addr, ETH_ALEN);
-	return ETH_ALEN;
+	memcpy(mac_addr, pcie->mac_addr, PCIE_ALEN);
+	return PCIE_ALEN;
 }
 
 static int pcie_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],

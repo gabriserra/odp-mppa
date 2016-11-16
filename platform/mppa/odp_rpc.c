@@ -8,6 +8,11 @@
 #include <inttypes.h>
 #include <HAL/hal/hal.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/eth.h>
+#include <odp/rpc/pcie.h>
+#include <odp/rpc/c2c.h>
+#include <odp/rpc/rnd.h>
+#include <odp/rpc/fp.h>
 
 #include <mppa_bsp.h>
 #include <mppa_routing.h>

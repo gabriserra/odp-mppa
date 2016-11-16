@@ -16,6 +16,4 @@ typedef enum {
 	"INVALID",							\
 		"PING"
 
-#define MPPA_RPC_ODP_ACK_LIST_BAS
-
 #endif /* __MPPA_RPC_ODP_BAS_H__ */

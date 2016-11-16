@@ -18,8 +18,6 @@ typedef enum {
 		"C2C CLOSE",			\
 		"C2C QUERY"
 
-#define MPPA_RPC_ODP_ACK_LIST_C2C mppa_rpc_odp_ack_c2c_query_t c2c_query;
-
 /**
  * Command for MPPA_RPC_ODP_CMD_C2C_OPEN
  */
@@ -65,5 +63,8 @@ typedef struct {
 	uint8_t cnoc_rx : 8;
 	uint16_t mtu    : 16;
 } mppa_rpc_odp_ack_c2c_query_t;
+
+MPPA_RPC_ODP_DEFINE_ACK(c2c, mppa_rpc_odp_ack_c2c_query_t c2c_query;);
+
 
 #endif /* __MPPA_RPC_ODP_C2C_H__ */

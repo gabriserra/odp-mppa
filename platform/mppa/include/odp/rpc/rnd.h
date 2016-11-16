@@ -14,8 +14,6 @@ typedef enum {
 #define MPPA_RPC_ODP_CMD_NAMES_RND			\
 	"RANDOM GET"
 
-#define MPPA_RPC_ODP_ACK_LIST_RND
-
 /**
  * Command for MPPA_RPC_ODP_CMD_RND_GET
  */

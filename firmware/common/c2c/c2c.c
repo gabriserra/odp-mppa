@@ -5,6 +5,7 @@
 #include <HAL/hal/hal.h>
 
 #include <odp/rpc/rpc.h>
+#include <odp/rpc/c2c.h>
 #include <stdio.h>
 #include <mppa_noc.h>
 
@@ -75,23 +76,23 @@ void c2c_query(unsigned src_cluster, mppa_rpc_odp_t *msg,
 	const c2c_status_t * d2s = &c2c_status[dst_cluster][src_cluster];
 
 	if (!s2d->opened || !d2s->opened){
-		answer->ack.status = 1;
-		answer->ack.cmd.c2c_query.closed = 1;
+		GET_ACK(c2c, answer)->status = 1;
+		GET_ACK(c2c, answer)->cmd.c2c_query.closed = 1;
 		return;
 	}
 
 	if (!s2d->tx_enabled || !d2s->rx_enabled) {
-		answer->ack.status = 1;
-		answer->ack.cmd.c2c_query.eacces = 1;
+		GET_ACK(c2c, answer)->status = 1;
+		GET_ACK(c2c, answer)->cmd.c2c_query.eacces = 1;
 		return;
 	}
-	answer->ack.cmd.c2c_query.mtu = d2s->rx_size;
-	if (s2d->rx_size < answer->ack.cmd.c2c_query.mtu)
-		answer->ack.cmd.c2c_query.mtu = s2d->rx_size;
+	GET_ACK(c2c, answer)->cmd.c2c_query.mtu = d2s->rx_size;
+	if (s2d->rx_size < GET_ACK(c2c, answer)->cmd.c2c_query.mtu)
+		GET_ACK(c2c, answer)->cmd.c2c_query.mtu = s2d->rx_size;
 
-	answer->ack.cmd.c2c_query.min_rx = d2s->min_rx;
-	answer->ack.cmd.c2c_query.max_rx = d2s->max_rx;
-	answer->ack.cmd.c2c_query.cnoc_rx = d2s->cnoc_rx;
+	GET_ACK(c2c, answer)->cmd.c2c_query.min_rx = d2s->min_rx;
+	GET_ACK(c2c, answer)->cmd.c2c_query.max_rx = d2s->max_rx;
+	GET_ACK(c2c, answer)->cmd.c2c_query.cnoc_rx = d2s->cnoc_rx;
 	return;
 }
 

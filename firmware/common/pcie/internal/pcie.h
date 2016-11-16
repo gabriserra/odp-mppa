@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <odp/rpc/rpc.h>
+#include <odp/rpc/pcie.h>
 #include "pcie.h"
 #include "rpc-server.h"
 #include "internal/rpc-server.h"

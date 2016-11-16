@@ -34,6 +34,8 @@ typedef struct {
 
 int mppa_rpc_odp_server_ack(mppa_rpc_odp_answer_t *answer);
 
+#define GET_ACK(type, ptr) ((mppa_rpc_odp_ack_##type##_t*)(&answer->ack))
+
 /** Global structure for modules to register their handlers */
 extern mppa_rpc_odp_handler_t __rpc_handlers[MPPA_RPC_ODP_N_CLASS];
 

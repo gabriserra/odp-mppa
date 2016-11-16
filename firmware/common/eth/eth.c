@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <HAL/hal/hal.h>
 #include <odp/rpc/rpc.h>
+#include <odp/rpc/eth.h>
 
 #include "rpc-server.h"
 #include "internal/rpc-server.h"
@@ -92,21 +93,21 @@ void eth_open(unsigned remoteClus, mppa_rpc_odp_t *msg,
 	if (ethtool_start_lane(data.ifId, data.loopback, data.verbose, answer))
 		goto err;
 
-	answer->ack.cmd.eth_open.tx_if = externalAddress;
-	answer->ack.cmd.eth_open.tx_tag = status[eth_if].cluster[remoteClus].rx_tag;
+	GET_ACK(eth, answer)->cmd.eth_open.tx_if = externalAddress;
+	GET_ACK(eth, answer)->cmd.eth_open.tx_tag = status[eth_if].cluster[remoteClus].rx_tag;
 	if (data.jumbo) {
-		answer->ack.cmd.eth_open.mtu = 9000;
+		GET_ACK(eth, answer)->cmd.eth_open.mtu = 9000;
 	} else {
-		answer->ack.cmd.eth_open.mtu = 1600;
+		GET_ACK(eth, answer)->cmd.eth_open.mtu = 1600;
 	}
 
 	if (!lb_status.dual_mac || fallthrough) {
-		memcpy(answer->ack.cmd.eth_open.mac, status[eth_if].mac_address[0], ETH_ALEN);
+		memcpy(GET_ACK(eth, answer)->cmd.eth_open.mac, status[eth_if].mac_address[0], ETH_ALEN);
 	} else {
-		memcpy(answer->ack.cmd.eth_open.mac, status[eth_if].mac_address[1], ETH_ALEN);
+		memcpy(GET_ACK(eth, answer)->cmd.eth_open.mac, status[eth_if].mac_address[1], ETH_ALEN);
 	}
 
-	answer->ack.cmd.eth_open.lb_ts_off = lb_timestamp;
+	GET_ACK(eth, answer)->cmd.eth_open.lb_ts_off = lb_timestamp;
 
 	return;
  err:
@@ -217,7 +218,7 @@ void eth_get_stat(unsigned remoteClus __attribute__((unused)),
 		   ETH_RPC_ERR_MSG(answer, "Tring to set state for 1/10G lane while lane is closed or in 40G\n");
 		   return;
 	}
-	answer->ack.cmd.eth_get_stat.link_status = ethtool_poll_lane(data.ifId);
+	GET_ACK(eth, answer)->cmd.eth_get_stat.link_status = ethtool_poll_lane(data.ifId);
 
 	if (data.link_stats) {
 		ethtool_lane_stats(data.ifId, answer);
