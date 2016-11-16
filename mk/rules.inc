@@ -59,7 +59,7 @@ $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)
 	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS) \
 	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-debug-config.cache
 
-odp-debug-$(1)-build: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
+odp-debug-$(1)-build: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile $(odp-build_DEPS)
 	$$(MAKE) -C$$$$(basename $$@)V=1 all
 odp-debug-$(1)-clean:
 	rm -Rf $(ODP_$(1)_DEBUG_BUILDDIR)
@@ -79,7 +79,7 @@ $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/l
 	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) \
 	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-config.cache
 
-odp-$(1)-build: $(ODP_$(1)_BUILDDIR)/Makefile
+odp-$(1)-build: $(ODP_$(1)_BUILDDIR)/Makefile $(odp-build_DEPS)
 	$$(MAKE) -C$$$$(dirname $$<) V=1 all
 
 odp-$(1)-install-lib: odp-$(1)-build
@@ -132,7 +132,7 @@ define FIRMWARE_RULE
 #$(2) Firmware type
 $(eval $(1)-$(2)-ENV := ODP_FIRMWARE_CONFIG="$(1)" INSTDIR="$(firmware_$(1)_INSTDIR)" ODP_TOOLCHAIN_DIR="$(K1ST_DIR)" FIRMWARE_VERSION="$(FIRMWARE_VERSION)")
 firmware-$(2)-$(1)-configure: firmware/$(2)/Makefile
-firmware-$(2)-$(1)-build: firmware/$(2)/Makefile extra-install odp-k1b-kalray-mos_hw-install-headers
+firmware-$(2)-$(1)-build: firmware/$(2)/Makefile extra-install odp-k1b-kalray-mos_hw-install-headers $(firmware-build_DEPS)
 	mkdir -p $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2)
 	cd $(ARCH_DIR)/firmware/$(lastword $(subst _, ,$(1)))/$(2) && $$(MAKE) -f $(TOP_DIR)/firmware/$(2)/Makefile all $($(1)-$(2)-ENV)
 
