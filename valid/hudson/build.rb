@@ -113,7 +113,10 @@ if ENV["label"].to_s() != "" then
     when /MPPAExplorers_k1b*/
         valid_configs = [ "k1b-kalray-nodeos_explorer", "k1b-kalray-mos_explorer" ]
         valid_type = "jtag"
-    else
+     when "debian8-64"
+	b.run("	echo 'SKIP'");
+	b.log.finish(b.current_target)
+   else
         raise("Unsupported label #{ENV["label"]}!")
     end
 end
