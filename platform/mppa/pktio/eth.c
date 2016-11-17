@@ -9,6 +9,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/eth.h>
 #include <HAL/hal/core/optimize.h>
 
 #ifdef K1_NODEOS
@@ -70,7 +71,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 {
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_eth_t ack;
 	int ret;
 	uint8_t *payload;
 
@@ -329,7 +330,7 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 	int slot_id = eth->slot_id;
 	int port_id = eth->port_id;
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_eth_t ack;
 	int ret;
 	mppa_rpc_odp_cmd_eth_clos_t close_cmd = {
 		{
@@ -379,7 +380,7 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 	int slot_id = eth->slot_id;
 	int port_id = eth->port_id;
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_eth_t ack;
 	int ret;
 	mppa_rpc_odp_cmd_eth_state_t state_cmd = {
 		{
@@ -518,7 +519,7 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_eth_t ack;
 	int ret;
 	uint8_t *payload;
 	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats;

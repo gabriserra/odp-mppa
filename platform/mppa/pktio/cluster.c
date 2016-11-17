@@ -7,6 +7,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/c2c.h>
 
 #include <mppa_bsp.h>
 #include <mppa_routing.h>
@@ -101,7 +102,7 @@ static int cluster_rpc_send_c2c_open(odp_pktio_param_t * params, pkt_cluster_t *
 {
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_c2c_t ack;
 	int ret;
 
 	/*
@@ -158,7 +159,7 @@ static int cluster_rpc_send_c2c_query(pkt_cluster_t *cluster)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_c2c_t ack;
 	int ret;
 
 	mppa_rpc_odp_cmd_c2c_query_t query_cmd = {
@@ -350,7 +351,7 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 {
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
 	mppa_rpc_odp_t *ack_msg;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_c2c_t ack;
 	int ret;
 	mppa_rpc_odp_cmd_c2c_clos_t close_cmd = {
 		{

@@ -21,20 +21,28 @@ PERF_FILES := $(wildcard perf/*/regex) perf/run_single
 MAKE_M4S:= $(shell find $(TOP_DIR) -name "*.m4")
 MAKE_DEPS:= $(MAKE_AMS) $(MAKE_M4S) $(TOP_DIR)/Makefile $(wildcard $(TOP_DIR)/mk/*.inc)
 FIRMWARE_VERSION= $(shell $(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
+RPCFIRMWARE_PATH := $(K1_TOOLCHAIN_DIR)/kalray_internal/rpc-firmwares
 
 FIRMWARES := $(patsubst firmware/%/Makefile, %, $(wildcard firmware/*/Makefile))
 APPS      := $(patsubst apps/%/Makefile, %, $(wildcard apps/*/Makefile))
 LONGS     := $(patsubst long/%/Makefile, %, $(wildcard long/*/Makefile))
+RPCINCLUDES := $(shell find $(RPCFIRMWARE_PATH)/include/ -name *.h)
+RPCMODS    := $(shell find $(RPCFIRMWARE_PATH)/firmware/ -type f)
+RPCINCLUDES_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, platform/mppa/%, $(RPCINCLUDES))
+RPCMODS_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, %, $(RPCMODS))
+
 RULE_LIST_SERIAL   :=  install valid
 RULE_LIST_PARALLEL := clean configure build
 RULE_LIST := $(RULE_LIST_SERIAL) $(RULE_LIST_PARALLEL)
 ARCH_COMPONENTS := odp cunit
-COMPONENTS := extra doc $(ARCH_COMPONENTS) firmware perf
+COMPONENTS := extra doc $(ARCH_COMPONENTS) firmware perf rpc
 CHECK_LIST :=
 FIRMWARE_FILES := $(shell find firmware/common -type f -or -type l) firmware/Makefile
 TEMPLATE_FILES := $(shell find apps/skel -type f -or -type l)
 install_DEPS := build
+firmware-build_DEPS := $(RPCMODS_INST)
 firmware-install_DEPS := firmware-common-install
+odp-build_DEPS := $(RPCINCLUDES_INST)
 
 include mk/platforms.inc
 include mk/rules.inc
@@ -89,7 +97,6 @@ doc-install:
 # Perf rules
 #
 perf-clean:
-	$(MAKE) -C$(TOP_DIR)/perf clean
 perf-configure:
 perf-build:
 perf-long:
@@ -132,6 +139,20 @@ $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh: ktest-wrapper.sh
 
 $(patsubst %, $(K1ST_DIR)/share/odp/%, $(PERF_FILES)): $(K1ST_DIR)/share/odp/%: %
 	install -D $< $@
+#
+# RPC rules:
+#
+rpc-build:
+rpc-valid:
+rpc-install: $(RPCINCLUDES_INST) $(RPCMODS_INST)
+rpc-clean:
+	rm -f $(RPCINCLUDES_INST) $(RPCMODS_INST)
+$(RPCINCLUDES_INST): platform/mppa/% : $(RPCFIRMWARE_PATH)/%
+	install -D $< $@
+$(RPCMODS_INST): % : $(RPCFIRMWARE_PATH)/%
+	install -D $< $@
+list-rpc-files:
+	@echo  $(RPCINCLUDES_INST) $(RPCMODS_INST)
 
 #
 # Generate rule wrappers that pull all CONFIGS for a given (firmware/Arch componen)|RULE

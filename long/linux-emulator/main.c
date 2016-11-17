@@ -4,6 +4,7 @@
 #include <mppa_noc.h>
 #include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/eth.h>
 
 typedef struct {
 	uint8_t dma_if;          /**< DMA Rx Interface */
@@ -56,7 +57,7 @@ int main(){
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
 	rx_config_t rx_config;
-	mppa_rpc_odp_ack_t ack;
+	mppa_rpc_odp_ack_eth_t ack;
 
 	for (volatile int i = 0; i < 20000000; ++i);
 	mppa_rpc_odp_client_init();

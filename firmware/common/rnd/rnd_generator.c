@@ -6,6 +6,7 @@
 #include <mppa_bsp.h>
 #include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/rnd.h>
 
 #include "internal/lib_trng.h"
 #include "internal/rpc-server.h"
@@ -97,7 +98,7 @@ rnd_send_buffer(unsigned remoteClus, mppa_rpc_odp_t * msg) {
 	assert( rnd.rnd_len <= sizeof(rnd.rnd_data));
 
 	rnd.rnd_len = odp_rnd_gen_get((char*)rnd.rnd_data, rnd.rnd_len);
-	mppa_rpc_odp_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
+	rpc_server_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
 }
 
 static int rnd_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)

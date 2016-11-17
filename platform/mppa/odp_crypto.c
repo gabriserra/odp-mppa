@@ -17,6 +17,7 @@
 #include <odp/hints.h>
 #include <odp/random.h>
 #include <odp/rpc/api.h>
+#include <odp/rpc/rnd.h>
 
 #include <stdint.h>
 #include <odp_packet_internal.h>

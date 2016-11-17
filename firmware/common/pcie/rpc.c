@@ -209,12 +209,12 @@ static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
 	if (ret)
 		return;
 
-	answer->ack.cmd.pcie_open.min_tx_tag = min_tx_tag; /* RX ID ! */
-	answer->ack.cmd.pcie_open.max_tx_tag = max_tx_tag; /* RX ID ! */
-	answer->ack.cmd.pcie_open.tx_if = mppa_rpc_odp_get_cluster_id(if_id);
+	GET_ACK(pcie, answer)->cmd.pcie_open.min_tx_tag = min_tx_tag; /* RX ID ! */
+	GET_ACK(pcie, answer)->cmd.pcie_open.max_tx_tag = max_tx_tag; /* RX ID ! */
+	GET_ACK(pcie, answer)->cmd.pcie_open.tx_if = mppa_rpc_odp_get_cluster_id(if_id);
 	/* FIXME, we send the same MTU as the one received */
-	answer->ack.cmd.pcie_open.mtu = cfg->mtu;
-	memcpy(answer->ack.cmd.pcie_open.mac,
+	GET_ACK(pcie, answer)->cmd.pcie_open.mtu = cfg->mtu;
+	memcpy(GET_ACK(pcie, answer)->cmd.pcie_open.mac,
 	       eth_ctrl->configs[open_cmd.pcie_eth_if_id].mac_addr,
 	       MAC_ADDR_LEN);
 
