@@ -10,8 +10,8 @@
 #include <sched.h>
 #include <pthread.h>
 
-#include <odp/cpu.h>
-#include <odp/cpumask.h>
+#include <odp/api/cpu.h>
+#include <odp/api/cpumask.h>
 #include <odp_debug_internal.h>
 
 int odp_cpumask_default_worker(odp_cpumask_t *mask, int num_in)
@@ -59,4 +59,12 @@ int odp_cpumask_default_control(odp_cpumask_t *mask, int num ODP_UNUSED)
 	/* By default all control threads on CPU 0 */
 	odp_cpumask_set(mask, 0);
 	return 1;
+}
+
+int odp_cpumask_all_available(odp_cpumask_t *mask)
+{
+	odp_cpumask_default_control(mask, 0);
+	odp_cpumask_set(mask, 0);
+
+	return odp_cpumask_count(mask);
 }

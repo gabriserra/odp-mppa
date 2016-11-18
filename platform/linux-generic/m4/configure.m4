@@ -36,4 +36,9 @@ m4_include([platform/linux-generic/m4/odp_dpdk.m4])
 m4_include([platform/linux-generic/m4/odp_ipc.m4])
 m4_include([platform/linux-generic/m4/odp_schedule.m4])
 
-AC_CONFIG_FILES([platform/linux-generic/Makefile])
+AC_CONFIG_FILES([platform/linux-generic/Makefile
+		 pkgconfig/libodp-linux.pc
+		 pkgconfig/libodphelper-linux.pc])
+
+IMPLEMENTATION_NAME="odp-linux"
+ODP_LIB_NAME=linux

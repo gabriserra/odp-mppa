@@ -146,7 +146,7 @@ static void count(counter_type_e type) {
 }
 #endif
 
-odp_pktio_t pktios[ODP_CONFIG_PKTIO_ENTRIES];
+odp_pktio_t pktios[16];
 unsigned n_pktios = 0;
 
 /**
@@ -268,13 +268,12 @@ void ipsec_init_pre(void)
 	 *  - sequence number queue (must be ATOMIC)
 	 */
 	odp_queue_param_init(&qparam);
+	qparam.type        = ODP_QUEUE_TYPE_PLAIN;
 	qparam.sched.prio  = ODP_SCHED_PRIO_HIGHEST;
-	qparam.sched.sync  = ODP_SCHED_SYNC_NONE;
+	qparam.sched.sync  = ODP_SCHED_SYNC_PARALLEL;
 	qparam.sched.group = ODP_SCHED_GROUP_ALL;
 
-	seqnumq = odp_queue_create("seqnum",
-				   ODP_QUEUE_TYPE_POLL,
-				   &qparam);
+	seqnumq = odp_queue_create("seqnum", &qparam);
 	if (ODP_QUEUE_INVALID == seqnumq) {
 		EXAMPLE_ERR("Error: sequence number queue creation failed\n");
 		exit(EXIT_FAILURE);
@@ -351,14 +350,12 @@ static
 void initialize_intf(char *intf)
 {
 	odp_pktio_t pktio;
-	odp_queue_t inq_def;
-	char inq_name[ODP_QUEUE_NAME_LEN];
-	odp_queue_param_t qparam;
-	int ret;
+	odp_pktin_queue_t inq;
 	odp_pktio_param_t pktio_param;
+	odp_pktin_queue_param_t pktin_param;
 
 	odp_pktio_param_init(&pktio_param);
-	pktio_param.in_mode = ODP_PKTIN_MODE_POLL;
+	pktio_param.in_mode = ODP_PKTIN_MODE_DIRECT;
 
 	/*
 	 * Open a packet IO instance for thread and get default output queue
@@ -370,28 +367,21 @@ void initialize_intf(char *intf)
 	}
 	pktios[n_pktios++] = pktio;
 
-	/*
-	 * Create and set the default INPUT queue associated with the 'pktio'
-	 * resource
-	 */
-	odp_queue_param_init(&qparam);
-	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync  = ODP_SCHED_SYNC_NONE;
-	qparam.sched.group = ODP_SCHED_GROUP_ALL;
-	snprintf(inq_name, sizeof(inq_name), "%" PRIu64 "-pktio_inq_def",
-		 odp_pktio_to_u64(pktio));
-	inq_name[ODP_QUEUE_NAME_LEN - 1] = '\0';
+	odp_pktin_queue_param_init(&pktin_param);
+	pktin_param.queue_param.sched.sync = ODP_SCHED_SYNC_ATOMIC;
 
-	inq_def = odp_queue_create(inq_name, ODP_QUEUE_TYPE_PKTIN, &qparam);
-	if (ODP_QUEUE_INVALID == inq_def) {
-		EXAMPLE_ERR("Error: pktio queue creation failed for %s\n",
-			    intf);
+	if (odp_pktin_queue_config(pktio, &pktin_param)) {
+		EXAMPLE_ERR("Error: pktin config failed for %s\n", intf);
 		exit(EXIT_FAILURE);
 	}
 
-	ret = odp_pktio_inq_setdef(pktio, inq_def);
-	if (ret) {
-		EXAMPLE_ERR("Error: default input-Q setup for %s\n", intf);
+	if (odp_pktout_queue_config(pktio, NULL)) {
+		EXAMPLE_ERR("Error: pktout config failed for %s\n", intf);
+		exit(EXIT_FAILURE);
+	}
+
+	if (odp_pktin_queue(pktio, &inq, 1) != 1) {
+		EXAMPLE_ERR("Error: failed to get input queue for %s\n", intf);
 		exit(EXIT_FAILURE);
 	}
 }
@@ -399,13 +389,15 @@ void initialize_intf(char *intf)
 static
 void start_intf(char* intf, odp_pktio_t pktio)
 {
+	int ret;
 	uint8_t src_mac[ODPH_ETHADDR_LEN];
-    int ret;
-	char intf_name[256];
-	odp_queue_t outq_def;
+	odp_pktout_queue_t pktout;
 
 
-	outq_def = odp_pktio_outq_getdef(pktio);
+	if (odp_pktout_queue(pktio, &pktout, 1) != 1) {
+		EXAMPLE_ERR("Error: failed to get pktout queue for %s\n", intf);
+		exit(EXIT_FAILURE);
+	}
 
 	ret = odp_pktio_start(pktio);
 	if (ret) {
@@ -422,24 +414,17 @@ void start_intf(char* intf, odp_pktio_t pktio)
 	}
 
 #if 0
-	 char src_mac_str[MAX_STRING];
-	 printf("Created pktio:%02" PRIu64 ", dev:%s, queue mode (ATOMIC queues)\n"
-	        "          default pktio%02" PRIu64 "-INPUT queue:%" PRIu64 "\n"
-	        "          source mac address %s\n",
-	        odp_pktio_to_u64(pktio), intf, odp_pktio_to_u64(pktio),
-	        odp_queue_to_u64(inq_def),
-	        mac_addr_str(src_mac_str, src_mac));
+	char src_mac_str[MAX_STRING];
+	printf("Created pktio:%02" PRIu64 ", queue mode (ATOMIC queues)\n"
+	       "          default pktio%02" PRIu64 "-INPUT queue:%" PRIu64 "\n"
+	       "          source mac address %s\n",
+	       odp_pktio_to_u64(pktio), odp_pktio_to_u64(pktio),
+	       odp_queue_to_u64(inq),
+	       mac_addr_str(src_mac_str, src_mac));
 #endif
 
-	char* end = strchr(intf, ':');
-	if (end) {
-		memcpy(intf_name, intf, end - intf);
-		intf_name[end-intf] = 0;
-	} else {
-		strcpy(intf_name, intf);
-	}
 	/* Resolve any routes using this interface for output */
-	resolve_fwd_db(intf_name, outq_def, src_mac);
+	resolve_fwd_db(intf, pktout, src_mac);
 }
 
 /**
@@ -488,7 +473,8 @@ pkt_disposition_e do_route_fwd_db(odp_packet_t pkt, fwd_db_entry_t *entry)
 
 		memcpy(&eth->dst, entry->dst_mac, ODPH_ETHADDR_LEN);
 		memcpy(&eth->src, entry->src_mac, ODPH_ETHADDR_LEN);
-		odp_packet_user_ptr_set(pkt, (void*)entry->queue);
+		memcpy(odp_packet_user_area(pkt), &entry->pktout,
+		       sizeof(entry->pktout));
 
 		return PKT_CONTINUE;
 	}
@@ -531,11 +517,11 @@ pkt_disposition_e do_ipsec_out_classify(odp_packet_t pkt,
 {
 	uint8_t *buf = odp_packet_data(pkt);
 	odph_ipv4hdr_t *ip = (odph_ipv4hdr_t *)odp_packet_l3_ptr(pkt, NULL);
-    if (ip == NULL) {
-        printf("Error : do_ipsec_out_classify: no valid l3 ptr, dropping pkt\n");
+	if (ip == NULL) {
+		/* printf("Error : do_ipsec_out_classify: no valid l3 ptr, dropping pkt\n"); */
 		fflush(stdout);
-        return PKT_DROP;
-    }
+		return PKT_DROP;
+	}
 	uint16_t ip_data_len = ipv4_data_len(ip);
 	uint8_t *ip_data = ipv4_data_p(ip);
 	ipsec_cache_entry_t *entry;
@@ -795,268 +781,254 @@ static odp_packet_t pack_udp_pkt(void);
 odp_packet_t inj_pkts[PKT_BURST_SIZE];
 
 static
-void *pktio_thread(void *arg EXAMPLE_UNUSED)
+int pktio_thread(void *arg EXAMPLE_UNUSED)
 {
-    int thr;
-    //odp_event_t ev;
-    pkt_disposition_e rc;
+	int thr;
+	//odp_event_t ev;
+	pkt_disposition_e rc;
 
-    uint64_t totdq = 0;
+	uint64_t totdq = 0;
 
-    thr = odp_thread_id();
+	thr = odp_thread_id();
 
-    odp_barrier_wait(&sync_barrier);
+	odp_barrier_wait(&sync_barrier);
 
-    /* sender threads */
-    if ( 0
-            ||thr==2
-            //||thr==6
-            ||thr==8
-       ) {
-        //if (__k1_get_cluster_id() == 2)
-        //    printf(" %d : cpy/send\n", thr);
-        odp_pktio_t pktio;
-        if (thr==2) pktio = pktios[0];
-        else if (thr==8) pktio = pktios[1];
-        else pktio = pktios[0];
-        odp_packet_t inj_pkts = ODP_PACKET_INVALID;
-        while (inj_pkts == ODP_PACKET_INVALID)
-            inj_pkts = pack_udp_pkt();
-        odp_packet_has_ipv4_set(inj_pkts, 1);
+	/* sender threads */
+	if (thr == 2 || thr == 8 ) {
+		odp_pktio_t pktio;
+		odp_packet_t inj_pkts = ODP_PACKET_INVALID;
+		odp_pktout_queue_t pktout;
 
-        for (;;) {
-            odp_packet_t bye_pkt;
-            bye_pkt = ODP_PACKET_INVALID;
-            while (bye_pkt == ODP_PACKET_INVALID)
-                bye_pkt = odp_packet_copy(inj_pkts, pkt_pool);
-            if (1)
-            {
-                int n = 0;
-                while (n == 0)
-                    n = odp_pktio_send(pktio, &bye_pkt, 1);
-            } else {
-                odp_packet_free(bye_pkt);
-            }
-        }
+		if (thr == 2)
+			pktio = pktios[0];
+		else if (thr == 8)
+			pktio = pktios[1];
+		else
+			pktio = pktios[0];
 
-    }
-    /* receiver threads */
-    if ( 0
-            ||thr==4
-            ||thr==10
-            //||thr==12
-       )
-    {
-        //if (__k1_get_cluster_id() == 2)
-        //    printf(" %d : recv/inject\n", thr);
-        odp_pktio_t pktio;
-        if (thr==4) pktio = pktios[0];
-        else if (thr==10) pktio = pktios[1];
-        else pktio = pktios[0];
-        odp_packet_t welcome_pkts[PKT_BURST_SIZE];
+		while (inj_pkts == ODP_PACKET_INVALID)
+			inj_pkts = pack_udp_pkt();
+		odp_packet_has_ipv4_set(inj_pkts, 1);
+		odp_pktout_queue(pktio, &pktout, 1);
 
-        for (;;) {
-            int n = 0;
-            while (n == 0) 
-                n = odp_pktio_recv(pktio, welcome_pkts, PKT_BURST_SIZE);
-            int n_enq = odp_queue_enq_multi(seqnumq, (odp_event_t*)welcome_pkts, n);
-            if (n_enq < 0)
-                printf(" ERROR odp_queue_enq_multi failed, n_enq = %d\n", n_enq);
-            else if (n_enq != n)
-                printf("-> enqueued %d pkts !!\n", n_enq);
-            totnq[thr] += n_enq;
-        }
-    }
+		for (;;) {
+			odp_packet_t bye_pkt;
+			bye_pkt = ODP_PACKET_INVALID;
+			while (bye_pkt == ODP_PACKET_INVALID)
+				bye_pkt = odp_packet_copy(inj_pkts, pkt_pool);
+			if (1)
+				{
+					int n = 0;
+					while (n == 0)
+						n = odp_pktout_send(pktout, &bye_pkt, 1);
+				} else {
+				odp_packet_free(bye_pkt);
+			}
+		}
 
-    /* direct inject threads */
-    if ( 0 
-            //||thr==6
-            //||thr==12
-       )
-    {
-        //if (__k1_get_cluster_id() == 2)
-        //    printf(" %d : inject\n", thr);
-        odp_packet_t inj_pkts = ODP_PACKET_INVALID;
-        while (inj_pkts == ODP_PACKET_INVALID)
-            inj_pkts = pack_udp_pkt();
-        odp_packet_has_ipv4_set(inj_pkts, 1);
+	}
+	/* receiver threads */
+	if (thr == 4 ||thr == 10) {
+		odp_pktio_t pktio;
+		odp_packet_t welcome_pkts[PKT_BURST_SIZE];
+		odp_pktin_queue_t pktin;
 
-        for(;;) {
-            odp_packet_t crypt_pkts[PKT_BURST_SIZE];
-            odp_packet_t drop_pkts[PKT_BURST_SIZE];
-            odp_packet_t pkts[PKT_BURST_SIZE];
-            int n_crypt = 0;
-            int pkt_off = 0;
-            int n_drop = 0;
-            int ret = 0;
+		if (thr == 4)
+			pktio = pktios[0];
+		else if (thr == 10)
+			pktio = pktios[1];
+		else
+			pktio = pktios[0];
+		if (odp_pktin_queue(pktio, &pktin, 1) != 1) {
+			printf("ERROR Failed to get pktio pktin queue %p\n", pktio);
+		}
 
-            int n_pkt = PKT_BURST_SIZE;
-            for (int i = 0; i < n_pkt; i++) {
-                pkts[i] = ODP_PACKET_INVALID;
-                while (pkts[i] == ODP_PACKET_INVALID)
-                    pkts[i] = odp_packet_copy(inj_pkts, pkt_pool);
-            }
-            count(CNT_PKT_RX);
+		for (;;) {
+			int n = 0;
+			while (n == 0)
+				n = odp_pktin_recv(pktin, welcome_pkts, PKT_BURST_SIZE);
+			int n_enq = odp_queue_enq_multi(seqnumq, (odp_event_t*)welcome_pkts, n);
+			if (n_enq < 0)
+				printf(" ERROR odp_queue_enq_multi failed, n_enq = %d\n", n_enq);
+			else if (n_enq != n)
+				printf("-> enqueued %d pkts !!\n", n_enq);
+			totnq[thr] += n_enq;
+		}
+	}
 
-            for (int i = 0; i < n_pkt; ++i) {
-                start_counter(CNT_GLOBAL);
-                start_counter(CNT_INPUT_VERIFY);
-                rc = do_input_verify(pkts[i]);
-                stop_counter(CNT_INPUT_VERIFY);
+	/* direct inject threads */
+	if ( 0 ) {
+		odp_packet_t inj_pkts = ODP_PACKET_INVALID;
+		while (inj_pkts == ODP_PACKET_INVALID)
+			inj_pkts = pack_udp_pkt();
+		odp_packet_has_ipv4_set(inj_pkts, 1);
 
-                if(rc != PKT_CONTINUE)
-                    goto end;
+		for(;;) {
+			odp_packet_t crypt_pkts[PKT_BURST_SIZE];
+			odp_packet_t drop_pkts[PKT_BURST_SIZE];
+			odp_packet_t pkts[PKT_BURST_SIZE];
+			int n_crypt = 0;
+			int pkt_off = 0;
+			int n_drop = 0;
+			int ret = 0;
 
-                start_counter(CNT_CHECK_CRYPTO_OUT);
-                ret = require_ipsec_out(pkts[i]);
-                if (!ret) 
-                    printf("pkts %d does not req ipsec out!!!\n", i);
-                if (ret == 1) {
-                    crypt_pkts[n_crypt++] = pkts[i];
-                    continue;
-                } else if (!ret){
-                    rc = PKT_CONTINUE;
-                } else {
-                    rc = PKT_DROP;
-                }
-                stop_counter(CNT_CHECK_CRYPTO_OUT);
-end:
-                /* Check for drop */
-                if (PKT_DROP == rc) {
-                    drop_pkts[n_drop++] = pkts[i];
-                    count(CNT_PKT_DROP);
-                }
-                else {
-                    pkts[pkt_off++] = pkts[i];
-                }
-                stop_counter(CNT_GLOBAL);
-            }
-            if (pkt_off) {
-                printf("WARNING pkt_off case\n");
-                start_counter(CNT_TRANSMIT);
-                odp_queue_enq_multi((odp_queue_t)odp_packet_user_ptr(pkts[0]), (odp_event_t*)pkts, pkt_off);
-                rc = PKT_DONE;
-                stop_counter(CNT_TRANSMIT);
-            }
-            if (n_crypt) {
-                int n_enq = odp_queue_enq_multi(seqnumq, (odp_event_t*)crypt_pkts, n_crypt);
-                if (n_enq < 0)
-                    printf(" ERROR odp_queue_enq_multi failed, n_enq = %d\n", n_enq);
-                else if (n_enq != n_crypt)
-                    printf("-> enqueued %d crypt_pkts !!\n", n_enq);
-                totnq[thr] += n_enq;
-            }
-            if (n_drop) {
-                printf("WARNING unexpected free\n");
-                odp_packet_free_multi(drop_pkts, n_drop);
-            }
+			int n_pkt = PKT_BURST_SIZE;
+			for (int i = 0; i < n_pkt; i++) {
+				pkts[i] = ODP_PACKET_INVALID;
+				while (pkts[i] == ODP_PACKET_INVALID)
+					pkts[i] = odp_packet_copy(inj_pkts, pkt_pool);
+			}
+			count(CNT_PKT_RX);
 
-        }
-    }
+			for (int i = 0; i < n_pkt; ++i) {
+				start_counter(CNT_GLOBAL);
+				start_counter(CNT_INPUT_VERIFY);
+				rc = do_input_verify(pkts[i]);
+				stop_counter(CNT_INPUT_VERIFY);
 
-    /* encrypt threads */
-    if ( 0 
-            ||thr%2==1
-            //||thr==3
-            //||thr==5
-            //||thr==7
-            //||thr==9
-            //||thr==11
-            //||thr==13
-            ||thr==14
-       )
-    {
-        //if (__k1_get_cluster_id() == 2)
-        //    printf(" %d : encrypt\n", thr);
-        for(;;) {
-            odp_bool_t skip = FALSE;
-            pkt_ctx_t   ctx;
-            odp_crypto_op_result_t result;
-            odp_packet_t pkts[PKT_BURST_SIZE];
-            odp_packet_t crypt_pkts[PKT_BURST_SIZE];
-            int n_crypt = 0;
-            int ret = 0;
-            int n_pkt;
-            do {
-                start_counter(CNT_DEQ);
-                n_pkt = odp_queue_deq_multi(seqnumq, (odp_event_t*)pkts, PKT_BURST_SIZE);
-                stop_counter(CNT_DEQ);
-            } while(n_pkt == 0);
+				if(rc != PKT_CONTINUE)
+					goto end;
 
-            for (int i = 0; i < n_pkt; ++i){
-                //ev = (odp_event_t) pkts[i];
-                count(CNT_PKT_RX);
-                start_counter(CNT_GLOBAL);
+				start_counter(CNT_CHECK_CRYPTO_OUT);
+				ret = require_ipsec_out(pkts[i]);
+				if (!ret) 
+					printf("pkts %d does not req ipsec out!!!\n", i);
+				if (ret == 1) {
+					crypt_pkts[n_crypt++] = pkts[i];
+					continue;
+				} else if (!ret){
+					rc = PKT_CONTINUE;
+				} else {
+					rc = PKT_DROP;
+				}
+				stop_counter(CNT_CHECK_CRYPTO_OUT);
+			end:
+				/* Check for drop */
+				if (PKT_DROP == rc) {
+					drop_pkts[n_drop++] = pkts[i];
+					count(CNT_PKT_DROP);
+				}
+				else {
+					pkts[pkt_off++] = pkts[i];
+				}
+				stop_counter(CNT_GLOBAL);
+			}
+			if (pkt_off) {
+				printf("WARNING pkt_off case\n");
+				start_counter(CNT_TRANSMIT);
+				odp_pktout_queue_t pktout;
+				memcpy(&pktout, odp_packet_user_area(pkts[0]), sizeof(pktout));
+				odp_pktout_send(pktout, pkts, pkt_off);
+				rc = PKT_DONE;
+				stop_counter(CNT_TRANSMIT);
+			}
+			if (n_crypt) {
+				int n_enq = odp_queue_enq_multi(seqnumq, (odp_event_t*)crypt_pkts, n_crypt);
+				if (n_enq < 0)
+					printf(" ERROR odp_queue_enq_multi failed, n_enq = %d\n", n_enq);
+				else if (n_enq != n_crypt)
+					printf("-> enqueued %d crypt_pkts !!\n", n_enq);
+				totnq[thr] += n_enq;
+			}
+			if (n_drop) {
+				printf("WARNING unexpected free\n");
+				odp_packet_free_multi(drop_pkts, n_drop);
+			}
 
-                odp_packet_t pkt = pkts[i];//odp_packet_from_event(ev);
+		}
+	}
 
-                start_counter(CNT_IPSEC_OUT_CLASSIFY);
-                rc = do_ipsec_out_classify(pkt, &ctx, &skip);
-                if (odp_unlikely(skip)) {
-                    //printf("multi_end case 1\n");
-                    goto multi_end;
-                }
-                stop_counter(CNT_IPSEC_OUT_CLASSIFY);
-                if(rc != PKT_CONTINUE) {
-                    //printf("multi_end case 2\n");
-                    goto multi_end;
-                }
+	/* encrypt threads */
+	if ( thr % 2 == 1 || thr == 14 ) {
+		for(;;) {
+			odp_bool_t skip = FALSE;
+			pkt_ctx_t   ctx;
+			odp_crypto_op_result_t result;
+			odp_packet_t pkts[PKT_BURST_SIZE];
+			odp_packet_t crypt_pkts[PKT_BURST_SIZE];
+			int n_crypt = 0;
+			int ret = 0;
+			int n_pkt;
+			do {
+				start_counter(CNT_DEQ);
+				n_pkt = odp_queue_deq_multi(seqnumq, (odp_event_t*)pkts, PKT_BURST_SIZE);
+				stop_counter(CNT_DEQ);
+			} while(n_pkt == 0);
 
-                start_counter(CNT_IPSEC_OUT_SEQ);
-                rc = do_ipsec_out_seq(pkt, &ctx, &result);
-                stop_counter(CNT_IPSEC_OUT_SEQ);
-                if(rc != PKT_CONTINUE) {
-                    printf("multi_end case 3\n");
-                    goto multi_end;
-                }
+			for (int i = 0; i < n_pkt; ++i){
+				//ev = (odp_event_t) pkts[i];
+				count(CNT_PKT_RX);
+				start_counter(CNT_GLOBAL);
 
-                start_counter(CNT_IPSEC_OUT_FINISH);
-                rc = do_ipsec_out_finish(pkt, &ctx, &result);
-                stop_counter(CNT_IPSEC_OUT_FINISH);
-                if(rc != PKT_CONTINUE) {
-                    printf("multi_end case 4\n");
-                    goto multi_end;
-                }
-                crypt_pkts[n_crypt++] = pkts[i];
-                stop_counter(CNT_GLOBAL);
-                continue;
-multi_end:
-                //printf("WARNING multi_end reached for pkt %d (ncrypt = %d)\n", i, n_crypt);
-                stop_counter(CNT_GLOBAL);
-                odp_packet_free(pkts[i]);
-            }
+				odp_packet_t pkt = pkts[i];//odp_packet_from_event(ev);
 
-            totdq += n_crypt;
-            __builtin_k1_sdu(&pkt__[thr], totdq);
+				start_counter(CNT_IPSEC_OUT_CLASSIFY);
+				rc = do_ipsec_out_classify(pkt, &ctx, &skip);
+				if (odp_unlikely(skip)) {
+					//printf("multi_end case 1\n");
+					goto multi_end;
+				}
+				stop_counter(CNT_IPSEC_OUT_CLASSIFY);
+				if(rc != PKT_CONTINUE) {
+					//printf("multi_end case 2\n");
+					goto multi_end;
+				}
+
+				start_counter(CNT_IPSEC_OUT_SEQ);
+				rc = do_ipsec_out_seq(pkt, &ctx, &result);
+				stop_counter(CNT_IPSEC_OUT_SEQ);
+				if(rc != PKT_CONTINUE) {
+					printf("multi_end case 3\n");
+					goto multi_end;
+				}
+
+				start_counter(CNT_IPSEC_OUT_FINISH);
+				rc = do_ipsec_out_finish(pkt, &ctx, &result);
+				stop_counter(CNT_IPSEC_OUT_FINISH);
+				if(rc != PKT_CONTINUE) {
+					printf("multi_end case 4\n");
+					goto multi_end;
+				}
+				crypt_pkts[n_crypt++] = pkts[i];
+				stop_counter(CNT_GLOBAL);
+				continue;
+			multi_end:
+				//printf("WARNING multi_end reached for pkt %d (ncrypt = %d)\n", i, n_crypt);
+				stop_counter(CNT_GLOBAL);
+				odp_packet_free(pkts[i]);
+			}
+
+			totdq += n_crypt;
+			__builtin_k1_sdu(&pkt__[thr], totdq);
 
 
 #if 0
-            start_counter(CNT_TRANSMIT);
-            if (n_crypt < 0) {
-                ret = odp_queue_enq_multi((odp_queue_t)odp_packet_user_ptr(crypt_pkts[0]),
-                        (odp_event_t*)crypt_pkts, n_crypt);
-            } else {
-                ret = 0;
-            }
+			start_counter(CNT_TRANSMIT);
+			if (n_crypt < 0) {
+				ret = odp_queue_enq_multi((odp_queue_t)odp_packet_user_ptr(crypt_pkts[0]),
+							  (odp_event_t*)crypt_pkts, n_crypt);
+			} else {
+				ret = 0;
+			}
 #endif
-            rc = PKT_DONE;
-            stop_counter(CNT_TRANSMIT);
+			rc = PKT_DONE;
+			stop_counter(CNT_TRANSMIT);
 
 #if 1
-            if (ret < n_crypt) {
-                //if (n_crypt -ret != n_pkt) printf("freeing only %d pkts\n", n_crypt - ret);
-                odp_packet_free_multi(crypt_pkts + ret, n_crypt - ret);
-            }
+			if (ret < n_crypt) {
+				//if (n_crypt -ret != n_pkt) printf("freeing only %d pkts\n", n_crypt - ret);
+				odp_packet_free_multi(crypt_pkts + ret, n_crypt - ret);
+			}
 #endif
-        }
-    } else {
-        //if (__k1_get_cluster_id() == 2)
-        //    printf("thr %d : idle\n", thr);
-        while (1);
-    }
+		}
+	} else {
+		//if (__k1_get_cluster_id() == 2)
+		//    printf("thr %d : idle\n", thr);
+		while (1);
+	}
 
-    /* unreachable */
-    return NULL;
+	/* unreachable */
+	return 0;
 }
 
 /**
@@ -1078,7 +1050,8 @@ main(int argc, char *argv[])
 {
 	odp_atomic_init_u64(&counters.seq, 0);
 
-	odph_linux_pthread_t thread_tbl[MAX_WORKERS];
+	odp_instance_t instance;
+	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	int i;
 	int stream_count;
 	odp_shm_t shm;
@@ -1086,14 +1059,16 @@ main(int argc, char *argv[])
 	char cpumaskstr[ODP_CPUMASK_STR_SIZE];
 	odp_pool_param_t params;
 	odp_platform_init_t platform_params = { .n_rx_thr = 1 };
+	odph_odpthread_params_t thr_params;
+
 	/* Init ODP before calling anything else */
-	if (odp_init_global(NULL, &platform_params)) {
+	if (odp_init_global(&instance, NULL, &platform_params)) {
 		EXAMPLE_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Init this thread */
-	if (odp_init_local(ODP_THREAD_CONTROL)) {
+	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
 		EXAMPLE_ERR("Error: ODP local init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -1152,6 +1127,7 @@ main(int argc, char *argv[])
 	params.pkt.seg_len = SHM_PKT_POOL_BUF_SIZE;
 	params.pkt.len     = SHM_PKT_POOL_BUF_SIZE;
 	params.pkt.num     = SHM_PKT_POOL_BUF_COUNT;
+	params.pkt.uarea_size = sizeof(odp_pktout_queue_t);
 	params.type        = ODP_POOL_PACKET;
 
 	pkt_pool = odp_pool_create("packet_pool", &params);
@@ -1185,118 +1161,123 @@ main(int argc, char *argv[])
 	resolve_stream_db();
 	stream_count = create_stream_db_inputs();
 
-    /* Try and make all clusters start at about the same time */
-    my_sleep(15-__k1_get_cluster_id());
+	/* Try and make all clusters start at about the same time */
+	my_sleep(15-__k1_get_cluster_id());
+
 
 	/*
 	 * Create and init worker threads
 	 */
-	odph_linux_pthread_create(thread_tbl, &cpumask,
-				  pktio_thread, NULL, ODP_THREAD_WORKER);
+	memset(&thr_params, 0, sizeof(thr_params));
+	thr_params.start    = pktio_thread;
+	thr_params.arg      = NULL;
+	thr_params.thr_type = ODP_THREAD_WORKER;
+	thr_params.instance = instance;
+	odph_odpthreads_create(thread_tbl, &cpumask, &thr_params);
 
 	/*
 	 * If there are streams attempt to verify them else
 	 * wait indefinitely
 	 */
-    if (stream_count) {
-        odp_bool_t done;
-        do {
-            done = verify_stream_db_outputs();
-            sleep(1);
-        } while (!done);
-        printf("All received\n");
-    } else {
-        int lapse = 0;
-        my_sleep(__k1_get_cluster_id()*lapse);
-        uint64_t prev = 0;
-        uint64_t prevcy = 0;
-        float pps = 0.0f;
-        float ref_pps_at_500 = ref_perf;
-        float freq = __bsp_frequency;
-        float target_pps = ref_pps_at_500*(freq/500e6);
-        float min_pps = 0.0f;
-        int target_reached = 0, steady_reached = 0;
+	if (stream_count) {
+		odp_bool_t done;
+		do {
+			done = verify_stream_db_outputs();
+			sleep(1);
+		} while (!done);
+		printf("All received\n");
+	} else {
+		int lapse = 0;
+		my_sleep(__k1_get_cluster_id()*lapse);
+		uint64_t prev = 0;
+		uint64_t prevcy = 0;
+		float pps = 0.0f;
+		float ref_pps_at_500 = ref_perf;
+		float freq = __bsp_frequency;
+		float target_pps = ref_pps_at_500*(freq/500e6);
+		float min_pps = 0.0f;
+		int target_reached = 0, steady_reached = 0;
 
-        uint64_t start = __k1_read_dsu_timestamp();
+		uint64_t start = __k1_read_dsu_timestamp();
 
-        uint64_t ts_wait_end = 0;
-        float wait_end_seconds = 10.0f;
-        int err = 0, end = 0;
+		uint64_t ts_wait_end = 0;
+		float wait_end_seconds = 10.0f;
+		int err = 0, end = 0;
 
-        char status_str[10];
-        sprintf(status_str, "start");
+		char status_str[10];
+		sprintf(status_str, "start");
 
-        while (1) {
-            uint64_t cy = __k1_read_dsu_timestamp();
-            float seconds_from_start = ((float)(cy-start))*(1.0f/freq);
-            int i;
-            uint64_t curpkt = 0;
-            for (i=0; i<MAX_WORKERS; i++)
-                curpkt += __builtin_k1_ldu(&pkt__[i]);
+		while (1) {
+			uint64_t cy = __k1_read_dsu_timestamp();
+			float seconds_from_start = ((float)(cy-start))*(1.0f/freq);
+			int i;
+			uint64_t curpkt = 0;
+			for (i=0; i<MAX_WORKERS; i++)
+				curpkt += __builtin_k1_ldu(&pkt__[i]);
 
-            pps = (float)(curpkt-prev) / ((float)(cy-prevcy)*(1.0f/freq));
+			pps = (float)(curpkt-prev) / ((float)(cy-prevcy)*(1.0f/freq));
 
-            if (end) {
-                if (__k1_read_dsu_timestamp()-ts_wait_end >= wait_end_seconds*freq)
-                    break;
+			if (end) {
+				if (__k1_read_dsu_timestamp()-ts_wait_end >= wait_end_seconds*freq)
+					break;
 
-            } else if (!target_reached) {
-                if (pps >= target_pps) {
-                    target_reached = 1;
-                } else if (seconds_from_start > 30.0f) {
-                    printf("Error, pps (%.6e) could not reach target (%.6e) after 30 seconds\n", pps, target_pps);
-                    err = 1;
-                    end = 1;
-                }
-            } else if (!steady_reached) {
-                steady_reached = 1;
-                min_pps = pps * 0.95; // allow pps to drop by 5% compared to max reached
-                //printf("%ssteady pps reached (%7.3e), min_pps = %7.3e\n",
-                //        __k1_get_cluster_id()<10?" ":"", pps, min_pps);
-                sprintf(status_str, "steady");
-            } else {
-                if (pps < min_pps) {
-                    printf("Error, pps (%.6e) below allowed minimum (%.6e)\n", pps, min_pps);
-                    err = 1;
-                    end = 1;
-                } else if (curpkt > pkt_cnt) {
-                    end = 1;
-                }
-                if (end) {
-                    ts_wait_end = __k1_read_dsu_timestamp();
-                    sprintf(status_str, "end");
-                }
-            }
+			} else if (!target_reached) {
+				if (pps >= target_pps) {
+					target_reached = 1;
+				} else if (seconds_from_start > 30.0f) {
+					printf("Error, pps (%.6e) could not reach target (%.6e) after 30 seconds\n", pps, target_pps);
+					err = 1;
+					end = 1;
+				}
+			} else if (!steady_reached) {
+				steady_reached = 1;
+				min_pps = pps * 0.95; // allow pps to drop by 5% compared to max reached
+				//printf("%ssteady pps reached (%7.3e), min_pps = %7.3e\n",
+				//        __k1_get_cluster_id()<10?" ":"", pps, min_pps);
+				sprintf(status_str, "steady");
+			} else {
+				if (pps < min_pps) {
+					printf("Error, pps (%.6e) below allowed minimum (%.6e)\n", pps, min_pps);
+					err = 1;
+					end = 1;
+				} else if (curpkt > pkt_cnt) {
+					end = 1;
+				}
+				if (end) {
+					ts_wait_end = __k1_read_dsu_timestamp();
+					sprintf(status_str, "end");
+				}
+			}
 
 #if 1
-            if ((int)seconds_from_start%4 == 0 && __k1_get_cluster_id() == 15)
+			if ((int)seconds_from_start%4 == 0 && __k1_get_cluster_id() == 15)
 #else
-            if ((int)seconds_from_start%(16*lapse) == 0)
+				if ((int)seconds_from_start%(16*lapse) == 0)
 #endif
-            {
-                    printf("%s%7.3e pps (T0+%3i) [%s]\n", __k1_get_cluster_id()<10?" ":"",
-                    pps, (int)seconds_from_start, status_str);
-            }
+					{
+						printf("%s%7.3e pps (T0+%3i) [%s]\n", __k1_get_cluster_id()<10?" ":"",
+						       pps, (int)seconds_from_start, status_str);
+					}
 
-            prev= curpkt;
-            prevcy = cy;
+			prev= curpkt;
+			prevcy = cy;
 
-            my_sleep(1);
-        }
+			my_sleep(1);
+		}
 
-        if (err == 1)
-            return EXIT_FAILURE;
-        else
-            return EXIT_SUCCESS;
+		if (err == 1)
+			return EXIT_FAILURE;
+		else
+			return EXIT_SUCCESS;
 
-        odph_linux_pthread_join(thread_tbl, num_workers);
-    }
+		odph_odpthreads_join(thread_tbl);
+	}
 
-    free(args->appl.if_names);
-    free(args->appl.if_str);
-    printf("Exit\n\n");
+	free(args->appl.if_names);
+	free(args->appl.if_str);
+	printf("Exit\n\n");
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
 /**
@@ -1392,7 +1373,8 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 
 		case 'r':
-			rc = create_fwd_db_entry(optarg);
+			rc = create_fwd_db_entry(optarg, appl_args->if_names,
+						 appl_args->if_count);
 			break;
 
 		case 'p':
@@ -1453,7 +1435,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 static void print_info(char *progname, appl_args_t *appl_args)
 {
 	int i;
-	return;
+
 	printf("\n"
 	       "ODP system info\n"
 	       "---------------\n"
@@ -1463,7 +1445,7 @@ static void print_info(char *progname, appl_args_t *appl_args)
 	       "Cache line size: %i\n"
 	       "CPU count:       %i\n"
 	       "\n",
-	       odp_version_api_str(), odp_sys_cpu_model_str(), odp_sys_cpu_hz(),
+	       odp_version_api_str(), odp_cpu_model_str(), odp_cpu_hz_max(),
 	       odp_sys_cache_line_size(), odp_cpu_count());
 
 	printf("Running ODP appl: \"%s\"\n"

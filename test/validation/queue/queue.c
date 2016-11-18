@@ -15,6 +15,7 @@
 
 static int queue_context = 0xff;
 static odp_pool_t pool;
+odp_queue_t queue_capa[MAX_QUEUES];
 
 static void generate_name(char *name, uint32_t index)
 {
@@ -30,7 +31,6 @@ static void generate_name(char *name, uint32_t index)
 int queue_suite_init(void)
 {
 	odp_pool_param_t params;
-
 	params.buf.size  = 0;
 	params.buf.align = ODP_CACHE_LINE_SIZE;
 	params.buf.num   = 1024 * 2;
@@ -55,7 +55,6 @@ void queue_test_capa(void)
 	odp_queue_capability_t capa;
 	odp_queue_param_t qparams;
 	char name[ODP_QUEUE_NAME_LEN];
-	odp_queue_t queue[MAX_QUEUES];
 	uint32_t num_queues, i;
 
 	memset(&capa, 0, sizeof(odp_queue_capability_t));
@@ -80,9 +79,9 @@ void queue_test_capa(void)
 
 	for (i = 0; i < num_queues; i++) {
 		generate_name(name, i);
-		queue[i] = odp_queue_create(name, &qparams);
+		queue_capa[i] = odp_queue_create(name, &qparams);
 
-		if (queue[i] == ODP_QUEUE_INVALID) {
+		if (queue_capa[i] == ODP_QUEUE_INVALID) {
 			CU_FAIL("Queue create failed");
 			num_queues = i;
 			break;
@@ -92,7 +91,7 @@ void queue_test_capa(void)
 	}
 
 	for (i = 0; i < num_queues; i++)
-		CU_ASSERT(odp_queue_destroy(queue[i]) == 0);
+		CU_ASSERT(odp_queue_destroy(queue_capa[i]) == 0);
 }
 
 void queue_test_mode(void)

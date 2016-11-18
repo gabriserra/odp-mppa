@@ -9,8 +9,8 @@
 #endif
 #include <sched.h>
 
-#include <odp/cpu.h>
-#include <odp/cpumask.h>
+#include <odp/api/cpu.h>
+#include <odp/api/cpumask.h>
 #include <odp_debug_internal.h>
 
 #include <stdlib.h>

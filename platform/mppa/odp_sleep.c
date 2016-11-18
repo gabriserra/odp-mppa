@@ -14,9 +14,10 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <HAL/hal/cluster/dsu.h>
+#include <odp/api/cpu.h>
 #include "../../syscall/include/common.h"
 
-static int my_nanosleep(struct timespec *ts){
+int _odp_nanosleep(struct timespec *ts){
 	uint64_t freq = __bsp_frequency;
 	uint64_t tdiff = (ts->tv_sec * freq) + ((ts->tv_nsec * freq) / 1000000000ULL);
 
@@ -41,5 +42,5 @@ unsigned int sleep(unsigned int seconds){
 
     ts.tv_sec = seconds;
     ts.tv_nsec = 0;
-    return my_nanosleep(&ts);
+    return _odp_nanosleep(&ts);
 };

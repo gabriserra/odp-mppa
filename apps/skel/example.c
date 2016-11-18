@@ -6,15 +6,16 @@
 /* Example test program */
 int main(int argc, char *argv[] ODP_UNUSED)
 {
+	odp_instance_t instance;
 	/* Init ODP before calling anything else */
 	/* This will sync all booted clusters */
-	if (odp_init_global(NULL, NULL)) {
+	if (odp_init_global(&instance, NULL, NULL)) {
 		fprintf(stderr, "Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Init this thread */
-	if (odp_init_local(ODP_THREAD_CONTROL)) {
+	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
 		fprintf(stderr, "Error: ODP local init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -27,7 +28,7 @@ int main(int argc, char *argv[] ODP_UNUSED)
 		exit(EXIT_FAILURE);
 	}
 	/* Terminate ODP  */
-	if (odp_term_global()) {
+	if (odp_term_global(instance)) {
 		fprintf(stderr, "Error: ODP global term failed.\n");
 		exit(EXIT_FAILURE);
 	}

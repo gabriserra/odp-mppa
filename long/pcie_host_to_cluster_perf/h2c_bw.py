@@ -46,7 +46,7 @@ try:
 	for line in iter(jtag_p.stdout.readline, b""):
 		o = "# " + line
 		print o,
-		if "[13] srcif" in line:
+		if "[13] num pktios" in line:
 			os.kill(jtag_p.pid, signal.SIGSTOP)
 			break
 	time.sleep(1)

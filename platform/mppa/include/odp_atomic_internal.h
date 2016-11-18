@@ -16,20 +16,15 @@
 #ifndef ODP_ATOMIC_INTERNAL_H_
 #define ODP_ATOMIC_INTERNAL_H_
 
-#include <odp/std_types.h>
-#include <odp/align.h>
-#include <odp/hints.h>
-#include <odp/atomic.h>
+#include <odp/api/std_types.h>
+#include <odp/api/align.h>
+#include <odp/api/hints.h>
+#include <odp/api/atomic.h>
 #include <HAL/hal/core/atomic.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * Pointer atomic type
- */
-typedef odp_atomic_u32_t  _odp_atomic_ptr_t;
 
 /**
  * Atomic flag (boolean) type
@@ -135,168 +130,6 @@ static inline void _odp_atomic_flag_clear(_odp_atomic_flag_t *flag)
 }
 
 /*****************************************************************************
- * Operations on 32-bit atomics
- * _odp_atomic_u32_load_mm - return current value
- * _odp_atomic_u32_store_mm - no return value
- * _odp_atomic_u32_xchg_mm - return old value
- * _odp_atomic_u32_cmp_xchg_strong_mm - return bool
- * _odp_atomic_u32_fetch_add_mm - return old value
- * _odp_atomic_u32_add_mm - no return value
- * _odp_atomic_u32_fetch_sub_mm - return old value
- * _odp_atomic_u32_sub_mm - no return value
- *****************************************************************************/
-
-/**
- * Atomic load of 32-bit atomic variable
- *
- * @param atom Pointer to a 32-bit atomic variable
- * @param mmodel Memory ordering associated with the load operation
- *
- * @return Value of the variable
- */
-static inline uint32_t _odp_atomic_u32_load_mm(odp_atomic_u32_t *atom,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-{
-	return odp_atomic_load_u32(atom);
-}
-
-/**
- * Atomic store to 32-bit atomic variable
- *
- * @param[out] atom Pointer to a 32-bit atomic variable
- * @param val    Value to store in the atomic variable
- * @param mmodel Memory order associated with the store operation
- */
-static inline void _odp_atomic_u32_store_mm(odp_atomic_u32_t *atom,
-		uint32_t val,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-{
-	odp_atomic_store_u32(atom, val);
-}
-
-/**
- * Atomic exchange (swap) of 32-bit atomic variable
- *
- * @param[in,out] atom Pointer to a 32-bit atomic variable
- * @param val    New value to store in the atomic variable
- * @param mmodel Memory order associated with the exchange operation
- *
- * @return Old value of the variable
- */
-static inline uint32_t _odp_atomic_u32_xchg_mm(odp_atomic_u32_t *atom,
-		uint32_t val,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-
-{
-	uint32_t old_val = LOAD_U32(atom->v);
-	do {
-		__k1_uint64_t tmp = 0;
-		tmp = __builtin_k1_acwsu((void *)&atom->v, val, old_val );
-
-		uint32_t ret_val = tmp & 0xFFFFFFFF;
-		if (ret_val == old_val)
-			return 1;
-
-		old_val = ret_val;
-	} while(1);
-}
-
-/**
- * Atomic compare and exchange (swap) of 32-bit atomic variable
- * "Strong" semantics, will not fail spuriously.
- *
- * @param[in,out] atom Pointer to a 32-bit atomic variable
- * @param[in,out] exp Pointer to expected value (updated on failure)
- * @param val   New value to write
- * @param success Memory order associated with a successful compare-and-swap
- * operation
- * @param failure Memory order associated with a failed compare-and-swap
- * operation
- *
- * @retval 1 exchange successul
- * @retval 0 exchange failed and '*exp' updated with current value
- */
-static inline int _odp_atomic_u32_cmp_xchg_strong_mm(
-		odp_atomic_u32_t *atom,
-		uint32_t *exp,
-		uint32_t val,
-		_odp_memmodel_t success ODP_UNUSED,
-		_odp_memmodel_t failure ODP_UNUSED)
-{
-	__k1_uint64_t tmp = 0;
-	tmp = __builtin_k1_acwsu((void *)&atom->v, val, *exp );
-	if((tmp & 0xFFFFFFFF) == *exp){
-		return 1;
-	}else{
-		*exp = (tmp & 0xFFFFFFFF);
-		return 0;
-	}
-}
-
-/**
- * Atomic fetch and add of 32-bit atomic variable
- *
- * @param[in,out] atom Pointer to a 32-bit atomic variable
- * @param val Value to add to the atomic variable
- * @param mmodel Memory order associated with the add operation
- *
- * @return Value of the atomic variable before the addition
- */
-static inline uint32_t _odp_atomic_u32_fetch_add_mm(odp_atomic_u32_t *atom,
-		uint32_t val,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-{
-	return odp_atomic_fetch_add_u32(atom, val);
-}
-
-/**
- * Atomic add of 32-bit atomic variable
- *
- * @param[in,out] atom Pointer to a 32-bit atomic variable
- * @param val Value to add to the atomic variable
- * @param mmodel Memory order associated with the add operation
- */
-static inline void _odp_atomic_u32_add_mm(odp_atomic_u32_t *atom,
-		uint32_t val,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-
-{
-	odp_atomic_add_u32(atom, val);
-}
-
-/**
- * Atomic fetch and subtract of 32-bit atomic variable
- *
- * @param[in,out] atom Pointer to a 32-bit atomic variable
- * @param val Value to subtract from the atomic variable
- * @param mmodel Memory order associated with the subtract operation
- *
- * @return Value of the atomic variable before the subtraction
- */
-static inline uint32_t _odp_atomic_u32_fetch_sub_mm(odp_atomic_u32_t *atom,
-		uint32_t val,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-{
-	return odp_atomic_fetch_sub_u32(atom, val);
-}
-
-/**
- * Atomic subtract of 32-bit atomic variable
- *
- * @param[in,out] atom Pointer to a 32-bit atomic variable
- * @param val Value to subtract from the atomic variable
- * @param mmodel Memory order associated with the subtract operation
- */
-static inline void _odp_atomic_u32_sub_mm(odp_atomic_u32_t *atom,
-		uint32_t val,
-		_odp_memmodel_t mmodel ODP_UNUSED)
-
-{
-	return odp_atomic_sub_u32(atom, val);
-}
-
-
-/*****************************************************************************
  * Operations on 64-bit atomics
  * _odp_atomic_u64_load_mm - return current value
  * _odp_atomic_u64_store_mm - no return value
@@ -396,94 +229,6 @@ static inline void _odp_atomic_u64_sub_mm(odp_atomic_u64_t *atom,
 
 {
 	odp_atomic_sub_u64(atom, val);
-}
-
-/*****************************************************************************
- * Operations on pointer atomics
- * _odp_atomic_ptr_init - no return value
- * _odp_atomic_ptr_load - return current value
- * _odp_atomic_ptr_store - no return value
- * _odp_atomic_ptr_xchg - return old value
- *****************************************************************************/
-
-/**
- * Initialization of pointer atomic variable
- *
- * @param[out] atom Pointer to a pointer atomic variable
- * @param val   Value to initialize the variable with
- */
-static inline void _odp_atomic_ptr_init(_odp_atomic_ptr_t *atom, void *val)
-{
-	_odp_atomic_u32_store_mm((odp_atomic_u32_t*)atom, (uint32_t)val, __ATOMIC_RELAXED);
-}
-
-/**
- * Atomic load of pointer atomic variable
- *
- * @param atom Pointer to a pointer atomic variable
- * @param mmodel Memory order associated with the load operation
- *
- * @return Value of the variable
- */
-static inline void *_odp_atomic_ptr_load(const _odp_atomic_ptr_t *atom,
-		_odp_memmodel_t mmodel)
-{
-	return (void*)_odp_atomic_u32_load_mm((odp_atomic_u32_t*)atom, mmodel);
-}
-
-/**
- * Atomic store to pointer atomic variable
- *
- * @param[out] atom Pointer to a pointer atomic variable
- * @param val  Value to write to the atomic variable
- * @param mmodel Memory order associated with the store operation
- */
-static inline void _odp_atomic_ptr_store(_odp_atomic_ptr_t *atom,
-		void *val,
-		_odp_memmodel_t mmodel)
-{
-	_odp_atomic_u32_store_mm((odp_atomic_u32_t*)atom, (uint32_t)val, mmodel);
-}
-
-/**
- * Atomic exchange (swap) of pointer atomic variable
- *
- * @param[in,out] atom Pointer to a pointer atomic variable
- * @param val   New value to write
- * @param mmodel Memory order associated with the exchange operation
- *
- * @return Old value of variable
- */
-static inline void *_odp_atomic_ptr_xchg(_odp_atomic_ptr_t *atom,
-		void *val,
-		_odp_memmodel_t mmodel)
-{
-	return (void*)_odp_atomic_u32_xchg_mm((odp_atomic_u32_t*)atom, (uint32_t)val, mmodel);
-}
-
-/**
- * Atomic compare and exchange (swap) of pointer atomic variable
- * "Strong" semantics, will not fail spuriously.
- *
- * @param[in,out] atom Pointer to a pointer atomic variable
- * @param[in,out] exp Pointer to expected value (updated on failure)
- * @param val   New value to write
- * @param success Memory order associated with a successful compare-and-swap
- * operation
- * @param failure Memory order associated with a failed compare-and-swap
- * operation
- *
- * @retval 1 exchange successful
- * @retval 0 exchange failed and '*exp' updated with current value
- */
-static inline int _odp_atomic_ptr_cmp_xchg_strong(
-		_odp_atomic_ptr_t *atom,
-		void **exp,
-		void *val,
-		_odp_memmodel_t success,
-		_odp_memmodel_t failure)
-{
-	return _odp_atomic_u32_cmp_xchg_strong_mm((odp_atomic_u32_t*)atom, (uint32_t*) exp, (uint32_t)val, success, failure);
 }
 
 #ifdef __cplusplus

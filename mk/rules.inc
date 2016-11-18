@@ -59,6 +59,8 @@ $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/l
 	--libdir=$(K1ST_DIR)lib/odp/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
 	--oldincludedir=$(K1ST_DIR)kalray_internal/odp/$($(1)_INC_DIR)/include \
+	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) \
+	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-config.cache
 	--enable-test-perf  --disable-debug-print \
 	$($(1)_CONF_OPTS)
 
@@ -79,25 +81,21 @@ odp-$(1)-install-headers: odp-$(1)-configure
 
 odp-$(1)-install-doc: odp-$(1)-build
 	if [ "$($(1)_INSTALL_DOC)" == "true" ]; then \
-		$$(MAKE) -C$(ODP_$(1)_BUILDDIR) V=1 doxygen-pdf && \
+		$$(MAKE) -C$(ODP_$(1)_BUILDDIR) V=1 doxygen-doc && \
 		mkdir -p $(ODP_$(1)_DOC_INST) && \
-		install $(ODP_$(1)_BUILDDIR)/doc/output/opendataplane.pdf $(ODP_$(1)_DOC_INST)/opendataplane.pdf && \
-		rm -Rf   $(ODP_$(1)_DOC_INST)/opendataplane && \
-		mkdir -p $(ODP_$(1)_DOC_INST)/opendataplane && \
-		cp -Rf $(ODP_$(1)_BUILDDIR)/doc/output/html/* $(ODP_$(1)_DOC_INST)/opendataplane && \
-		$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/doc V=1 all && \
-		mkdir -p $(ODP_$(1)_DOC_INST)/images/ && \
-		cp -Rf $(ODP_$(1)_BUILDDIR)/doc/images/*.png $(ODP_$(1)_DOC_INST)/images/ && \
-		mkdir -p $(ODP_$(1)_DOC_INST)/users-guide/ && \
-		cp -Rf $(ODP_$(1)_BUILDDIR)/doc/output/users-guide.html $(ODP_$(1)_DOC_INST)/users-guide/ && \
+		install $(ODP_$(1)_BUILDDIR)/doc/application-api-guide/output/opendataplane.pdf \
+			 $(ODP_$(1)_DOC_INST)/application-api-guide.pdf && \
+		install $(ODP_$(1)_BUILDDIR)/doc/helper-guide/output/opendataplane.pdf \
+			 $(ODP_$(1)_DOC_INST)/helper-guide.pdf && \
+		install $(ODP_$(1)_BUILDDIR)/doc/users-guide/users-guide.html \
+			 $(ODP_$(1)_DOC_INST)/users-guide.html && \
 		true; \
 	else true; fi
 
 $(call ADD_DEPRULE, odp-$(1)-install, odp-$(1)-install-lib odp-$(1)-install-doc)
 
 odp-$(1)-valid: odp-$(1)-build extra-install firmware-install
-	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/test/validation $($(1)_MAKE_VALID) check
-	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/platform/$($(1)_PLATFORM)/test/ check
+	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/platform/$($(1)_PLATFORM)/ check
 	$$(MAKE) -C$(ODP_$(1)_BUILDDIR)/test/performance $($(1)_MAKE_VALID) check
 
 $(call ADD_DEPRULE, odp-$(1)-perf, odp-$(1)-build extra-install firmware-install)

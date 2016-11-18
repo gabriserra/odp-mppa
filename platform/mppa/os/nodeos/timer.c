@@ -19,7 +19,7 @@
 #include <signal.h>
 #include <odp_buffer_inlines.h>
 #include <odp_debug_internal.h>
-#include <odp/time.h>
+#include <odp/api/time.h>
 #include <odp_timer_types_internal.h>
 
 

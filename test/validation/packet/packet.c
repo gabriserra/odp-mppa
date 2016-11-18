@@ -15,12 +15,12 @@
 #define PACKET_TAILROOM_RESERVE  4
 
 static odp_pool_t packet_pool, packet_pool_no_uarea, packet_pool_double_uarea;
-static uint32_t packet_len;
+static uint32_t packet_len, concat_packet_len;
 
 static uint32_t segmented_packet_len;
 static odp_bool_t segmentation_supported = true;
 
-odp_packet_t test_packet, segmented_test_packet;
+odp_packet_t test_packet, concat_test_packet, segmented_test_packet;
 
 static struct udata_struct {
 	uint64_t u64;
@@ -108,6 +108,18 @@ int packet_suite_init(void)
 	data = 0;
 	for (i = 0; i < segmented_packet_len; i++) {
 		odp_packet_copy_from_mem(segmented_test_packet, i, 1, &data);
+		data++;
+	}
+
+	if (segmentation_supported)
+		concat_packet_len = packet_len;
+	else
+		concat_packet_len = packet_len / 2;
+
+	concat_test_packet = odp_packet_alloc(packet_pool, concat_packet_len);
+
+	for (i = 0; i < concat_packet_len; i++) {
+		odp_packet_copy_from_mem(concat_test_packet, i, 1, &data);
 		data++;
 	}
 
@@ -1152,8 +1164,9 @@ void packet_test_concatsplit(void)
 	uint32_t pkt_len;
 	odp_packet_t splits[4];
 
-	pkt = odp_packet_copy(test_packet, odp_packet_pool(test_packet));
-	pkt_len = odp_packet_len(test_packet);
+	pkt = odp_packet_copy(concat_test_packet,
+			      odp_packet_pool(concat_test_packet));
+	pkt_len = odp_packet_len(concat_test_packet);
 	CU_ASSERT_FATAL(pkt != ODP_PACKET_INVALID);
 
 	CU_ASSERT(odp_packet_concat(&pkt, pkt) == 0);
@@ -1165,7 +1178,7 @@ void packet_test_concatsplit(void)
 	CU_ASSERT(odp_packet_data(pkt) != odp_packet_data(pkt2));
 	CU_ASSERT(odp_packet_len(pkt) == odp_packet_len(pkt2));
 	_packet_compare_data(pkt, pkt2);
-	_packet_compare_data(pkt, test_packet);
+	_packet_compare_data(pkt, concat_test_packet);
 
 	odp_packet_free(pkt);
 	odp_packet_free(pkt2);

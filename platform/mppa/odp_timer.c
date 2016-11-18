@@ -17,27 +17,27 @@
 #include <stdlib.h>
 #include <time.h>
 #include <signal.h>
-#include <odp/align.h>
+#include <odp/api/align.h>
 #include <odp_align_internal.h>
-#include <odp/atomic.h>
+#include <odp/api/atomic.h>
 #include <odp_atomic_internal.h>
-#include <odp/buffer.h>
+#include <odp/api/buffer.h>
 #include <odp_buffer_inlines.h>
-#include <odp/pool.h>
+#include <odp/api/cpu.h>
+#include <odp/api/pool.h>
 #include <odp_pool_internal.h>
-#include <odp/debug.h>
+#include <odp/api/debug.h>
 #include <odp_debug_internal.h>
-#include <odp/event.h>
-#include <odp/hints.h>
+#include <odp/api/event.h>
+#include <odp/api/hints.h>
 #include <odp_internal.h>
-#include <odp/queue.h>
-#include <odp/shared_memory.h>
-#include <odp_spin_internal.h>
-#include <odp/spinlock.h>
-#include <odp/std_types.h>
-#include <odp/sync.h>
-#include <odp/time.h>
-#include <odp/timer.h>
+#include <odp/api/queue.h>
+#include <odp/api/shared_memory.h>
+#include <odp/api/spinlock.h>
+#include <odp/api/std_types.h>
+#include <odp/api/sync.h>
+#include <odp/api/time.h>
+#include <odp/api/timer.h>
 #include <odp_timer_internal.h>
 #include <odp_timer_types_internal.h>
 
@@ -128,7 +128,7 @@ static odp_timer_pool *timer_pool[MAX_TIMER_POOLS];
 
 static inline odp_timer_pool *handle_to_tp(odp_timer_t hdl)
 {
-	uint32_t tp_idx = hdl >> INDEX_BITS;
+	uint32_t tp_idx = _odp_typeval(hdl) >> INDEX_BITS;
 	if (odp_likely(tp_idx < MAX_TIMER_POOLS)) {
 		odp_timer_pool *tp = timer_pool[tp_idx];
 		if (odp_likely(tp != NULL))
@@ -140,7 +140,7 @@ static inline odp_timer_pool *handle_to_tp(odp_timer_t hdl)
 static inline uint32_t handle_to_idx(odp_timer_t hdl,
 		struct odp_timer_pool_s *tp)
 {
-	uint32_t idx = hdl & ((1U << INDEX_BITS) - 1U);
+	uint32_t idx = _odp_typeval(hdl) & ((1U << INDEX_BITS) - 1U);
 	if (odp_likely(idx < odp_atomic_load_u32(&tp->high_wm)))
 		return idx;
 	ODP_ABORT("Invalid timer handle %#x\n", hdl);
@@ -150,7 +150,7 @@ static inline odp_timer_t tp_idx_to_handle(struct odp_timer_pool_s *tp,
 		uint32_t idx)
 {
 	ODP_ASSERT(idx < (1U << INDEX_BITS));
-	return (tp->tp_idx << INDEX_BITS) | idx;
+	return _odp_cast_scalar(odp_timer_t, (tp->tp_idx << INDEX_BITS) | idx);
 }
 
 static odp_timer_pool *odp_timer_pool_new(
@@ -243,9 +243,7 @@ static inline odp_timer_t timer_alloc(odp_timer_pool *tp,
 				 odp_atomic_load_u32(&tp->high_wm)))
 			/* Update high_wm last with release model to
 			 * ensure timer initialization is visible */
-			_odp_atomic_u32_store_mm(&tp->high_wm,
-						 tp->num_alloc,
-						 _ODP_MEMMODEL_RLS);
+			odp_atomic_store_u32(&tp->high_wm, tp->num_alloc);
 		hdl = tp_idx_to_handle(tp, idx);
 	} else {
 		__odp_errno = ENFILE; /* Reusing file table overflow */
@@ -299,7 +297,7 @@ static bool timer_reset(uint32_t idx,
 		while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 			/* While lock is taken, spin using relaxed loads */
 			while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-				odp_spin();
+				odp_cpu_pause();
 
 		/* Only if there is a timeout buffer can be reset the timer */
 		if (odp_likely(LOAD_PTR(tb->tmo_buf) != ODP_BUFFER_INVALID)) {
@@ -332,7 +330,7 @@ static bool timer_reset(uint32_t idx,
 		while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 			/* While lock is taken, spin using relaxed loads */
 			while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-				odp_spin();
+				odp_cpu_pause();
 
 		/* Swap in new buffer, save any old buffer */
 		old_buf = LOAD_PTR(tb->tmo_buf);
@@ -361,7 +359,7 @@ static odp_buffer_t timer_cancel(odp_timer_pool *tp,
 	while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 		/* While lock is taken, spin using relaxed loads */
 		while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-			odp_spin();
+			odp_cpu_pause();
 
 	/* Update the timer state (e.g. cancel the current timeout) */
 	_odp_atomic_u64_store_mm(&tb->exp_tck, new_state, _ODP_MEMMODEL_RLS);
@@ -388,7 +386,7 @@ static unsigned timer_expire(odp_timer_pool *tp, uint32_t idx, uint64_t tick)
 	while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 		/* While lock is taken, spin using relaxed loads */
 		while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-			odp_spin();
+			odp_cpu_pause();
 	/* Proper check for timer expired */
 	exp_tck = odp_atomic_load_u64(&tb->exp_tck);
 	if (odp_likely(exp_tck <= tick)) {
@@ -439,8 +437,7 @@ static unsigned timer_expire(odp_timer_pool *tp, uint32_t idx, uint64_t tick)
 unsigned _odp_timer_pool_expire(odp_timer_pool_t tpid, uint64_t tick)
 {
 	tick_buf_t *array = &tpid->tick_buf[0];
-	uint32_t high_wm = _odp_atomic_u32_load_mm(&tpid->high_wm,
-			_ODP_MEMMODEL_ACQ);
+	uint32_t high_wm = odp_atomic_load_u32(&tpid->high_wm);
 	unsigned nexp = 0;
 	uint32_t i;
 
@@ -509,6 +506,11 @@ int odp_timer_pool_info(odp_timer_pool_t tpid,
 	buf->hwm_timers = odp_atomic_load_u32(&tpid->high_wm);
 	buf->name = tpid->name;
 	return 0;
+}
+
+uint64_t odp_timer_pool_to_u64(odp_timer_pool_t tpid)
+{
+	return _odp_pri(tpid);
 }
 
 odp_timer_t odp_timer_alloc(odp_timer_pool_t tpid,
@@ -584,6 +586,11 @@ int odp_timer_cancel(odp_timer_t hdl, odp_event_t *tmo_ev)
 	}
 }
 
+uint64_t odp_timer_to_u64(odp_timer_t hdl)
+{
+	return _odp_pri(hdl);
+}
+
 odp_timeout_t odp_timeout_from_event(odp_event_t ev)
 {
 	/* This check not mandated by the API specification */
@@ -595,6 +602,11 @@ odp_timeout_t odp_timeout_from_event(odp_event_t ev)
 odp_event_t odp_timeout_to_event(odp_timeout_t tmo)
 {
 	return (odp_event_t)tmo;
+}
+
+uint64_t odp_timeout_to_u64(odp_timeout_t tmo)
+{
+	return _odp_pri(tmo);
 }
 
 int odp_timeout_fresh(odp_timeout_t tmo)

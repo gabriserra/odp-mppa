@@ -345,11 +345,6 @@ static inline uint32_t pool_handle_to_index(odp_pool_t pool_hdl)
 	return _odp_typeval(pool_hdl);
 }
 
-static inline odp_pool_t pool_handle(pool_entry_t *pool)
-{
-	return pool->s.pool_hdl;
-}
-
 static inline void *get_pool_entry(uint32_t pool_id)
 {
 	return pool_entry_ptr[pool_id];

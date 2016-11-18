@@ -14,6 +14,9 @@ ${prefix}if test "\${with_platform}" == "${platform}";
 then
 	m4_include([./platform/${platform}/m4/configure.m4])
 EOF
+	if [ -f test/platform/${platform}/m4/configure.m4 ]; then
+echo "	m4_include([./test/platform/${platform}/m4/configure.m4])" >> $GEN_M4
+	fi
 	prefix="el"
 done
 cat << EOF >> $GEN_M4

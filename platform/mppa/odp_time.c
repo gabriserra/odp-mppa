@@ -7,8 +7,8 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <time.h>
-#include <odp/time.h>
-#include <odp/hints.h>
+#include <odp/api/time.h>
+#include <odp/api/hints.h>
 #include <odp_debug_internal.h>
 #include <HAL/hal/cluster/dsu.h>
 

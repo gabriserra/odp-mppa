@@ -44,6 +44,15 @@ int release_order(void *origin_qe, uint64_t order,
 void schedule_order_lock(unsigned lock_index);
 void schedule_order_unlock(unsigned lock_index);
 
+/* Number of priority levels  */
+#define SCHEDULE_NUM_PRIO 4
+
+/* Priority queues per priority */
+#define SCHEDULE_QUEUES_PER_PRIO  2
+
+/* Packet input poll cmd queues */
+#define POLL_CMD_QUEUES  4
+
 #ifdef __cplusplus
 }
 #endif

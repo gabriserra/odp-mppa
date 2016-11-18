@@ -4,6 +4,12 @@
 include $(top_srcdir)/platform/Makefile.inc
 include $(top_srcdir)/platform/@with_platform@/Makefile.inc
 
+pkgconfig_DATA = $(top_builddir)/pkgconfig/libodp-linux.pc
+
+.PHONY: pkgconfig/libodp-linux.pc
+
+lib_LTLIBRARIES = $(LIB)/libodp-linux.la
+
 AM_CFLAGS +=  -I$(srcdir)/include
 AM_CFLAGS +=  -I$(top_srcdir)/include
 

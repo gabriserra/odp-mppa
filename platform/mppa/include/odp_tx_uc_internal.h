@@ -56,7 +56,7 @@ uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 void tx_uc_commit(tx_uc_ctx_t *ctx, uint64_t slot,
 		  unsigned int count);
 int tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
-		       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
+		       tx_uc_ctx_t *ctx, const odp_packet_t pkt_table[],
 		       int len, int mtu);
 void tx_uc_flush(tx_uc_ctx_t *ctx);
 

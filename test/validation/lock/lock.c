@@ -15,7 +15,7 @@
 #ifdef MAGIC_SCALL
 #define MAX_ITERATIONS		100
 #else
-#define MAX_ITERATIONS		1000
+#define MAX_ITERATIONS		10
 #endif
 
 #define MIN_ITERATIONS		100
@@ -794,7 +794,7 @@ static int rwlock_functional_test(void *arg UNUSED)
 
 		/* Verify lock is unowned (no writer holds it) */
 		thread_delay(per_thread_mem, lock_owner_delay);
-		if (global_mem->global_lock_owner != 0) {
+		if (LOAD_U32(global_mem->global_lock_owner) != 0) {
 			current_errs++;
 			sync_failures++;
 		}
@@ -806,7 +806,7 @@ static int rwlock_functional_test(void *arg UNUSED)
 		odp_rwlock_write_lock(&global_mem->global_rwlock);
 
 		/* Make sure we have lock now AND didn't previously own it */
-		if (global_mem->global_lock_owner != 0) {
+		if (LOAD_U32(global_mem->global_lock_owner) != 0) {
 			current_errs++;
 			sync_failures++;
 		}
@@ -815,19 +815,19 @@ static int rwlock_functional_test(void *arg UNUSED)
 		* then we see if anyone else has snuck in and changed the
 		* global_lock_owner to be themselves
 		*/
-		global_mem->global_lock_owner = thread_num;
+		STORE_U32(global_mem->global_lock_owner, thread_num);
 		odp_mb_full();
 		thread_delay(per_thread_mem, lock_owner_delay);
-		if (global_mem->global_lock_owner != thread_num) {
+		if (LOAD_U32(global_mem->global_lock_owner) != thread_num) {
 			current_errs++;
 			sync_failures++;
 		}
 
 		/* Release shared lock, and make sure we no longer have it */
-		global_mem->global_lock_owner = 0;
+		STORE_U32(global_mem->global_lock_owner, 0);
 		odp_mb_full();
 		odp_rwlock_write_unlock(&global_mem->global_rwlock);
-		if (global_mem->global_lock_owner == thread_num) {
+		if (LOAD_U32(global_mem->global_lock_owner) == thread_num) {
 			current_errs++;
 			sync_failures++;
 		}

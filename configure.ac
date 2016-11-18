@@ -36,7 +36,7 @@ AM_PROG_LIBTOOL
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_MMAP
-AC_CHECK_FUNCS([bzero clock_gettime gethostbyname getpagesize gettimeofday memset munmap socket strchr strerror strrchr strstr strtoull])
+AC_CHECK_FUNCS([backtrace bzero clock_gettime gethostbyname getpagesize getrlimit getrusage gettimeofday memset munmap sched_setaffinity setrlimit sigaction socket strchr strerror strrchr strstr strtoull sync])
 
 # Checks for header files.
 AC_HEADER_RESOLV
@@ -80,6 +80,7 @@ AS_CASE([$host],
   [powerpc*], [ARCH_DIR=powerpc],
   [aarch64*], [ARCH_DIR=arm],
   [arm*], [ARCH_DIR=arm],
+  [k1*], [ARCH_DIR=k1],
   [ARCH_DIR=undefined]
 )
 AC_SUBST([ARCH_DIR])
@@ -116,6 +117,16 @@ AC_SUBST([platform_with_platform], ["platform/${with_platform}"])
 # Run platform specific checks and settings
 ##########################################################################
 m4_include([m4/platforms.m4])
+
+ODP_CFLAGS="$ODP_CFLAGS -DIMPLEMENTATION_NAME=$IMPLEMENTATION_NAME"
+
+##########################################################################
+# Include m4 files
+##########################################################################
+m4_include([./doc/m4/configure.m4])
+m4_include([./example/m4/configure.m4])
+m4_include([./helper/m4/configure.m4])
+m4_include([./test/m4/configure.m4])
 
 ##########################################################################
 # Set SDK install path
@@ -162,7 +173,7 @@ AM_CONDITIONAL([HAVE_MSCGEN], [test "x${MSCGEN}" = "xmscgen"])
 # Setup doxygen documentation
 ##########################################################################
 DX_HTML_FEATURE(ON)
-DX_PDF_FEATURE(OFF)
+DX_PDF_FEATURE(ON)
 DX_PS_FEATURE(OFF)
 DX_INIT_DOXYGEN($PACKAGE_NAME,
 		${srcdir}/doc/application-api-guide/Doxyfile,
@@ -184,6 +195,19 @@ AC_ARG_ENABLE([debug-print],
 	ODP_DEBUG_PRINT=0
     fi])
 ODP_CFLAGS="$ODP_CFLAGS -DODP_DEBUG_PRINT=$ODP_DEBUG_PRINT"
+
+##########################################################################
+# Enable/disable ODPH_DEBUG_PRINT
+##########################################################################
+ODPH_DEBUG_PRINT=0
+AC_ARG_ENABLE([helper-debug-print],
+    [  --enable-helper-debug-print    display debugging information for ODP helpers],
+    [if test "x$enableval" = "xyes"; then
+	ODPH_DEBUG_PRINT=1
+     else
+	ODPH_DEBUG_PRINT=0
+    fi])
+ODPH_CFLAGS="$ODPH_CFLAGS -DODPH_DEBUG_PRINT=$ODPH_DEBUG_PRINT"
 
 ##########################################################################
 # Enable/disable ODP_DEBUG
@@ -234,8 +258,6 @@ AM_CXXFLAGS="-std=c++11"
 AC_CONFIG_FILES([Makefile
 		 helper/Makefile
 		 helper/test/Makefile
-		 pkgconfig/libodp-linux.pc
-		 pkgconfig/libodphelper-linux.pc
 		 scripts/Makefile
 		 ])
 
@@ -257,6 +279,8 @@ AC_SUBST([CFLAGS])
 AC_SUBST([AM_LDFLAGS])
 AC_SUBST([LDFLAGS])
 AC_SUBST([EXEEXT])
+AC_SUBST([ODP_LIB_NAME])
+AC_SUBST([ODPH_CFLAGS])
 
 AC_OUTPUT
 AC_MSG_RESULT([

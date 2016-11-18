@@ -20,7 +20,7 @@
  * a single packet rate can be specified on the command line.
  *
  */
-#include <odp.h>
+#include <odp_api.h>
 
 #include <odp/helper/eth.h>
 #include <odp/helper/ip.h>
@@ -31,13 +31,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <test_debug.h>
 
 #define PKT_BUF_NUM       1024
 #define MAX_NUM_IFACES    2
 #define TEST_HDR_MAGIC    0x92749451
 #define MAX_WORKERS       32
-#define BATCH_LEN_MAX     8
+#define BATCH_LEN_MAX     32
 
 /* Packet rate at which to start when using binary search */
 #define RATE_SEARCH_INITIAL_PPS 1000000
@@ -116,6 +117,7 @@ typedef union tx_stats_u {
 
 /* Test global variables */
 typedef struct {
+	odp_instance_t instance;
 	test_args_t args;
 	odp_barrier_t rx_barrier;
 	odp_barrier_t tx_barrier;
@@ -134,6 +136,7 @@ typedef struct {
 	uint64_t pps_curr; /* Current attempted PPS */
 	uint64_t pps_pass; /* Highest passing PPS */
 	uint64_t pps_fail; /* Lowest failing PPS */
+	int      warmup;   /* Warmup stage - ignore results */
 } test_status_t;
 
 /* Thread specific arguments */
@@ -144,7 +147,7 @@ typedef struct {
 } thread_args_t;
 
 typedef struct {
-	uint32be_t magic; /* Packet header magic number */
+	odp_u32be_t magic; /* Packet header magic number */
 } pkt_head_t;
 
 /* Pool from which transmitted packets are allocated */
@@ -221,7 +224,8 @@ static odp_packet_t pktio_create_packet(void)
 	/* payload */
 	offset += ODPH_UDPHDR_LEN;
 	pkt_hdr.magic = TEST_HDR_MAGIC;
-	if (odp_packet_copydata_in(pkt, offset, sizeof(pkt_hdr), &pkt_hdr) != 0)
+	if (odp_packet_copy_from_mem(pkt, offset, sizeof(pkt_hdr),
+				     &pkt_hdr) != 0)
 		LOG_ABORT("Failed to generate test packet.\n");
 
 	return pkt;
@@ -237,9 +241,9 @@ static int pktio_pkt_has_magic(odp_packet_t pkt)
 
 	l4_off = odp_packet_l4_offset(pkt);
 	if (l4_off) {
-		int ret = odp_packet_copydata_out(pkt,
-						  l4_off+ODPH_UDPHDR_LEN,
-						  sizeof(pkt_hdr), &pkt_hdr);
+		int ret = odp_packet_copy_to_mem(pkt,
+						 l4_off + ODPH_UDPHDR_LEN,
+						 sizeof(pkt_hdr), &pkt_hdr);
 
 		if (ret != 0)
 			return 0;
@@ -255,61 +259,62 @@ static int pktio_pkt_has_magic(odp_packet_t pkt)
 /*
  * Allocate packets for transmission.
  */
-static int alloc_packets(odp_event_t *event_tbl, int num_pkts)
+static int alloc_packets(odp_packet_t *pkt_tbl, int num_pkts)
 {
-	odp_packet_t pkt_tbl[num_pkts];
 	int n;
 
 	for (n = 0; n < num_pkts; ++n) {
 		pkt_tbl[n] = pktio_create_packet();
 		if (pkt_tbl[n] == ODP_PACKET_INVALID)
 			break;
-		event_tbl[n] = odp_packet_to_event(pkt_tbl[n]);
 	}
 
 	return n;
 }
 
-static int send_packets(odp_queue_t outq,
-			odp_event_t *event_tbl, unsigned num_pkts)
+static int send_packets(odp_pktout_queue_t pktout,
+			odp_packet_t *pkt_tbl, unsigned pkts)
 {
-	int ret;
-	unsigned i;
+	unsigned tx_drops;
+	unsigned sent = 0;
 
-	if (num_pkts == 0)
+	if (pkts == 0)
 		return 0;
-	else if (num_pkts == 1) {
-		if (odp_queue_enq(outq, event_tbl[0])) {
-			odp_event_free(event_tbl[0]);
-			return 0;
-		} else {
-			return 1;
-		}
+
+	while (sent < pkts) {
+		int ret;
+
+		ret = odp_pktout_send(pktout, &pkt_tbl[sent], pkts - sent);
+
+		if (odp_likely(ret > 0))
+			sent += ret;
+		else
+			break;
 	}
 
-	ret = odp_queue_enq_multi(outq, event_tbl, num_pkts);
-	i = ret < 0 ? 0 : ret;
-	for ( ; i < num_pkts; i++)
-		odp_event_free(event_tbl[i]);
-	return ret;
+	tx_drops = pkts - sent;
 
+	if (odp_unlikely(tx_drops))
+		odp_packet_free_multi(&pkt_tbl[sent], tx_drops);
+
+	return sent;
 }
 
 /*
  * Main packet transmit routine. Transmit packets at a fixed rate for
  * specified length of time.
  */
-static void *run_thread_tx(void *arg)
+static int run_thread_tx(void *arg)
 {
 	test_globals_t *globals;
 	int thr_id;
-	odp_queue_t outq;
+	odp_pktout_queue_t pktout;
 	pkt_tx_stats_t *stats;
 	odp_time_t cur_time, send_time_end, send_duration;
 	odp_time_t burst_gap_end, burst_gap;
 	uint32_t batch_len;
 	int unsent_pkts = 0;
-	odp_event_t  tx_event[BATCH_LEN_MAX];
+	odp_packet_t tx_packet[BATCH_LEN_MAX];
 	odp_time_t idle_start = ODP_TIME_NULL;
 
 	thread_args_t *targs = arg;
@@ -324,8 +329,7 @@ static void *run_thread_tx(void *arg)
 	globals = odp_shm_addr(odp_shm_lookup("test_globals"));
 	stats = &globals->tx_stats[thr_id];
 
-	outq = odp_pktio_outq_getdef(globals->pktio_tx);
-	if (outq == ODP_QUEUE_INVALID)
+	if (odp_pktout_queue(globals->pktio_tx, &pktout, 1) != 1)
 		LOG_ABORT("Failed to get output queue for thread %d\n", thr_id);
 
 	burst_gap = odp_time_local_from_ns(
@@ -359,11 +363,11 @@ static void *run_thread_tx(void *arg)
 
 		burst_gap_end = odp_time_sum(burst_gap_end, burst_gap);
 
-		alloc_cnt = alloc_packets(tx_event, batch_len - unsent_pkts);
+		alloc_cnt = alloc_packets(tx_packet, batch_len - unsent_pkts);
 		if (alloc_cnt != batch_len)
 			stats->s.alloc_failures++;
 
-		tx_cnt = send_packets(outq, tx_event, alloc_cnt);
+		tx_cnt = send_packets(pktout, tx_packet, alloc_cnt);
 		unsent_pkts = alloc_cnt - tx_cnt;
 		stats->s.enq_failures += unsent_pkts;
 		stats->s.tx_cnt += tx_cnt;
@@ -378,10 +382,10 @@ static void *run_thread_tx(void *arg)
 	       odp_time_to_ns(stats->s.idle_ticks) /
 	       (uint64_t)ODP_TIME_MSEC_IN_NS);
 
-	return NULL;
+	return 0;
 }
 
-static int receive_packets(odp_queue_t pollq,
+static int receive_packets(odp_queue_t queue,
 			   odp_event_t *event_tbl, unsigned num_pkts)
 {
 	int n_ev = 0;
@@ -389,12 +393,12 @@ static int receive_packets(odp_queue_t pollq,
 	if (num_pkts == 0)
 		return 0;
 
-	if (pollq != ODP_QUEUE_INVALID) {
+	if (queue != ODP_QUEUE_INVALID) {
 		if (num_pkts == 1) {
-			event_tbl[0] = odp_queue_deq(pollq);
+			event_tbl[0] = odp_queue_deq(queue);
 			n_ev = event_tbl[0] != ODP_EVENT_INVALID;
 		} else {
-			n_ev = odp_queue_deq_multi(pollq, event_tbl, num_pkts);
+			n_ev = odp_queue_deq_multi(queue, event_tbl, num_pkts);
 		}
 	} else {
 		if (num_pkts == 1) {
@@ -408,11 +412,11 @@ static int receive_packets(odp_queue_t pollq,
 	return n_ev;
 }
 
-static void *run_thread_rx(void *arg)
+static int run_thread_rx(void *arg)
 {
 	test_globals_t *globals;
 	int thr_id, batch_len;
-	odp_queue_t pollq = ODP_QUEUE_INVALID;
+	odp_queue_t queue = ODP_QUEUE_INVALID;
 
 	thread_args_t *targs = arg;
 
@@ -428,9 +432,8 @@ static void *run_thread_rx(void *arg)
 	pkt_rx_stats_t *stats = &globals->rx_stats[thr_id];
 
 	if (gbl_args->args.schedule == 0) {
-		pollq = odp_pktio_inq_getdef(globals->pktio_rx);
-		if (pollq == ODP_QUEUE_INVALID)
-			LOG_ABORT("Invalid input queue.\n");
+		if (odp_pktin_event_queue(globals->pktio_rx, &queue, 1) != 1)
+			LOG_ABORT("No input queue.\n");
 	}
 
 	odp_barrier_wait(&globals->rx_barrier);
@@ -438,7 +441,7 @@ static void *run_thread_rx(void *arg)
 		odp_event_t ev[BATCH_LEN_MAX];
 		int i, n_ev;
 
-		n_ev = receive_packets(pollq, ev, batch_len);
+		n_ev = receive_packets(queue, ev, batch_len);
 
 		for (i = 0; i < n_ev; ++i) {
 			if (odp_event_type(ev[i]) == ODP_EVENT_PACKET) {
@@ -454,7 +457,7 @@ static void *run_thread_rx(void *arg)
 			break;
 	}
 
-	return NULL;
+	return 0;
 }
 
 /*
@@ -600,10 +603,15 @@ static int run_test_single(odp_cpumask_t *thd_mask_tx,
 			   odp_cpumask_t *thd_mask_rx,
 			   test_status_t *status)
 {
-	odph_linux_pthread_t thd_tbl[MAX_WORKERS];
+	odph_odpthread_t thd_tbl[MAX_WORKERS];
 	thread_args_t args_tx, args_rx;
 	uint64_t expected_tx_cnt;
 	int num_tx_workers, num_rx_workers;
+	odph_odpthread_params_t thr_params;
+
+	memset(&thr_params, 0, sizeof(thr_params));
+	thr_params.thr_type = ODP_THREAD_WORKER;
+	thr_params.instance = gbl_args->instance;
 
 	odp_atomic_store_u32(&shutdown, 0);
 
@@ -614,24 +622,26 @@ static int run_test_single(odp_cpumask_t *thd_mask_tx,
 	expected_tx_cnt = status->pps_curr * gbl_args->args.duration;
 
 	/* start receiver threads first */
+	thr_params.start  = run_thread_rx;
+	thr_params.arg    = &args_rx;
 	args_rx.batch_len = gbl_args->args.rx_batch_len;
-	odph_linux_pthread_create(&thd_tbl[0], thd_mask_rx,
-				  run_thread_rx, &args_rx, ODP_THREAD_WORKER);
+	odph_odpthreads_create(&thd_tbl[0], thd_mask_rx, &thr_params);
 	odp_barrier_wait(&gbl_args->rx_barrier);
 	num_rx_workers = odp_cpumask_count(thd_mask_rx);
 
 	/* then start transmitters */
+	thr_params.start  = run_thread_tx;
+	thr_params.arg    = &args_tx;
 	num_tx_workers    = odp_cpumask_count(thd_mask_tx);
 	args_tx.pps       = status->pps_curr / num_tx_workers;
 	args_tx.duration  = gbl_args->args.duration;
 	args_tx.batch_len = gbl_args->args.tx_batch_len;
-	odph_linux_pthread_create(&thd_tbl[num_rx_workers], thd_mask_tx,
-				  run_thread_tx, &args_tx, ODP_THREAD_WORKER);
+	odph_odpthreads_create(&thd_tbl[num_rx_workers], thd_mask_tx,
+			       &thr_params);
 	odp_barrier_wait(&gbl_args->tx_barrier);
 
 	/* wait for transmitter threads to terminate */
-	odph_linux_pthread_join(&thd_tbl[num_rx_workers],
-				num_tx_workers);
+	odph_odpthreads_join(&thd_tbl[num_rx_workers]);
 
 	/* delay to allow transmitted packets to reach the receivers */
 	odp_time_wait_ns(SHUTDOWN_DELAY_NS);
@@ -640,9 +650,12 @@ static int run_test_single(odp_cpumask_t *thd_mask_tx,
 	odp_atomic_store_u32(&shutdown, 1);
 
 	/* wait for receivers */
-	odph_linux_pthread_join(&thd_tbl[0], num_rx_workers);
+	odph_odpthreads_join(&thd_tbl[0]);
 
-	return process_results(expected_tx_cnt, status);
+	if (!status->warmup)
+		return process_results(expected_tx_cnt, status);
+
+	return 1;
 }
 
 static int run_test(void)
@@ -654,6 +667,7 @@ static int run_test(void)
 		.pps_curr = gbl_args->args.pps,
 		.pps_pass = 0,
 		.pps_fail = 0,
+		.warmup = 1,
 	};
 
 	if (setup_txrx_masks(&txmask, &rxmask) != 0)
@@ -668,11 +682,15 @@ static int run_test(void)
 	printf("\tReceive batch length: \t%" PRIu32 "\n",
 	       gbl_args->args.rx_batch_len);
 	printf("\tPacket receive method:\t%s\n",
-	       gbl_args->args.schedule ? "schedule" : "poll");
+	       gbl_args->args.schedule ? "schedule" : "plain");
 	printf("\tInterface(s):         \t");
 	for (i = 0; i < gbl_args->args.num_ifaces; ++i)
 		printf("%s ", gbl_args->args.ifaces[i]);
 	printf("\n");
+
+	/* first time just run the test but throw away the results */
+	run_test_single(&txmask, &rxmask, &status);
+	status.warmup = 0;
 
 	while (ret > 0)
 		ret = run_test_single(&txmask, &rxmask, &status);
@@ -704,7 +722,7 @@ static odp_pktio_t create_pktio(const char *iface, int schedule)
 	if (schedule)
 		pktio_param.in_mode = ODP_PKTIN_MODE_SCHED;
 	else
-		pktio_param.in_mode = ODP_PKTIN_MODE_POLL;
+		pktio_param.in_mode = ODP_PKTIN_MODE_QUEUE;
 
 	pktio = odp_pktio_open(iface, pool, &pktio_param);
 
@@ -714,11 +732,8 @@ static odp_pktio_t create_pktio(const char *iface, int schedule)
 static int test_init(void)
 {
 	odp_pool_param_t params;
-	odp_queue_param_t qparam;
-	odp_queue_t inq_def;
 	const char *iface;
 	int schedule;
-	char inq_name[ODP_QUEUE_NAME_LEN];
 
 	odp_pool_param_init(&params);
 	params.pkt.len     = PKT_HDR_LEN + gbl_args->args.pkt_len;
@@ -756,24 +771,29 @@ static int test_init(void)
 		return -1;
 	}
 
-	/* create and associate an input queue for the RX side */
-	odp_queue_param_init(&qparam);
-	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync  = ODP_SCHED_SYNC_NONE;
-	qparam.sched.group = ODP_SCHED_GROUP_ALL;
-
-	snprintf(inq_name, sizeof(inq_name), "inq-pktio-%" PRIu64,
-		 odp_pktio_to_u64(gbl_args->pktio_rx));
-	inq_def = odp_queue_lookup(inq_name);
-	if (inq_def == ODP_QUEUE_INVALID)
-		inq_def = odp_queue_create(inq_name,
-				ODP_QUEUE_TYPE_PKTIN, &qparam);
-
-	if (inq_def == ODP_QUEUE_INVALID)
+	/* Create single queue with default parameters */
+	if (odp_pktout_queue_config(gbl_args->pktio_tx, NULL)) {
+		LOG_ERR("failed to configure pktio_tx queue\n");
 		return -1;
+	}
 
-	if (odp_pktio_inq_setdef(gbl_args->pktio_rx, inq_def) != 0)
+	/* Configure also input side (with defaults) */
+	if (odp_pktin_queue_config(gbl_args->pktio_tx, NULL)) {
+		LOG_ERR("failed to configure pktio_tx queue\n");
 		return -1;
+	}
+
+	if (gbl_args->args.num_ifaces > 1) {
+		if (odp_pktout_queue_config(gbl_args->pktio_rx, NULL)) {
+			LOG_ERR("failed to configure pktio_rx queue\n");
+			return -1;
+		}
+
+		if (odp_pktin_queue_config(gbl_args->pktio_rx, NULL)) {
+			LOG_ERR("failed to configure pktio_rx queue\n");
+			return -1;
+		}
+	}
 
 	if (odp_pktio_start(gbl_args->pktio_tx) != 0)
 		return -1;
@@ -784,25 +804,21 @@ static int test_init(void)
 	return 0;
 }
 
-static int destroy_inq(odp_pktio_t pktio)
+static int empty_inq(odp_pktio_t pktio)
 {
-	odp_queue_t inq;
+	odp_queue_t queue;
 	odp_event_t ev;
 	odp_queue_type_t q_type;
 
-	inq = odp_pktio_inq_getdef(pktio);
-
-	if (inq == ODP_QUEUE_INVALID)
+	if (odp_pktin_event_queue(pktio, &queue, 1) != 1)
 		return -1;
 
-	odp_pktio_inq_remdef(pktio);
-
-	q_type = odp_queue_type(inq);
+	q_type = odp_queue_type(queue);
 
 	/* flush any pending events */
 	while (1) {
-		if (q_type == ODP_QUEUE_TYPE_POLL)
-			ev = odp_queue_deq(inq);
+		if (q_type == ODP_QUEUE_TYPE_PLAIN)
+			ev = odp_queue_deq(queue);
 		else
 			ev = odp_schedule(NULL, ODP_SCHED_NO_WAIT);
 
@@ -812,7 +828,7 @@ static int destroy_inq(odp_pktio_t pktio)
 			break;
 	}
 
-	return odp_queue_destroy(inq);
+	return 0;
 }
 
 static int test_term(void)
@@ -823,13 +839,23 @@ static int test_term(void)
 	int ret = 0;
 
 	if (gbl_args->pktio_tx != gbl_args->pktio_rx) {
-		if (odp_pktio_close(gbl_args->pktio_tx) != 0) {
+		if (odp_pktio_stop(gbl_args->pktio_tx)) {
+			LOG_ERR("Failed to stop pktio_tx\n");
+			return -1;
+		}
+
+		if (odp_pktio_close(gbl_args->pktio_tx)) {
 			LOG_ERR("Failed to close pktio_tx\n");
 			ret = -1;
 		}
 	}
 
-	destroy_inq(gbl_args->pktio_rx);
+	empty_inq(gbl_args->pktio_rx);
+
+	if (odp_pktio_stop(gbl_args->pktio_rx)) {
+		LOG_ERR("Failed to stop pktio_rx\n");
+		return -1;
+	}
 
 	if (odp_pktio_close(gbl_args->pktio_rx) != 0) {
 		LOG_ERR("Failed to close pktio_rx\n");
@@ -873,7 +899,7 @@ static void usage(void)
 	printf("                         default: cpu_count+1/2\n");
 	printf("  -b, --txbatch <length> Number of packets per TX batch\n");
 	printf("                         default: %d\n", BATCH_LEN_MAX);
-	printf("  -p, --poll             Poll input queue for packet RX\n");
+	printf("  -p, --plain            Plain input queue for packet RX\n");
 	printf("                         default: disabled (use scheduler)\n");
 	printf("  -R, --rxbatch <length> Number of packets per RX batch\n");
 	printf("                         default: %d\n", BATCH_LEN_MAX);
@@ -892,11 +918,11 @@ static void parse_args(int argc, char *argv[], test_args_t *args)
 	int opt;
 	int long_index;
 
-	static struct option longopts[] = {
+	static const struct option longopts[] = {
 		{"count",     required_argument, NULL, 'c'},
 		{"txcount",   required_argument, NULL, 't'},
 		{"txbatch",   required_argument, NULL, 'b'},
-		{"poll",      no_argument,       NULL, 'p'},
+		{"plain",     no_argument,       NULL, 'p'},
 		{"rxbatch",   required_argument, NULL, 'R'},
 		{"length",    required_argument, NULL, 'l'},
 		{"rate",      required_argument, NULL, 'r'},
@@ -906,6 +932,11 @@ static void parse_args(int argc, char *argv[], test_args_t *args)
 		{"help",      no_argument,       NULL, 'h'},
 		{NULL, 0, NULL, 0}
 	};
+
+	static const char *shortopts = "+c:t:b:pR:l:r:i:d:vh";
+
+	/* let helper collect its own arguments (e.g. --odph_proc) */
+	odph_parse_options(argc, argv, shortopts, longopts);
 
 	args->cpu_count      = 0; /* all CPUs */
 	args->num_tx_workers = 0; /* defaults to cpu_count+1/2 */
@@ -917,8 +948,10 @@ static void parse_args(int argc, char *argv[], test_args_t *args)
 	args->schedule       = 1;
 	args->verbose        = 0;
 
+	opterr = 0; /* do not issue errors on helper options */
+
 	while (1) {
-		opt = getopt_long(argc, argv, "+c:t:b:pR:l:r:i:d:vh",
+		opt = getopt_long(argc, argv, shortopts,
 				  longopts, &long_index);
 
 		if (opt == -1)
@@ -952,7 +985,6 @@ static void parse_args(int argc, char *argv[], test_args_t *args)
 				LOG_ABORT("Failed to alloc iface storage\n");
 
 			strcpy(args->if_str, optarg);
-
 			for (token = strtok(args->if_str, ",");
 			     token != NULL && args->num_ifaces < MAX_NUM_IFACES;
 			     token = strtok(NULL, ","))
@@ -988,13 +1020,13 @@ int main(int argc, char **argv)
 	int ret;
 	odp_shm_t shm;
 	int max_thrs;
-
+	odp_instance_t instance;
 	odp_platform_init_t platform_params = { .n_rx_thr = 4 };
-	/* Init ODP before calling anything else */
-	if (odp_init_global(NULL, &platform_params))
+
+	if (odp_init_global(&instance, NULL, &platform_params) != 0)
 		LOG_ABORT("Failed global init.\n");
 
-	if (odp_init_local(ODP_THREAD_CONTROL) != 0)
+	if (odp_init_local(instance, ODP_THREAD_CONTROL) != 0)
 		LOG_ABORT("Failed local init.\n");
 
 	shm = odp_shm_reserve("test_globals",
@@ -1006,6 +1038,7 @@ int main(int argc, char **argv)
 
 	max_thrs = odp_thread_count_max();
 
+	gbl_args->instance = instance;
 	gbl_args->rx_stats_size = max_thrs * sizeof(pkt_rx_stats_t);
 	gbl_args->tx_stats_size = max_thrs * sizeof(pkt_tx_stats_t);
 

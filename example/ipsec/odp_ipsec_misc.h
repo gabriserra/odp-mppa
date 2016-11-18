@@ -15,6 +15,7 @@ extern "C" {
 #include <odp/helper/eth.h>
 #include <odp/helper/ip.h>
 #include <odp/helper/ipsec.h>
+#include <inttypes.h>
 
 #ifndef TRUE
 #define TRUE  1

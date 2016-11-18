@@ -5,12 +5,11 @@ TESTS_ENVIRONMENT += TEST_DIR=${builddir}
 EXECUTABLES = odp_crypto$(EXEEXT) odp_pktio_perf$(EXEEXT)
 
 COMPILE_ONLY = odp_l2fwd$(EXEEXT) \
-				odp_scheduling$(EXEEXT) \
-				odp_autoreply$(EXEEXT)
+				odp_scheduling$(EXEEXT)
 TESTSCRIPTS  =
 
-TESTSCRIPTS = odp_l2fwd_run.sh \
-	      odp_scheduling_run.sh
+TESTSCRIPTS =  odp_scheduling_run.sh
+# odp_l2fwd_run.sh
 
 TEST_EXTENSIONS = .sh
 
@@ -31,6 +30,5 @@ noinst_HEADERS = \
 dist_odp_crypto_SOURCES = odp_crypto.c
 dist_odp_scheduling_SOURCES = odp_scheduling.c
 dist_odp_pktio_perf_SOURCES = odp_pktio_perf.c
-dist_odp_autoreply_SOURCES  = odp_autoreply.c
 
 dist_bin_SCRIPTS = $(TESTSCRIPTS)

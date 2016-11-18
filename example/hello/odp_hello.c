@@ -58,8 +58,6 @@ int main(int argc, char *argv[])
 {
 	odp_instance_t inst;
 	options_t opt;
-	pid_t pid;
-	cpu_set_t cpu_set;
 	int i;
 
 	memset(&opt, 0, sizeof(opt));
@@ -69,14 +67,21 @@ int main(int argc, char *argv[])
 	if (parse_args(argc, argv, &opt))
 		return -1;
 
-	pid = getpid();
-	CPU_ZERO(&cpu_set);
-	CPU_SET(opt.cpu, &cpu_set);
+#ifdef HAVE_SCHED_SETAFFINITY
+	{
+		pid_t pid;
+		cpu_set_t cpu_set;
 
-	if (sched_setaffinity(pid, sizeof(cpu_set_t), &cpu_set)) {
-		printf("Set CPU affinity failed.\n");
-		return -1;
+		pid = getpid();
+		CPU_ZERO(&cpu_set);
+		CPU_SET(opt.cpu, &cpu_set);
+
+		if (sched_setaffinity(pid, sizeof(cpu_set_t), &cpu_set)) {
+			printf("Set CPU affinity failed.\n");
+			return -1;
+		}
 	}
+#endif
 
 	if (odp_init_global(&inst, NULL, NULL)) {
 		printf("Global init failed.\n");

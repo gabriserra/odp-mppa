@@ -26,7 +26,7 @@
 /** @def SHM_PKT_POOL_SIZE
  * @brief Size of the shared memory block
  */
-#define SHM_PKT_POOL_SIZE      (512 * 2048 * 2)
+#define SHM_PKT_POOL_SIZE      (512 * 2048)
 
 /** @def SHM_PKT_POOL_BUF_SIZE
  * @brief Buffer size of the packet pool buffer
@@ -271,8 +271,15 @@ static void
 fill_time_record(time_record_t *rec)
 {
 	gettimeofday(&rec->tv, NULL);
+#ifdef HAVE_GETRUSAGE
 	getrusage(RUSAGE_SELF, &rec->ru_self);
 	getrusage(RUSAGE_THREAD, &rec->ru_thread);
+#else
+	rec->ru_self.ru_utime.tv_sec = rec->ru_self.ru_utime.tv_usec = 0;
+	rec->ru_self.ru_stime.tv_sec = rec->ru_self.ru_stime.tv_usec = 0;
+	rec->ru_thread.ru_utime.tv_sec = rec->ru_thread.ru_utime.tv_usec = 0;
+	rec->ru_thread.ru_stime.tv_sec = rec->ru_thread.ru_stime.tv_usec = 0;
+#endif
 }
 
 /**

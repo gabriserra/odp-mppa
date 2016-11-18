@@ -27,7 +27,7 @@
 #define MAX_NUM_IFACES           2
 #define MAX_TM_SYSTEMS           3
 #define NUM_LEVELS               3
-#define NUM_PRIORITIES           4
+#define NUM_PRIORITIES           ((ODP_TM_MAX_PRIORITIES > 4) ? 4 : ODP_TM_MAX_PRIORITIES)
 #define NUM_QUEUES_PER_NODE      NUM_PRIORITIES
 #define FANIN_RATIO              8
 #define NUM_LEVEL0_TM_NODES      1
@@ -2203,13 +2203,14 @@ void traffic_mngr_test_sched_profile(void)
 	odp_tm_sched_t        profile;
 	uint32_t              idx, priority, sched_idx, i;
 	char                  sched_name[TM_NAME_LEN];
-
+	const uint32_t priorities =
+		ODP_TM_MAX_PRIORITIES >= 16 ? 16 : ODP_TM_MAX_PRIORITIES;
 	odp_tm_sched_params_init(&sched_params);
 
 	for (idx = 1; idx <= NUM_SCHED_TEST_PROFILES; idx++) {
 		snprintf(sched_name, sizeof(sched_name),
 			 "sched_profile_%" PRIu32, idx);
-		for (priority = 0; priority < 16; priority++) {
+		for (priority = 0; priority < priorities; priority++) {
 			sched_params.sched_modes[priority] =
 				ODP_TM_BYTE_BASED_WEIGHTS;
 			sched_params.sched_weights[priority] = 8 + idx +

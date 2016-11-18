@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <odp/errno.h>
+#include <odp/api/errno.h>
 #include <errno.h>
 #include "odp_classification_internal.h"
 #include "../../syscall/include/common.h"
@@ -76,7 +76,8 @@ static int magic_mac_addr_get(pktio_entry_t *pktio_entry, void * mac_addr)
 	return _magic_scall_mac_get(pktio_entry->s.pkt_magic.fd, mac_addr);
 }
 
-static int magic_recv(pktio_entry_t *const pktio_entry, odp_packet_t pkt_table[], unsigned len)
+static int magic_recv(pktio_entry_t *const pktio_entry, int index ODP_UNUSED,
+		      odp_packet_t pkt_table[], unsigned len)
 {
 	ssize_t recv_bytes;
 	unsigned i;
@@ -102,30 +103,25 @@ static int magic_recv(pktio_entry_t *const pktio_entry, odp_packet_t pkt_table[]
 		/* Parse and set packet header data */
 		packet_parse_reset((odp_packet_hdr_t *)pkt);
 		odp_packet_pull_tail(pkt, pktio_entry->s.pkt_magic.max_frame_len - recv_bytes);
-		packet_parse_l2((odp_packet_hdr_t *)pkt);
+		packet_parse_l2(&((odp_packet_hdr_t *)pkt)->p, recv_bytes);
 
 		pkt_table[nb_rx] = pkt;
 		pkt = ODP_PACKET_INVALID;
 		nb_rx++;
+		((odp_packet_hdr_t *)pkt)->input = pktio_entry->s.handle;
 	} /* end for() */
 
 	if (odp_unlikely(pkt != ODP_PACKET_INVALID))
 		odp_packet_free(pkt);
 
-	if (nb_rx && pktio_cls_enabled(pktio_entry)) {
-		int defq_pkts = 0;
-		for (int i = 0; i < nb_rx; ++i) {
-			if (0 > _odp_packet_classifier(pktio_entry, pkt_table[i])) {
-				pkt_table[defq_pkts] = pkt_table[i];
-			}
-		}
-		nb_rx = defq_pkts;
-	}
+	if (nb_rx && pktio_cls_enabled(pktio_entry))
+		nb_rx = _odp_pktio_classify(pktio_entry, index, pkt_table, nb_rx);
 
 	return nb_rx;
 }
 
-static int magic_send(pktio_entry_t *const pktio_entry, odp_packet_t pkt_table[], unsigned len)
+static int magic_send(pktio_entry_t *const pktio_entry, int index ODP_UNUSED,
+		      const odp_packet_t pkt_table[], unsigned len)
 {
 	odp_packet_t pkt;
 	unsigned i;
@@ -161,11 +157,12 @@ static int magic_promisc_mode(pktio_entry_t *const pktio_entry){
 	return _magic_scall_prom_get(pktio_entry->s.pkt_magic.fd);
 }
 
-static int magic_mtu_get(__attribute__ ((unused)) pktio_entry_t *const pktio_entry) {
+static uint32_t magic_mtu_get(__attribute__ ((unused)) pktio_entry_t *const pktio_entry) {
 	return -1;
 }
 
 const pktio_if_ops_t magic_pktio_ops = {
+	.name = "magic",
 	.init = magic_init,
 	.term = NULL,
 	.open = magic_open,

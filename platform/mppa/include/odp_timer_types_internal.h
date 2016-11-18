@@ -14,12 +14,12 @@
 #ifndef ODP_TIMER_TYPES_INTERNAL_H_
 #define ODP_TIMER_TYPES_INTERNAL_H_
 
-#include <odp/align.h>
-#include <odp/debug.h>
+#include <odp/api/align.h>
+#include <odp/api/debug.h>
 #include <odp_buffer_internal.h>
 #include <odp_pool_internal.h>
-#include <odp/timer.h>
-#include <odp/spinlock.h>
+#include <odp/api/timer.h>
+#include <odp/api/spinlock.h>
 
 /******************************************************************************
  * odp_timer abstract datatype

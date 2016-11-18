@@ -18,18 +18,20 @@
 extern "C" {
 #endif
 
-#include <odp/spinlock.h>
-#include <odp/rwlock.h>
+#include <odp/api/spinlock.h>
+#include <odp/api/rwlock.h>
 #include <odp_classification_datamodel.h>
 #include <odp_align_internal.h>
 #include <odp_debug_internal.h>
 #include <odp_buffer_inlines.h>
 #include <odp_rx_internal.h>
-
-#include <odp/config.h>
-#include <odp/hints.h>
+#include <odp/api/hints.h>
 
 #define PKTIO_NAME_LEN 256
+#define PKTIO_MAX_QUEUES 16
+
+#define PKTIN_INVALID  ((odp_pktin_queue_t) {ODP_PKTIO_INVALID, 0})
+#define PKTOUT_INVALID ((odp_pktout_queue_t) {ODP_PKTIO_INVALID, 0})
 
 #ifndef ETH_ALEN
 #define ETH_ALEN 6
@@ -165,13 +167,37 @@ typedef struct {
 
 struct pktio_entry {
 	const struct pktio_if_ops *ops; /**< Implementation specific methods */
-	odp_ticketlock_t lock;		/**< entry ticketlock */
-	int taken;			/**< is entry taken(1) or free(0) */
+	odp_ticketlock_t rxl;		/**< RX ticketlock */
+	odp_ticketlock_t txl;		/**< TX ticketlock */
 	int cls_enabled;		/**< is classifier enabled */
 	odp_pktio_t handle;		/**< pktio handle */
-	odp_queue_t inq_default;	/**< default input queue, if set */
-	odp_queue_t outq_default;	/**< default out queue */
+
+	enum {
+		/* Not allocated */
+		PKTIO_STATE_FREE = 0,
+		/* Close pending on scheduler response. Next state after this
+		 * is PKTIO_STATE_FREE. */
+		PKTIO_STATE_CLOSE_PENDING,
+		/* Open in progress.
+		   Marker for all active states following under. */
+		PKTIO_STATE_ACTIVE,
+		/* Open completed */
+		PKTIO_STATE_OPENED,
+		/* Start completed */
+		PKTIO_STATE_STARTED,
+		/* Stop pending on scheduler response */
+		PKTIO_STATE_STOP_PENDING,
+		/* Stop completed */
+		PKTIO_STATE_STOPPED
+	} state;
+	odp_pktio_config_t config;	/**< Device configuration */
 	classifier_t cls;		/**< classifier linked with this pktio*/
+	odp_pktio_stats_t stats;	/**< statistic counters for pktio */
+	enum {
+		STATS_SYSFS = 0,
+		STATS_ETHTOOL,
+		STATS_UNSUPPORTED
+	} stats_type;
 	char name[PKTIO_NAME_LEN];      /**< name of pktio provided to
 					     pktio_open() */
 
@@ -184,11 +210,23 @@ struct pktio_entry {
 		pkt_pcie_t pkt_pcie;
 		pkt_ioddr_t pkt_ioddr;
 	};
-	enum {
-		STATE_START = 0,
-		STATE_STOP
-	} state;
+
+	odp_pool_t pool;
 	odp_pktio_param_t param;
+	/* Storage for queue handles
+	 * Multi-queue support is pktio driver specific */
+	unsigned num_in_queue;
+	unsigned num_out_queue;
+
+	struct {
+		odp_queue_t        queue;
+		odp_pktin_queue_t  pktin;
+	} in_queue[PKTIO_MAX_QUEUES];
+
+	struct {
+		odp_queue_t        queue;
+		odp_pktout_queue_t pktout;
+	} out_queue[PKTIO_MAX_QUEUES];
 };
 
 typedef union {
@@ -202,6 +240,8 @@ typedef struct {
 } pktio_table_t;
 
 typedef struct pktio_if_ops {
+	const char *name;
+	void (*print)(pktio_entry_t *pktio_entry);
 	int (*init)(void);
 	int (*term)(void);
 	int (*open)(odp_pktio_t pktio, pktio_entry_t *pktio_entry,
@@ -209,18 +249,30 @@ typedef struct pktio_if_ops {
 	int (*close)(pktio_entry_t *pktio_entry);
 	int (*start)(pktio_entry_t *pktio_entry);
 	int (*stop)(pktio_entry_t *pktio_entry);
-	int (*stats)(pktio_entry_t *pktio_entry, _odp_pktio_stats_t *stats);
-	int (*recv)(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
-		    unsigned len);
-	int (*send)(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
-		    unsigned len);
-	int (*mtu_get)(pktio_entry_t *pktio_entry);
+	int (*stats)(pktio_entry_t *pktio_entry, odp_pktio_stats_t *stats);
+	int (*stats_reset)(pktio_entry_t *pktio_entry);
+	uint64_t (*pktin_ts_res)(pktio_entry_t *pktio_entry);
+	odp_time_t (*pktin_ts_from_ns)(pktio_entry_t *pktio_entry, uint64_t ns);
+	int (*recv)(pktio_entry_t *pktio_entry, int index,
+		    odp_packet_t pkt_table[], unsigned num);
+	int (*send)(pktio_entry_t *pktio_entry, int index,
+		    const odp_packet_t pkt_table[], unsigned num);
+	uint32_t (*mtu_get)(pktio_entry_t *pktio_entry);
 	int (*promisc_mode_set)(pktio_entry_t *pktio_entry,  int enable);
 	int (*promisc_mode_get)(pktio_entry_t *pktio_entry);
 	int (*mac_get)(pktio_entry_t *pktio_entry, void *mac_addr);
+	int (*link_status)(pktio_entry_t *pktio_entry);
+	int (*capability)(pktio_entry_t *pktio_entry,
+			  odp_pktio_capability_t *capa);
+	int (*config)(pktio_entry_t *pktio_entry,
+		      const odp_pktio_config_t *config);
+	int (*input_queues_config)(pktio_entry_t *pktio_entry,
+				   const odp_pktin_queue_param_t *param);
+	int (*output_queues_config)(pktio_entry_t *pktio_entry,
+				    const odp_pktout_queue_param_t *p);
 } pktio_if_ops_t;
 
-extern pktio_table_t pktio_table;
+extern pktio_table_t pktio_tbl;
 
 static inline pktio_entry_t *get_pktio_entry(odp_pktio_t pktio)
 {
@@ -233,7 +285,7 @@ static inline pktio_entry_t *get_pktio_entry(odp_pktio_t pktio)
 static inline int pktio_to_id(odp_pktio_t pktio)
 {
 	pktio_entry_t * entry = get_pktio_entry(pktio);
-	return entry - pktio_table.entries;
+	return entry - pktio_tbl.entries;
 }
 
 static inline int pktio_cls_enabled(pktio_entry_t *entry)
@@ -246,7 +298,18 @@ static inline void pktio_cls_enabled_set(pktio_entry_t *entry, int ena)
 	entry->s.cls_enabled = ena;
 }
 
-int pktin_poll(pktio_entry_t *entry);
+/*
+ * Dummy single queue implementations of multi-queue API
+ */
+int single_capability(odp_pktio_capability_t *capa);
+int single_input_queues_config(pktio_entry_t *entry,
+			       const odp_pktin_queue_param_t *param);
+int single_output_queues_config(pktio_entry_t *entry,
+				const odp_pktout_queue_param_t *param);
+int single_recv_queue(pktio_entry_t *entry, int index, odp_packet_t packets[],
+		      int num);
+int single_send_queue(pktio_entry_t *entry, int index,
+		      const odp_packet_t packets[], int num);
 
 extern const pktio_if_ops_t loopback_pktio_ops;
 extern const pktio_if_ops_t magic_pktio_ops;
@@ -291,6 +354,10 @@ uint32_t _rx_pkt_to_iovec(odp_packet_t pkt,
 struct pkt_rule;
 const char* parse_hashpolicy(const char* pptr, int *nb_rules,
 			     struct pkt_rule *rules, int max_rules);
+
+int _odp_pktio_classify(pktio_entry_t *const pktio_entry,
+			int index ODP_UNUSED,
+			odp_packet_t pkt_table[], unsigned len);
 #ifdef __cplusplus
 }
 #endif

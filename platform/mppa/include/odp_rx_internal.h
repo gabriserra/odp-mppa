@@ -13,7 +13,8 @@ extern "C" {
 
 #include <odp_buffer_ring_internal.h>
 #include <odp_macros_internal.h>
-#include <odp/cpu.h>
+#include <odp_config_internal.h>
+#include <odp/api/cpu.h>
 
 #include <HAL/hal/cluster/cnoc.h>
 #include <HAL/hal/cluster/dnoc.h>

@@ -40,7 +40,7 @@ FIRMWARE_DIR = $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/
 
 cluster-cflags := -I$(ODP_TOOLCHAIN_DIR)/$(INCLUDE_DIR)/include $($(REAL_ODP_ARCH)_CFLAGS)
 cluster-lflags := -L$(ODP_TOOLCHAIN_DIR)/lib/odp/$(ODP_FLAVOUR)/$(OS_PLAT_NAME)/
-cluster-lflags += -lodphelper -lodp -lcrypto  $(LIB_NOC_LFLAGS) $($(REAL_ODP_ARCH)_LDFLAGS) -Wl,--gc-sections
+cluster-lflags += -lodphelper-mppa -lodp-mppa -lcrypto  $(LIB_NOC_LFLAGS) $($(REAL_ODP_ARCH)_LDFLAGS) -Wl,--gc-sections
 
 # Empty direct assignement to allows += to work in included Makefiles
 io-bin :=

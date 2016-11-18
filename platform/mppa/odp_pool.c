@@ -4,19 +4,19 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#include <odp/std_types.h>
-#include <odp/pool.h>
+#include <odp/api/std_types.h>
+#include <odp/api/pool.h>
 #include <odp_buffer_internal.h>
 #include <odp_pool_internal.h>
 #include <odp_buffer_inlines.h>
 #include <odp_packet_internal.h>
 #include <odp_timer_internal.h>
 #include <odp_align_internal.h>
-#include <odp/shared_memory.h>
-#include <odp/align.h>
+#include <odp/api/shared_memory.h>
+#include <odp/api/align.h>
 #include <odp_internal.h>
-#include <odp/config.h>
-#include <odp/hints.h>
+#include <odp_config_internal.h>
+#include <odp/api/hints.h>
 #include <odp_debug_internal.h>
 #include <odp_atomic_internal.h>
 #include <odp_packet_internal.h>
@@ -80,6 +80,11 @@ int odp_pool_init_global(void)
 	return 0;
 }
 
+int odp_pool_init_local(void)
+{
+	return 0;
+}
+
 int odp_pool_term_global(void)
 {
 	int i;
@@ -103,6 +108,37 @@ int odp_pool_term_global(void)
 int odp_pool_term_local(void)
 {
 	_odp_flush_caches();
+	return 0;
+}
+
+int odp_pool_capability(odp_pool_capability_t *capa)
+{
+	memset(capa, 0, sizeof(odp_pool_capability_t));
+
+	capa->max_pools = ODP_CONFIG_POOLS;
+
+	/* Buffer pools */
+	capa->buf.max_pools = ODP_CONFIG_POOLS;
+	capa->buf.max_align = ODP_CONFIG_BUFFER_ALIGN_MAX;
+	capa->buf.max_size  = 0;
+	capa->buf.max_num   = 0;
+
+	/* Packet pools */
+	capa->pkt.max_pools        = ODP_CONFIG_POOLS;
+	capa->pkt.max_len          = ODP_CONFIG_PACKET_MAX_SEGS *
+				     ODP_CONFIG_PACKET_SEG_LEN_MIN;
+	capa->pkt.max_num	   = 0;
+	capa->pkt.min_headroom     = ODP_CONFIG_PACKET_HEADROOM;
+	capa->pkt.min_tailroom     = ODP_CONFIG_PACKET_TAILROOM;
+	capa->pkt.max_segs_per_pkt = ODP_CONFIG_PACKET_MAX_SEGS;
+	capa->pkt.min_seg_len      = ODP_CONFIG_PACKET_SEG_LEN_MIN;
+	capa->pkt.max_seg_len      = ODP_CONFIG_PACKET_SEG_LEN_MAX;
+	capa->pkt.max_uarea_size   = 0;
+
+	/* Timeout pools */
+	capa->tmo.max_pools = ODP_CONFIG_POOLS;
+	capa->tmo.max_num   = 0;
+
 	return 0;
 }
 
@@ -322,6 +358,7 @@ odp_pool_t odp_pool_create(const char *name, odp_pool_param_t *params)
 			tmp->event_type = params->type;
 			tmp->pool_hdl = (odp_pool_t)pool;
 			tmp->uarea_addr = (void *)udat;
+			tmp->uarea_size = p_udata_size;
 
 			/* Set 1st seg addr for zero-len buffers */
 			tmp->addr = blk;

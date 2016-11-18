@@ -4,9 +4,9 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <odp/cpu.h>
-#include <odp/cpumask.h>
-#include <odp/errno.h>
+#include <odp/api/cpu.h>
+#include <odp/api/cpumask.h>
+#include <odp/api/errno.h>
 #include <errno.h>
 #include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
@@ -27,7 +27,7 @@
 
 #define MAX_ETH_SLOTS 2
 #define MAX_ETH_PORTS 5
-_ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
+ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
 		   "MAX_RX_ETH_IF__ERROR");
 
 #define N_RX_P_ETH 20
@@ -461,8 +461,8 @@ static int eth_mac_addr_get(pktio_entry_t *pktio_entry,
 
 
 
-static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
-		    unsigned len)
+static int eth_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+		    odp_packet_t pkt_table[], unsigned len)
 {
 	int n_packet;
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
@@ -492,24 +492,18 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		const unsigned frame_len =
 			info._.pkt_size - sizeof(mppa_ethernet_header_t);
 		pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
-		packet_parse_l2(pkt_hdr);
+		packet_parse_l2(&pkt_hdr->p, frame_len);
+		pkt_hdr->input = pktio_entry->s.handle;
 	}
 
-	if (n_packet && pktio_cls_enabled(pktio_entry)) {
-		int defq_pkts = 0;
-		for (int i = 0; i < n_packet; ++i) {
-			if (0 > _odp_packet_classifier(pktio_entry, pkt_table[i])) {
-				pkt_table[defq_pkts] = pkt_table[i];
-			}
-		}
-		n_packet = defq_pkts;
-	}
+	if (n_packet && pktio_cls_enabled(pktio_entry))
+		n_packet = _odp_pktio_classify(pktio_entry, index, pkt_table, n_packet);
 
 	return n_packet;
 }
 
-static int eth_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
-		    unsigned len)
+static int eth_send(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+		    const odp_packet_t pkt_table[], unsigned len)
 {
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	tx_uc_ctx_t *ctx = eth_get_ctx(eth);
@@ -530,13 +524,13 @@ static int eth_promisc_mode(pktio_entry_t *const pktio_entry){
 	return 	pktio_entry->s.pkt_eth.promisc;
 }
 
-static int eth_mtu_get(pktio_entry_t *const pktio_entry) {
+static uint32_t eth_mtu_get(pktio_entry_t *const pktio_entry) {
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	return eth->mtu;
 }
 
 static int eth_stats(pktio_entry_t *const pktio_entry,
-		     _odp_pktio_stats_t *stats)
+		     odp_pktio_stats_t *stats)
 {
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	unsigned cluster_id = __k1_get_cluster_id();
@@ -589,7 +583,7 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 	stats->in_octets         = rpc_stats->in_octets;
 	stats->in_ucast_pkts     = rpc_stats->in_ucast_pkts;
 	stats->in_discards       = rpc_stats->in_discards;
-	stats->in_dropped        = 0;
+	/* stats->in_dropped        = 0; */
 	stats->in_errors         = rpc_stats->in_errors;
 	stats->in_unknown_protos = 0;
 	stats->out_octets        = rpc_stats->out_octets;
@@ -598,12 +592,13 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 	stats->out_errors        = rpc_stats->out_errors;
 
 	if (rx_thread_fetch_stats(eth->rx_config.pktio_id,
-				  &stats->in_dropped, &stats->in_discards))
+				  &stats->in_unknown_protos, &stats->in_discards))
 		return -1;
 	return 0;
 }
 
 const pktio_if_ops_t eth_pktio_ops = {
+	.name = "eth",
 	.init = eth_init,
 	.term = eth_destroy,
 	.open = eth_open,

@@ -27,7 +27,8 @@
 
 odp_pool_t pool;
 odp_pktio_t pktio;
-odp_queue_t inq;
+odp_pktout_queue_t outq;
+odp_pktin_queue_t inq;
 
 char *pktio_invalid_names[] = {
 	"e0:loop:hashpolicy=[P8{@6}]",
@@ -56,6 +57,8 @@ static int setup_test()
 {
 	odp_pool_param_t params;
 	odp_pktio_param_t pktio_param = {0};
+	odp_pktin_queue_param_t pktin_param;
+	odp_pktout_queue_param_t pktout_param;
 	odp_pktio_t tmp;
 
 	memset(&params, 0, sizeof(params));
@@ -70,7 +73,7 @@ static int setup_test()
 		return 1;
 	}
 
-	pktio_param.in_mode = ODP_PKTIN_MODE_POLL;
+	pktio_param.in_mode = ODP_PKTIN_MODE_DIRECT;
 
 	unsigned i;
 	for ( i = 0; i < sizeof(pktio_invalid_names)/sizeof(pktio_invalid_names[0]); ++i ) {
@@ -81,6 +84,15 @@ static int setup_test()
 	pktio = odp_pktio_open(pktio_valid_name, pool, &pktio_param);
 	test_assert_ret(pktio != ODP_PKTIO_INVALID);
 
+	odp_pktin_queue_param_init(&pktin_param);
+	odp_pktout_queue_param_init(&pktout_param);
+
+	test_assert_ret(odp_pktin_queue_config(pktio, &pktin_param) == 0);
+	test_assert_ret(odp_pktout_queue_config(pktio, &pktout_param) == 0);
+
+	test_assert_ret(odp_pktin_queue(pktio, &inq, 1) == 1);
+	test_assert_ret(odp_pktout_queue(pktio, &outq, 1) == 1);
+
 	test_assert_ret(odp_pktio_start(pktio) == 0);
 
 	printf("Setup ok\n");
@@ -89,6 +101,7 @@ static int setup_test()
 
 static int term_test()
 {
+	test_assert_ret(odp_pktio_stop(pktio) == 0);
 	test_assert_ret(odp_pktio_close(pktio) == 0);
 	test_assert_ret(odp_pool_destroy(pool) == 0);
 	return 0;
@@ -151,7 +164,6 @@ static int send_recv(odp_packet_t packet, int send_nb, int expt_nb)
 	static int test_id = 0;
 	printf("send_recv %d\n", test_id++);
 	odp_pktio_t pktio;
-	odp_queue_t outq_def;
 	odp_packet_t pkt_tbl[MAX_PKT_BURST];
 
 	pktio = odp_pktio_lookup(pktio_valid_name);
@@ -161,21 +173,15 @@ static int send_recv(odp_packet_t packet, int send_nb, int expt_nb)
 			    pktio_valid_name);
 		return 1;
 	}
-
-	outq_def = odp_pktio_outq_getdef(pktio);
-	if (outq_def == ODP_QUEUE_INVALID) {
-		printf("Error: def output-Q query\n");
-		return 1;
-	}
 	int i;
 	for ( i = 0; i < send_nb; ++i ) {
-		odp_queue_enq(outq_def, (odp_event_t)packet);
+		odp_pktout_send(outq, &packet, 1);
 	}
 	int ret = 0;
 
 	int start = __k1_read_dsu_timestamp();
 	while ( ret >= 0 && ret < expt_nb && ( __k1_read_dsu_timestamp() - start ) < 10 * __bsp_frequency ) {
-		int n_pkt = odp_pktio_recv(pktio, pkt_tbl, MAX_PKT_BURST);
+		int n_pkt = odp_pktin_recv(inq, pkt_tbl, MAX_PKT_BURST);
 		ret += n_pkt;
 		if (n_pkt > 0)
 			odp_packet_free_multi(pkt_tbl, n_pkt);
@@ -220,15 +226,16 @@ int run_test()
 
 int main(int argc, char **argv)
 {
+	odp_instance_t instance;
 	(void) argc;
 	(void) argv;
-	test_assert_ret(odp_init_global(NULL, NULL) == 0);
-	test_assert_ret(odp_init_local(ODP_THREAD_CONTROL) == 0);
+	test_assert_ret(odp_init_global(&instance, NULL, NULL) == 0);
+	test_assert_ret(odp_init_local(instance, ODP_THREAD_CONTROL) == 0);
 
 	test_assert_ret(run_test() == 0);
 
 	test_assert_ret(odp_term_local() == 0);
-	test_assert_ret(odp_term_global() == 0);
+	test_assert_ret(odp_term_global(instance) == 0);
 
 	return 0;
 }

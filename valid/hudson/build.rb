@@ -104,7 +104,7 @@ if ENV["label"].to_s() != "" then
         # Validate nothing.
         valid_configs = [ ]
     when "centos7-64", "debian7-64","debian8-64"
-        valid_configs = "k1b-kalray-nodeos_simu", "k1b-kalray-mos_simu"
+        valid_configs = [] #"k1b-kalray-nodeos_simu", "k1b-kalray-mos_simu"
         valid_type = "sim"
     when /MPPAExplorers_k1b*/
         valid_configs = [ "k1b-kalray-nodeos_explorer", "k1b-kalray-mos_explorer" ]
@@ -181,7 +181,7 @@ b.target("valid-packages") do
 	p odp_valid_name
 	p platform
 	p board
-        [ "platform/mppa/test", "test/performance", "helper/test"].each(){|dir|
+        [ "test/platform/mppa", "test/performance", "helper/test"].each(){|dir|
             cd File.join(ENV["K1_TOOLCHAIN_DIR"], "share/odp/tests", board,
                          platform, dir)
             testEnv = $env.merge({ :test_name => "valid-#{conf}-#{dir}"})

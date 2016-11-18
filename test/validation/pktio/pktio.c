@@ -18,6 +18,7 @@
 #define PKT_LEN_NORMAL         64
 #define PKT_LEN_MAX            (PKT_BUF_SIZE - ODPH_ETHHDR_LEN - \
 				ODPH_IPV4HDR_LEN - ODPH_UDPHDR_LEN)
+#define TEST_MAX_PKT           100
 
 #define USE_MTU                0
 #define MAX_NUM_IFACES         2
@@ -38,6 +39,8 @@ static const char *iface_name[MAX_NUM_IFACES];
 
 /** number of interfaces being used (1=loopback, 2=pair) */
 static int num_ifaces;
+
+static int segmentation_support;
 
 /** while testing real-world interfaces additional time may be
     needed for external network to enable link to pktio
@@ -96,6 +99,14 @@ odp_atomic_u32_t ip_seq;
 pkt_segmented_e pool_segmentation = PKT_POOL_UNSEGMENTED;
 
 odp_pool_t pool[MAX_NUM_IFACES] = {ODP_POOL_INVALID, ODP_POOL_INVALID};
+
+
+int pool_check_segmentation_support(void)
+{
+	if (segmentation_support)
+		return ODP_TEST_ACTIVE;
+	return ODP_TEST_INACTIVE;
+}
 
 static inline void _pktio_wait_linkup(odp_pktio_t pktio)
 {
@@ -652,7 +663,6 @@ static void test_txrx(odp_pktin_mode_t in_mode, int num_pkts,
 	int ret, i, if_b;
 	pktio_info_t pktios[MAX_NUM_IFACES];
 	pktio_info_t *io;
-	uint32_t mtu, min_mtu = UINT32_MAX;
 
 	/* create pktios and associate input/output queues */
 	for (i = 0; i < num_ifaces; ++i) {
@@ -1416,8 +1426,8 @@ void pktio_test_statistics_counters(void)
 	odp_pktio_t pktio_rx, pktio_tx;
 	odp_pktio_t pktio[MAX_NUM_IFACES];
 	odp_packet_t pkt;
-	odp_packet_t tx_pkt[1000];
-	uint32_t pkt_seq[1000];
+	odp_packet_t tx_pkt[TEST_MAX_PKT];
+	uint32_t pkt_seq[TEST_MAX_PKT];
 	odp_event_t ev;
 	int i, pkts, tx_pkts, ret, alloc = 0;
 	odp_pktout_queue_t pktout;
@@ -1449,7 +1459,7 @@ void pktio_test_statistics_counters(void)
 			odp_event_free(ev);
 	}
 
-	alloc = create_packets(tx_pkt, pkt_seq, 1000, pktio_tx, pktio_rx);
+	alloc = create_packets(tx_pkt, pkt_seq, TEST_MAX_PKT, pktio_tx, pktio_rx);
 
 	ret = odp_pktio_stats_reset(pktio_tx);
 	CU_ASSERT(ret == 0);
@@ -1524,8 +1534,8 @@ void pktio_test_start_stop(void)
 	odp_pktio_t pktio[MAX_NUM_IFACES];
 	odp_pktio_t pktio_in;
 	odp_packet_t pkt;
-	odp_packet_t tx_pkt[1000];
-	uint32_t pkt_seq[1000];
+	odp_packet_t tx_pkt[TEST_MAX_PKT];
+	uint32_t pkt_seq[TEST_MAX_PKT];
 	odp_event_t ev;
 	int i, pkts, ret, alloc = 0;
 	odp_pktout_queue_t pktout;
@@ -1556,7 +1566,7 @@ void pktio_test_start_stop(void)
 	/* Test Rx on a stopped interface. Only works if there are 2 */
 	if (num_ifaces > 1) {
 
-		alloc = create_packets(tx_pkt, pkt_seq, 1000, pktio[0],
+		alloc = create_packets(tx_pkt, pkt_seq, TEST_MAX_PKT, pktio[0],
 				       pktio[1]);
 
 		for (pkts = 0; pkts != alloc; ) {
@@ -1592,7 +1602,7 @@ void pktio_test_start_stop(void)
 		_pktio_wait_linkup(pktio[1]);
 
 		/* flush packets with magic number in pipes */
-		for (i = 0; i < 1000; i++) {
+		for (i = 0; i < 100; i++) {
 			ev = odp_schedule(NULL, wait);
 			if (ev != ODP_EVENT_INVALID)
 				odp_event_free(ev);
@@ -1605,7 +1615,7 @@ void pktio_test_start_stop(void)
 	else
 		pktio_in = pktio[0];
 
-	alloc = create_packets(tx_pkt, pkt_seq, 1000, pktio[0], pktio_in);
+	alloc = create_packets(tx_pkt, pkt_seq, TEST_MAX_PKT, pktio[0], pktio_in);
 
 	/* send */
 	for (pkts = 0; pkts != alloc; ) {
@@ -1618,7 +1628,7 @@ void pktio_test_start_stop(void)
 	}
 
 	/* get */
-	for (i = 0, pkts = 0; i < 100; i++) {
+	for (i = 0, pkts = 0; i < 1000; i++) {
 		ev = odp_schedule(NULL, wait);
 		if (ev != ODP_EVENT_INVALID) {
 			if (odp_event_type(ev) == ODP_EVENT_PACKET) {
@@ -1683,6 +1693,13 @@ int pktio_check_send_failure(void)
 		return ODP_TEST_ACTIVE;
 
 	return ODP_TEST_INACTIVE;
+}
+
+int pktio_check_send_failure_segmented(void)
+{
+	if (pool_check_segmentation_support() == ODP_TEST_INACTIVE)
+		return ODP_TEST_INACTIVE;
+	return pktio_check_send_failure();
 }
 
 void pktio_test_send_failure(void)
@@ -2005,6 +2022,7 @@ static int create_pool(const char *iface, int num)
 {
 	char pool_name[ODP_POOL_NAME_LEN];
 	odp_pool_param_t params;
+	odp_pool_capability_t pool_cap;
 
 	memset(&params, 0, sizeof(params));
 	set_pool_len(&params);
@@ -2021,6 +2039,11 @@ static int create_pool(const char *iface, int num)
 		return -1;
 	}
 
+	if (odp_pool_capability(&pool_cap)){
+		fprintf(stderr, "Failed to retreive pool capabilities\n");
+		return -1;
+	}
+	segmentation_support = pool_cap.pkt.max_segs_per_pkt > 1;
 	return 0;
 }
 
@@ -2143,15 +2166,22 @@ odp_testinfo_t pktio_suite_unsegmented[] = {
 };
 
 odp_testinfo_t pktio_suite_segmented[] = {
-	ODP_TEST_INFO(pktio_test_plain_queue),
-	ODP_TEST_INFO(pktio_test_plain_multi),
-	ODP_TEST_INFO(pktio_test_sched_queue),
-	ODP_TEST_INFO(pktio_test_sched_multi),
-	ODP_TEST_INFO(pktio_test_recv),
-	ODP_TEST_INFO(pktio_test_recv_multi),
-	ODP_TEST_INFO(pktio_test_recv_mtu),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_plain_queue,
+				  pool_check_segmentation_support),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_plain_multi,
+				  pool_check_segmentation_support),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_sched_queue,
+				  pool_check_segmentation_support),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_sched_multi,
+				  pool_check_segmentation_support),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_recv,
+				  pool_check_segmentation_support),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_recv_multi,
+				  pool_check_segmentation_support),
+	ODP_TEST_INFO_CONDITIONAL(pktio_test_recv_mtu,
+				  pool_check_segmentation_support),
 	ODP_TEST_INFO_CONDITIONAL(pktio_test_send_failure,
-				  pktio_check_send_failure),
+				  pktio_check_send_failure_segmented),
 	ODP_TEST_INFO_NULL
 };
 

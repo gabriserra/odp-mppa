@@ -5,8 +5,8 @@
  */
 
 #include <odp_atomic_internal.h>
-#include <odp/spinlock_recursive.h>
-#include <odp/thread.h>
+#include <odp/api/spinlock_recursive.h>
+#include <odp/api/thread.h>
 
 #define NO_OWNER (-1)
 

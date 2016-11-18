@@ -285,7 +285,7 @@ odp_queue_t odp_cos_queue(odp_cos_t cos_id)
 	if (!cos->s.queue)
 		return ODP_QUEUE_INVALID;
 
-	return queue_handle(cos->s.queue);
+	return cos->s.queue->s.handle;
 }
 
 int odp_cos_drop_set(odp_cos_t cos_id, odp_cls_drop_t drop_policy)
@@ -581,7 +581,7 @@ odp_pool_t odp_cls_cos_pool(odp_cos_t cos_id)
 	if (!cos->s.pool)
 		return ODP_POOL_INVALID;
 
-	return pool_handle(cos->s.pool);
+	return cos->s.pool->s.pool_hdl;
 }
 
 int verify_pmr(pmr_t *pmr, const uint8_t *pkt_addr, odp_packet_hdr_t *pkt_hdr)

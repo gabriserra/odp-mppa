@@ -36,6 +36,7 @@ void pktio_test_pktin_queue_config_queue(void);
 void pktio_test_pktout_queue_config(void);
 void pktio_test_start_stop(void);
 int pktio_check_send_failure(void);
+int pktio_check_send_failure_segmented(void);
 void pktio_test_send_failure(void);
 void pktio_test_recv_on_wonly(void);
 void pktio_test_send_on_ronly(void);
@@ -46,6 +47,7 @@ int pktio_check_statistics_counters(void);
 void pktio_test_statistics_counters(void);
 int pktio_check_pktin_ts(void);
 void pktio_test_pktin_ts(void);
+int pool_check_segmentation_support(void);
 
 /* test arrays: */
 extern odp_testinfo_t pktio_suite[];

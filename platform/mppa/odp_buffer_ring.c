@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier:     BSD-3-Clause
  */
+#include <odp/api/cpu.h>
 #include <odp_buffer_inlines.h>
 #include <odp_buffer_ring_internal.h>
 #include <stdlib.h>
@@ -42,10 +43,8 @@ int odp_buffer_ring_get_multi(odp_buffer_ring_t *ring,
 		if(cons_next > ring->buf_num)
 			cons_next = cons_next - ring->buf_num;
 
-		if(_odp_atomic_u32_cmp_xchg_strong_mm(&ring->cons_head, &cons_head,
-						      cons_next,
-						      _ODP_MEMMODEL_ACQ,
-						      _ODP_MEMMODEL_RLX)){
+		if(odp_atomic_cas_u32(&ring->cons_head, &cons_head,
+				       cons_next)){
 			break;
 		}
 	} while(1);
@@ -57,7 +56,7 @@ int odp_buffer_ring_get_multi(odp_buffer_ring_t *ring,
 	}
 
 	while (odp_atomic_load_u32(&ring->cons_tail) != cons_head)
-		odp_spin();
+		odp_cpu_pause();
 
 	odp_atomic_store_u32(&ring->cons_tail, cons_next);
 
@@ -85,10 +84,8 @@ void odp_buffer_ring_push_multi(odp_buffer_ring_t *ring,
 		if(prod_next > ring->buf_num)
 			prod_next = prod_next - ring->buf_num;
 
-		if(_odp_atomic_u32_cmp_xchg_strong_mm(&ring->prod_head, &prod_head,
-						      prod_next,
-						      _ODP_MEMMODEL_ACQ,
-						      _ODP_MEMMODEL_RLX)){
+		if(odp_atomic_cas_u32(&ring->prod_head, &prod_head,
+				       prod_next)){
 			cons_tail = odp_atomic_load_u32(&ring->cons_tail);
 			break;
 
@@ -102,7 +99,7 @@ void odp_buffer_ring_push_multi(odp_buffer_ring_t *ring,
 		STORE_PTR(ring->buf_ptrs[idx], buffers[i]);
 	}
 	while (odp_atomic_load_u32(&ring->prod_tail) != prod_head)
-		odp_spin();
+		odp_cpu_pause();
 
 	odp_atomic_store_u32(&ring->prod_tail, prod_next);
 
@@ -145,10 +142,8 @@ unsigned odp_buffer_ring_push_list(odp_buffer_ring_t *ring,
 		if(prod_next > ring->buf_num)
 			prod_next = prod_next - ring->buf_num;
 
-		if(_odp_atomic_u32_cmp_xchg_strong_mm(&ring->prod_head, &prod_head,
-						      prod_next,
-						      _ODP_MEMMODEL_ACQ,
-						      _ODP_MEMMODEL_RLX)){
+		if(odp_atomic_cas_u32(&ring->prod_head, &prod_head,
+				      prod_next)){
 			break;
 
 		}
@@ -171,7 +166,7 @@ unsigned odp_buffer_ring_push_list(odp_buffer_ring_t *ring,
 	__builtin_k1_fence();
 
 	while (odp_atomic_load_u32(&ring->prod_tail) != prod_head)
-		odp_spin();
+		odp_cpu_pause();
 
 	odp_atomic_store_u32(&ring->prod_tail, prod_next);
 	return total_bufs - n_buffers;

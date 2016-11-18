@@ -102,6 +102,7 @@ int main()
 			":cnoc=2:rrpolicy=20:rroffset=20:fc=1,drop",
 			"-m", "0",
 			"-s", "0",
+			"-d", "0",
 			"-t", "15",
 			"-c", "2", NULL
 		};

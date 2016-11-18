@@ -4,11 +4,11 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#include <odp/ticketlock.h>
-#include <odp/atomic.h>
+#include <odp/api/cpu.h>
+#include <odp/api/ticketlock.h>
+#include <odp/api/atomic.h>
 #include <odp_atomic_internal.h>
-#include <odp/sync.h>
-#include <odp_spin_internal.h>
+#include <odp/api/sync.h>
 
 
 void odp_ticketlock_init(odp_ticketlock_t *ticketlock)
@@ -30,9 +30,8 @@ void odp_ticketlock_lock(odp_ticketlock_t *ticketlock)
 
 	/* Spin waiting for our turn. Use load-acquire so that we acquire
 	 * all stores from the previous lock owner */
-	while (ticket != _odp_atomic_u32_load_mm(&ticketlock->cur_ticket,
-						 _ODP_MEMMODEL_ACQ))
-		odp_spin();
+	while (ticket != odp_atomic_load_u32(&ticketlock->cur_ticket))
+		odp_cpu_pause();
 }
 
 int odp_ticketlock_trylock(odp_ticketlock_t *tklock)
@@ -56,11 +55,8 @@ int odp_ticketlock_trylock(odp_ticketlock_t *tklock)
 		 * If CAS fails, it means some other thread intercepted and
 		 * took a ticket which means the lock is not available
 		 * anymore */
-		if (_odp_atomic_u32_cmp_xchg_strong_mm(&tklock->next_ticket,
-						       &next,
-						       next + 1,
-						       _ODP_MEMMODEL_ACQ,
-						       _ODP_MEMMODEL_RLX)){
+		if (odp_atomic_cas_u32(&tklock->next_ticket,
+				       &next, next + 1)){
 			__builtin_k1_wpurge();
 			return 1;
 		}

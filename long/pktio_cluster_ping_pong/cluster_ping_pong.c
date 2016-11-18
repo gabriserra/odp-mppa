@@ -26,7 +26,8 @@
 
 odp_pool_t pool;
 odp_pktio_t pktio;
-odp_queue_t inq;
+odp_pktout_queue_t outq;
+odp_pktin_queue_t inq;
 
 static int setup_test()
 {
@@ -34,6 +35,8 @@ static int setup_test()
 	char pktio_name[10];
 	int remote_cluster;
 	odp_pktio_param_t pktio_param;
+	odp_pktin_queue_param_t pktin_param;
+	odp_pktout_queue_param_t pktout_param;
 
 	memset(&params, 0, sizeof(params));
 	params.pkt.seg_len = PKT_BUF_SIZE;
@@ -51,38 +54,41 @@ static int setup_test()
 	remote_cluster = (__k1_get_cluster_id() % 2) == 0 ? __k1_get_cluster_id() + 1 : __k1_get_cluster_id() - 1;
 	sprintf(pktio_name, "cluster%d", remote_cluster);
 	memset(&pktio_param, 0, sizeof(pktio_param));
-	pktio_param.in_mode = ODP_PKTIN_MODE_POLL;
+
+	pktio_param.in_mode = ODP_PKTIN_MODE_DIRECT;
 
 	pktio = odp_pktio_open(pktio_name, pool, &pktio_param);
 	if (pktio == ODP_PKTIO_INVALID)
 		return 1;
 
-	inq = odp_queue_create("inq_pktio_cluster",
-				ODP_QUEUE_TYPE_PKTIN,
-				NULL);
-	test_assert_ret(inq != ODP_QUEUE_INVALID);
+	odp_pktin_queue_param_init(&pktin_param);
+	odp_pktout_queue_param_init(&pktout_param);
 
-	test_assert_ret(odp_pktio_inq_setdef(pktio, inq) == 0);
+	test_assert_ret(odp_pktin_queue_config(pktio, &pktin_param) == 0);
+	test_assert_ret(odp_pktout_queue_config(pktio, &pktout_param) == 0);
+	test_assert_ret(odp_pktin_queue(pktio, &inq, 1) == 1);
+	test_assert_ret(odp_pktout_queue(pktio, &outq, 1) == 1);
+
 	test_assert_ret(odp_pktio_start(pktio) == 0);
 	return 0;
 }
 
 static int term_test()
 {
-	odp_event_t ev;
+	odp_packet_t pkt;
+	int ret;
 
 	/* flush any pending events */
 	while (1) {
-		ev = odp_queue_deq(inq);
+		ret = odp_pktin_recv(inq, &pkt, 1);
 
-		if (ev != ODP_EVENT_INVALID)
-			odp_buffer_free(odp_buffer_from_event(ev));
+		if (ret > 0)
+			odp_packet_free(pkt);
 		else
 			break;
 	}
 
-	test_assert_ret(odp_queue_destroy(inq) == 0);
-	
+	test_assert_ret(odp_pktio_stop(pktio) == 0);
 	test_assert_ret(odp_pktio_close(pktio) == 0);
 
 	test_assert_ret(odp_pool_destroy(pool) == 0);
@@ -107,7 +113,7 @@ static int run_ping_pong()
 
 	int sent = 0;
 	for (i = 0; i < 10; ++i){
-		sent = odp_pktio_send(pktio, &packet, 1);
+		sent = odp_pktout_send(outq, &packet, 1);
 		if (sent) {
 			break;
 		} else {
@@ -117,7 +123,7 @@ static int run_ping_pong()
 	test_assert_ret(sent == 1);
 
 	while (1) {
-		ret = odp_pktio_recv(pktio, recv_pkts, 1);
+		ret = odp_pktin_recv(inq, recv_pkts, 1);
 
 		test_assert_ret(ret >= 0);
 
@@ -154,15 +160,16 @@ int run_test()
 
 int main(int argc, char **argv)
 {
+	odp_instance_t instance;
 	(void) argc;
 	(void) argv;
-	test_assert_ret(odp_init_global(NULL, NULL) == 0);
-	test_assert_ret(odp_init_local(ODP_THREAD_CONTROL) == 0);
+	test_assert_ret(odp_init_global(&instance, NULL, NULL) == 0);
+	test_assert_ret(odp_init_local(instance, ODP_THREAD_CONTROL) == 0);
 
 	test_assert_ret(run_test() == 0);
 
 	test_assert_ret(odp_term_local() == 0);
-	test_assert_ret(odp_term_global() == 0);
+	test_assert_ret(odp_term_global(instance) == 0);
 
 	return 0;
 }

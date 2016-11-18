@@ -85,6 +85,7 @@ int main(int argc, char *const argv[])
 				"-i", "p0p0:tags=60,p1p0:tags=60",
 				"-m", "0",
 				"-s", "0",
+				"-d", "0",
 				"-c", "8", NULL
 			};
 

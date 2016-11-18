@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <odp/errno.h>
+#include <odp/api/errno.h>
 #include <errno.h>
 #include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
@@ -436,8 +436,8 @@ static int cluster_send_recv_pkt_count(pkt_cluster_t *pktio_clus)
 
 
 static int cluster_recv(pktio_entry_t *const pktio_entry,
-			odp_packet_t pkt_table[],
-			unsigned len)
+			int index ODP_UNUSED,
+			odp_packet_t pkt_table[], unsigned len)
 {
 	int n_packet;
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
@@ -487,25 +487,19 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 		const unsigned frame_len =
 			info._.pkt_size - sizeof(*header);
 		pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
-		packet_parse_l2(pkt_hdr);
+		packet_parse_l2(&pkt_hdr->p, frame_len);
+		pkt_hdr->input = pktio_entry->s.handle;
 	}
 
-	if (n_packet && pktio_cls_enabled(pktio_entry)) {
-		int defq_pkts = 0;
-		for (int i = 0; i < n_packet; ++i) {
-			if (0 > _odp_packet_classifier(pktio_entry, pkt_table[i])) {
-				pkt_table[defq_pkts] = pkt_table[i];
-			}
-		}
-		n_packet = defq_pkts;
-	}
+	if (n_packet && pktio_cls_enabled(pktio_entry))
+		n_packet = _odp_pktio_classify(pktio_entry, index, pkt_table, n_packet);
 
 	return n_packet;
 
 }
 
-static int cluster_send(pktio_entry_t *const pktio_entry,
-			odp_packet_t pkt_table[], unsigned len)
+static int cluster_send(pktio_entry_t *const pktio_entry, int index ODP_UNUSED,
+			const odp_packet_t pkt_table[], unsigned len)
 {
 	pkt_cluster_t *pkt_cluster = &pktio_entry->s.pkt_cluster;
 
@@ -583,25 +577,26 @@ static int cluster_promisc_mode(pktio_entry_t *const pktio_entry)
 	return 	pktio_entry->s.pkt_cluster.promisc;
 }
 
-static int cluster_mtu_get(pktio_entry_t *const pktio_entry)
+static uint32_t cluster_mtu_get(pktio_entry_t *const pktio_entry)
 {
 	pkt_cluster_t *pkt_cluster = &pktio_entry->s.pkt_cluster;
 	return pkt_cluster->mtu;
 }
 
 static int cluster_stats(pktio_entry_t *const pktio_entry,
-			 _odp_pktio_stats_t *stats)
+			 odp_pktio_stats_t *stats)
 {
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
 
 	memset(stats, 0, sizeof(*stats));
 
 	if (rx_thread_fetch_stats(clus->rx_config.pktio_id,
-				  &stats->in_dropped, &stats->in_discards))
+				  &stats->in_unknown_protos, &stats->in_discards))
 		return -1;
 	return 0;
 }
 const pktio_if_ops_t cluster_pktio_ops = {
+	.name = "cluster",
 	.init = cluster_init,
 	.term = NULL,
 	.open = cluster_open,

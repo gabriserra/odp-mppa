@@ -1,10 +1,11 @@
 include $(top_srcdir)/platform/@with_platform@/Makefile.inc
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = $(top_builddir)/pkgconfig/libodphelper-linux.pc
+pkgconfig_DATA = $(top_builddir)/pkgconfig/libodphelper-@ODP_LIB_NAME@.pc
 
 LIB   = $(top_builddir)/lib
-AM_CFLAGS  = -I$(srcdir)/include
+AM_CFLAGS  = $(ODPH_CFLAGS)
+AM_CFLAGS += -I$(srcdir)/include
 AM_CFLAGS += -I$(top_srcdir)/platform/@with_platform@/include
 AM_CFLAGS += -I$(top_srcdir)/include
 
@@ -29,12 +30,12 @@ noinst_HEADERS = \
 		 $(srcdir)/odph_lineartable.h \
 		 $(srcdir)/odph_list_internal.h
 
-__LIB__libodphelper_linux_la_SOURCES = \
+__LIB__libodphelper_@ODP_LIB_NAME@_la_SOURCES = \
 					eth.c \
 					ip.c \
 					chksum.c \
-					linux.c \
+					os/@OS@/linux.c \
 					hashtable.c \
 					lineartable.c
 
-lib_LTLIBRARIES = $(LIB)/libodphelper-linux.la
+lib_LTLIBRARIES = $(LIB)/libodphelper-@ODP_LIB_NAME@.la

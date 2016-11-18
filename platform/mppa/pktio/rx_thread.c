@@ -4,9 +4,9 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <odp/thread.h>
-#include <odp/cpumask.h>
-#include <odp/errno.h>
+#include <odp/api/thread.h>
+#include <odp/api/cpumask.h>
+#include <odp/api/errno.h>
 #include <errno.h>
 #include <mppa_noc.h>
 #include <HAL/hal/core/optimize.h>
@@ -300,9 +300,15 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 			 rx_config->pkt_offset);
 
 		union mppa_ethernet_header_info_t info;
+		odp_time_t ts;
 		info.dword = LOAD_U64(header->info);
+		ts.cycles = LOAD_U64(header->timestamp);
+
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
 		hash_key = info._.hash_key;
+
+		packet_set_ts(pkt_hdr, &ts);
+
 		if (info._.pkt_size < sizeof(*header)) {
 			/* Probably a spurious EOT. */
 			STORE_U64(header->info, 0ULL);
@@ -311,6 +317,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 			if_th->dropped_pkts++;
 			mapped_pkt = 1;
 		}
+
 	}
 
 	typeof(mppa_dnoc[dma_if]->rx_queues[0]) * const rx_queue =

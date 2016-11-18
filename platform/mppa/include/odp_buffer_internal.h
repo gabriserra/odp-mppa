@@ -18,18 +18,18 @@
 extern "C" {
 #endif
 
-#include <odp/std_types.h>
-#include <odp/atomic.h>
-#include <odp/pool.h>
-#include <odp/buffer.h>
-#include <odp/debug.h>
-#include <odp/align.h>
+#include <odp/api/std_types.h>
+#include <odp/api/atomic.h>
+#include <odp/api/pool.h>
+#include <odp/api/buffer.h>
+#include <odp/api/debug.h>
+#include <odp/api/align.h>
 #include <odp_align_internal.h>
-#include <odp/config.h>
-#include <odp/byteorder.h>
-#include <odp/thread.h>
-#include <odp/event.h>
+#include <odp/api/byteorder.h>
+#include <odp/api/thread.h>
+#include <odp/api/event.h>
 #include <odp_forward_typedefs_internal.h>
+#include <odp_schedule_if.h>
 
 
 #define ODP_BITSIZE(x) \
@@ -78,6 +78,7 @@ struct odp_buffer_hdr_t {
 	int8_t                   event_type; /* for reuse as event */
 	uint16_t                 size;       /* max data size */
 	void                    *uarea_addr; /* user area address */
+	uint32_t                 uarea_size; /* size of user area */
 	odp_pool_t               pool_hdl;   /* buffer pool handle */
 	union {
 		void            *buf_ctx;    /* user context */
@@ -92,7 +93,7 @@ struct odp_buffer_hdr_t {
 			queue_entry_t   *target_qe;  /* ordered queue target */
 			struct odp_buffer_hdr_t *link;
 		};
-		uint64_t         sync[ODP_CONFIG_MAX_ORDERED_LOCKS_PER_QUEUE];
+		uint64_t         sync[SCHEDULE_ORDERED_LOCKS_PER_QUEUE];
 	};
 };
 

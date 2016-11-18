@@ -10,7 +10,7 @@
 #include <odp_cunit_common.h>
 
 #define SHM_PKT_NUM_BUFS        32
-#define SHM_PKT_BUF_SIZE        1024
+#define SHM_PKT_BUF_SIZE        1088
 
 /* Config values for Default CoS */
 #define TEST_DEFAULT		1

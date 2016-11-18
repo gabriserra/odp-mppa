@@ -9,12 +9,12 @@
 #include "scheduler.h"
 
 #define MAX_WORKERS_THREADS	32
-#define MSG_POOL_SIZE		(256 * 1024)
+#define MSG_POOL_SIZE		(4 * 1024)
 #define QUEUES_PER_PRIO	        2
 #define MAX_ORDERED_LOCKS       2
 #define BUF_SIZE		64
 #define BUFS_PER_QUEUE          100
-#define BUFS_PER_QUEUE_EXCL     10000
+#define BUFS_PER_QUEUE_EXCL     1000
 #define BURST_BUF_SIZE		4
 #define NUM_BUFS_PAUSE		150
 #define NUM_BUFS_BEFORE_PAUSE	10
@@ -45,10 +45,10 @@
 
 #ifdef MAGIC_SCALL
 #define CHAOS_NUM_ROUNDS 500
-#define CHAOS_DEBUG (CHAOS_NUM_ROUNDS < 100)
 #else
 #define CHAOS_NUM_ROUNDS 50000
 #endif
+#define CHAOS_DEBUG (CHAOS_NUM_ROUNDS < 100)
 #define CHAOS_NUM_EVENTS (CHAOS_NUM_QUEUES * CHAOS_NUM_BUFS_PER_QUEUE)
 #define CHAOS_PTR_TO_NDX(p) ((uint64_t)(uint32_t)(uintptr_t)p)
 #define CHAOS_NDX_TO_PTR(n) ((void *)(uintptr_t)n)
@@ -1569,9 +1569,9 @@ static int destroy_queues(void)
 			if (destroy_queue(name) != 0)
 				return -1;
 
-			/* snprintf(name, sizeof(name), "sched_%d_%d_o", i, j); */
-			/* if (destroy_queue(name) != 0) */
-			/* 	return -1; */
+			snprintf(name, sizeof(name), "sched_%d_%d_o", i, j);
+			if (destroy_queue(name) != 0)
+				return -1;
 
 			snprintf(name, sizeof(name), "plain_%d_%d_o", i, j);
 			if (destroy_queue(name) != 0)
@@ -1611,7 +1611,7 @@ odp_testinfo_t scheduler_suite[] = {
 	ODP_TEST_INFO(scheduler_test_pause_resume),
 	ODP_TEST_INFO(scheduler_test_parallel),
 	ODP_TEST_INFO(scheduler_test_atomic),
-	ODP_TEST_INFO(scheduler_test_ordered),
+	/* ODP_TEST_INFO(scheduler_test_ordered), */
 	ODP_TEST_INFO(scheduler_test_chaos),
 	ODP_TEST_INFO(scheduler_test_1q_1t_n),
 	ODP_TEST_INFO(scheduler_test_1q_1t_a),

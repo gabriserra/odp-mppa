@@ -9,13 +9,16 @@
 #define _GNU_SOURCE
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <inttypes.h>
 #include <sys/resource.h>
+#ifdef HAVE_BACKTRACE
 #include <execinfo.h>
+#endif
 #include <odp_api.h>
 #include <odp/api/plat/packet_types.h>
 #include <example_debug.h>
@@ -717,11 +720,10 @@ static int process_cmd_line_options(uint32_t argc, char *argv[])
 	return 0;
 }
 
+#ifdef HAVE_SIGACTION
 static void signal_handler(int signal)
 {
-	size_t num_stack_frames;
 	const char  *signal_name;
-	void  *bt_array[128];
 
 	switch (signal) {
 	case SIGILL:
@@ -738,22 +740,31 @@ static void signal_handler(int signal)
 		signal_name = "UNKNOWN";  break;
 	}
 
-	num_stack_frames = backtrace(bt_array, 100);
 	printf("Received signal=%u (%s) exiting.", signal, signal_name);
-	backtrace_symbols_fd(bt_array, num_stack_frames, fileno(stderr));
+#ifdef HAVE_BACKTRACE
+	{
+		size_t num_stack_frames;
+		void  *bt_array[128];
+		num_stack_frames = backtrace(bt_array, 100);
+		backtrace_symbols_fd(bt_array, num_stack_frames, fileno(stderr));
+	}
+#endif
 	fflush(NULL);
+#ifdef HAVE_SYNC
 	sync();
+#endif
 	abort();
 }
+#endif
 
 int main(int argc, char *argv[])
 {
-	struct sigaction signal_action;
-	struct rlimit    rlimit;
 	uint32_t pkts_into_tm, pkts_from_tm;
 	odp_instance_t instance;
 	int rc;
 
+#ifdef HAVE_SIGACTION
+	struct sigaction signal_action;
 	memset(&signal_action, 0, sizeof(signal_action));
 	signal_action.sa_handler = signal_handler;
 	sigfillset(&signal_action.sa_mask);
@@ -762,10 +773,16 @@ int main(int argc, char *argv[])
 	sigaction(SIGSEGV, &signal_action, NULL);
 	sigaction(SIGTERM, &signal_action, NULL);
 	sigaction(SIGBUS,  &signal_action, NULL);
+#endif
 
-	getrlimit(RLIMIT_CORE, &rlimit);
-	rlimit.rlim_cur = rlimit.rlim_max;
-	setrlimit(RLIMIT_CORE, &rlimit);
+#if defined(HAVE_GETRLIMIT) && defined(HAVE_SETRLIMIT)
+	{
+		struct rlimit    rlimit;
+		getrlimit(RLIMIT_CORE, &rlimit);
+		rlimit.rlim_cur = rlimit.rlim_max;
+		setrlimit(RLIMIT_CORE, &rlimit);
+	}
+#endif
 
 	rc = odp_init_global(&instance, &ODP_INIT_PARAMS, NULL);
 	if (rc != 0) {

@@ -637,7 +637,7 @@ static odp_pktio_t create_pktio(const char *dev, int idx, int num_rx, int num_tx
 	pktio = odp_pktio_open(dev, pool, &pktio_param);
 	if (pktio == ODP_PKTIO_INVALID) {
 		LOG_ERR("Error: failed to open %s\n", dev);
-		return -1;
+		return ODP_PKTIO_INVALID;
 	}
 
 	printf("created pktio %" PRIu64 " (%s)\n",
@@ -1071,7 +1071,6 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{"help", no_argument, NULL, 'h'},
 		{NULL, 0, NULL, 0}
 	};
-
 	static const char *shortopts =  "+c:+t:+a:i:m:o:r:d:Ss:e:hA";
 
 	/* let helper collect its own arguments (e.g. --odph_proc) */
@@ -1377,7 +1376,8 @@ int main(int argc, char *argv[])
 	odp_pool_param_init(&params);
 	params.pkt.seg_len = SHM_PKT_POOL_BUF_SIZE;
 	params.pkt.len     = SHM_PKT_POOL_BUF_SIZE;
-	params.pkt.num     = SHM_PKT_POOL_SIZE;
+	params.pkt.num     = (SHM_PKT_POOL_SIZE + SHM_PKT_POOL_BUF_SIZE - 1) /
+		SHM_PKT_POOL_BUF_SIZE ;
 	params.type        = ODP_POOL_PACKET;
 
 	pool = odp_pool_create("packet pool", &params);
@@ -1407,7 +1407,6 @@ int main(int argc, char *argv[])
 		}
 
 		pktio = create_pktio(dev, n_pktios, num_rx, num_tx, pool);
-			exit(EXIT_FAILURE);
 		if (pktio == ODP_PKTIO_INVALID) {
 			if (!gbl_args->appl.allow_fail)
 				exit(EXIT_FAILURE);
@@ -1527,7 +1526,9 @@ int main(int argc, char *argv[])
 	if (gbl_args->appl.pktio_stats) {
 		for (i = 0; i < gbl_args->appl.if_count; ++i) {
 			odp_pktio_stats_t pktio_stats;
-			pktio = gbl_args->pktios[i];
+			odp_pktio_t pktio;
+
+			pktio = gbl_args->pktios[i].pktio;
 			odp_pktio_stats(pktio, &pktio_stats);
 			_odp_pktio_stats_print(pktio, &pktio_stats);
 		}

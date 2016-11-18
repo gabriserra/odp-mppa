@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 #include <odp_buffer_internal.h>
-#include <odp/atomic.h>
+#include <odp/api/atomic.h>
 #include <odp_atomic_internal.h>
 
 typedef struct {

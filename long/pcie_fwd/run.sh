@@ -9,7 +9,7 @@ res=1
 for i in $(seq 1 5); do
     k1-jtag-runner --multibinary=pcie_fwd_multibin.mpk --exec-multibin=IODDR0:iopcie \
 		   --exec-multibin=IODDR1:iopcie --chip-freq=400 -- -cpcie_fwd \
-		   -a "-i p0p0:tags=60,p1p0:tags=60" -a "-m 0" -a "-s 0" -a "-c 8" &
+		   -a "-i p0p0:tags=60,p1p0:tags=60" -a "-m 0" -a "-s 0" -a "-d 0" -a "-c 8" &
     sleep 5
 
     #11s for 10 pings (allow 1 drop)

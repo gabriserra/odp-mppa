@@ -4,9 +4,9 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include <odp_packet_io_internal.h>
-#include <odp/thread.h>
-#include <odp/cpumask.h>
-#include <odp/errno.h>
+#include <odp/api/thread.h>
+#include <odp/api/cpumask.h>
+#include <odp/api/errno.h>
 #include <errno.h>
 #include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
@@ -247,11 +247,11 @@ static void _ioddr_compute_pkt_size(odp_packet_t pkt)
 	const unsigned frame_len =
 		info._.pkt_size - sizeof(mppa_ethernet_header_t);
 	pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);
-	packet_parse_l2(pkt_hdr);
+	packet_parse_l2(&pkt_hdr->p, frame_len);
 }
 
-static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
-		    unsigned len)
+static int ioddr_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+		      odp_packet_t pkt_table[], unsigned len)
 {
 	int total_packet = 0, n_packet;
 	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
@@ -292,23 +292,18 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 			top_pkt_hdr->sub_packets[j - 1] = pkt;
 			_ioddr_compute_pkt_size(pkt);
 		}
+		top_pkt_hdr->input = pktio_entry->s.handle;
 	}
 
-	if (n_packet && pktio_cls_enabled(pktio_entry)) {
-		int defq_pkts = 0;
-		for (int i = 0; i < n_packet; ++i) {
-			if (0 > _odp_packet_classifier(pktio_entry, pkt_table[i])) {
-				pkt_table[defq_pkts] = pkt_table[i];
-			}
-		}
-		n_packet = defq_pkts;
-	}
+	if (n_packet && pktio_cls_enabled(pktio_entry))
+		n_packet = _odp_pktio_classify(pktio_entry, index, pkt_table, n_packet);
 
 	return n_packet;
 }
 
 static int ioddr_send(pktio_entry_t *pktio_entry ODP_UNUSED,
-		      odp_packet_t pkt_table[] ODP_UNUSED,
+		      int index ODP_UNUSED,
+		      const odp_packet_t pkt_table[] ODP_UNUSED,
 		      unsigned len ODP_UNUSED)
 {
 	return 0;
@@ -325,24 +320,25 @@ static int ioddr_promisc_mode(pktio_entry_t *const pktio_entry){
 	return 	pktio_entry->s.pkt_ioddr.promisc;
 }
 
-static int ioddr_mtu_get(pktio_entry_t *const pktio_entry) {
+static uint32_t ioddr_mtu_get(pktio_entry_t *const pktio_entry) {
 	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
 	return ioddr->mtu;
 }
 
 static int ioddr_stats(pktio_entry_t *const pktio_entry,
-		     _odp_pktio_stats_t *stats)
+		     odp_pktio_stats_t *stats)
 {
 	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
 
 	memset(stats, 0, sizeof(*stats));
 	if (rx_thread_fetch_stats(ioddr->rx_config.pktio_id,
-				  &stats->in_dropped, &stats->in_discards))
+				  &stats->in_unknown_protos, &stats->in_discards))
 		return -1;
 	return 0;
 }
 
 const pktio_if_ops_t ioddr_pktio_ops = {
+	.name = "ioddr",
 	.init = ioddr_init,
 	.term = ioddr_destroy,
 	.open = ioddr_open,

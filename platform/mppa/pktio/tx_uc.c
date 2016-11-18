@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier:     BSD-3-Clause
  */
-#include <odp/errno.h>
+#include <odp/api/errno.h>
 #include <errno.h>
 #include <mppa_noc.h>
 #include <HAL/hal/core/legacy.h>
@@ -34,7 +34,7 @@ uint64_t tx_uc_alloc_uc_slots(tx_uc_ctx_t *ctx,
 	/* Wait for slot */
 	ev_counter = get_mOS_uc_event(ctx->dnoc_uc_id);
 	while (ev_counter + MAX_JOB_PER_UC <= last_id) {
-		odp_spin();
+		odp_cpu_pause();
 		ev_counter = get_mOS_uc_event(ctx->dnoc_uc_id);
 	}
 
@@ -125,7 +125,7 @@ int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
 }
 
 static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
-			       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
+			       tx_uc_ctx_t *ctx, const odp_packet_t pkt_table[],
 			       int pkt_count, int mtu, int *err)
 {
 	const uint64_t head = tx_uc_alloc_uc_slots(ctx, 1);
@@ -194,7 +194,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 }
 
 int tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
-		       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
+		       tx_uc_ctx_t *ctx, const odp_packet_t pkt_table[],
 		       int len, int mtu)
 {
 	int sent = 0;
