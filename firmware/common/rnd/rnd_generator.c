@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <string.h>
 #include <mppa_bsp.h>
+#include <HAL/hal/core/mp.h>
 #include <odp/rpc/rpc.h>
 #include <odp/rpc/api.h>
 #include <odp/rpc/rnd.h>

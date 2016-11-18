@@ -16,6 +16,7 @@
 #include <odp_debug_internal.h>
 #include <odp/hints.h>
 #include <odp/random.h>
+#include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
 #include <odp/rpc/rnd.h>
 

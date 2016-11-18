@@ -8,6 +8,7 @@
 #include <odp_internal.h>
 #include <odp/debug.h>
 #include <odp_debug_internal.h>
+#include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
 #include <odp_rx_internal.h>
 #include <errno.h>

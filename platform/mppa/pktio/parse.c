@@ -6,7 +6,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <HAL/hal/core/optimize.h>
-#include <odp/rpc/api.h>
+#include <HAL/hal/core/mp.h>
+#include <odp/rpc/rpc.h>
 #include <odp/rpc/eth.h>
 #include <odp_packet_io_internal.h>
 #include "odp_rx_internal.h"

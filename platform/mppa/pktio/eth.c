@@ -8,6 +8,7 @@
 #include <odp/cpumask.h>
 #include <odp/errno.h>
 #include <errno.h>
+#include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
 #include <odp/rpc/eth.h>
 #include <HAL/hal/core/optimize.h>

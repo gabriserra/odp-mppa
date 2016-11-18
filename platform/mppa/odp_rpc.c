@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <HAL/hal/core/mp.h>
 #include <odp/rpc/api.h>
 #include <odp/rpc/eth.h>
 #include <odp/rpc/pcie.h>
