@@ -67,7 +67,7 @@ void tx_uc_commit(tx_uc_ctx_t *ctx, uint64_t slot,
 }
 
 int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
-	       uintptr_t ucode, int add_header,
+	       uintptr_t ucode,tx_uc_flags_t flags,
 	       uint32_t pointer_mask)
 {
 	int i;
@@ -117,7 +117,7 @@ int tx_uc_init(tx_uc_ctx_t *uc_ctx_table, int n_uc_ctx,
 			trs->desc.path_updt = 1;
 			trs->desc.vid = COLOR_ID;
 		}
-		uc_ctx_table[i].add_header = add_header;
+		uc_ctx_table[i].flags = flags;
 		uc_ctx_table[i].init = 1;
 	}
 
@@ -150,7 +150,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			*err = EINVAL;
 			break;
 		}
-		if (ctx->add_header){
+		if (ctx->flags.add_header){
 			mppa_ethernet_header_t *hdr;
 
 			base_addr -= sizeof(*hdr);
@@ -242,7 +242,7 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 			*err = EINVAL;
 			break;
 		}
-		if (ctx->add_header){
+		if (ctx->flags.add_header){
 			mppa_ethernet_header_t *hdr;
 
 			base_addr -= sizeof(*hdr);
