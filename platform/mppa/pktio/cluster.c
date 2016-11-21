@@ -312,7 +312,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	if (pktio_entry->s.param.out_mode != ODP_PKTOUT_MODE_DISABLED) {
 		tx_uc_flags_t flags = TX_UC_FLAGS_DEFAULT;
 		flags.add_header = 1;
-
+		
 		tx_uc_init(g_c2c_tx_uc_ctx, NOC_C2C_UC_COUNT, ucode, flags, 0x1);
 
 		pkt_cluster->local.cnoc_rx = cluster_init_cnoc_rx();
