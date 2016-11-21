@@ -162,7 +162,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			hdr->info._.pkt_size = len +
 				((ctx->flags.exclude_hdr_size) ? 0 : sizeof(*hdr));
 			/* Add the packet end marker */
-			if (tx_config->add_end_marker && i == (pkt_count - 1))
+			if (ctx->flags.add_end_marker && i == (pkt_count - 1))
 				hdr->info._.hash_key |= END_OF_PACKETS;
 
 			len += sizeof(*hdr);
@@ -258,7 +258,7 @@ static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
 			hdr->info._.pkt_size = len +
 				((ctx->flags.exclude_hdr_size) ? 0 : sizeof(*hdr));
 			/* Add the packet end marker */
-			if (tx_config->add_end_marker && i == (pkt_count - 1))
+			if (ctx->flags.add_end_marker && i == (pkt_count - 1))
 				hdr->info._.hash_key |= END_OF_PACKETS;
 
 			len += sizeof(*hdr);
