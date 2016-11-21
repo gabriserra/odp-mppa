@@ -134,6 +134,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 	mOS_uc_transaction_t * const trs =
 		&_scoreboard_start.SCB_UC.trs [ctx->dnoc_uc_id][slot_id];
 	const odp_packet_hdr_t * pkt_hdr;
+	const tx_uc_flags_t flags = ctx->flags;
 
 	*err = 0;
 	job->nofree = tx_config->nofree;
@@ -150,7 +151,7 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			*err = EINVAL;
 			break;
 		}
-		if (ctx->flags.add_header){
+		if (flags.add_header){
 			mppa_ethernet_header_t *hdr;
 
 			base_addr -= sizeof(*hdr);
@@ -160,26 +161,27 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 			hdr->info.dword = 0ULL;
 			hdr->info._.pkt_id = 4 * head + i;
 			hdr->info._.pkt_size = len +
-				((ctx->flags.exclude_hdr_size) ? 0 : sizeof(*hdr));
+				((flags.exclude_hdr_size) ? 0 : sizeof(*hdr));
 			/* Add the packet end marker */
-			if (ctx->flags.add_end_marker && i == (pkt_count - 1))
+			if (flags.add_end_marker && i == (pkt_count - 1))
 				hdr->info._.hash_key |= END_OF_PACKETS;
 
 			len += sizeof(*hdr);
 		}
 
-		if (ctx->flags.round_up)
+		if (flags.round_up) {
 			len = ( ( len + sizeof(uint64_t) - 1 ) / sizeof(uint64_t) ) * sizeof(uint64_t);
-
-		trs->parameter.array[2 * i + 0] = len / sizeof(uint64_t);
-		trs->parameter.array[2 * i + 1] = len % sizeof(uint64_t);
+			trs->parameter.array[i] = len / sizeof(uint64_t);
+		} else {
+			trs->parameter.array[2 * i + 0] = len / sizeof(uint64_t);
+			trs->parameter.array[2 * i + 1] = len % sizeof(uint64_t);
+		}
 
 		trs->pointer.array[i] =
 			(unsigned long)(base_addr - (uint8_t*)&_data_start);
 	}
-	for (int i = pkt_count; i < 4; ++i) {
-		trs->parameter.array[2 * i + 0] = 0;
-		trs->parameter.array[2 * i + 1] = 0;
+	for (int i = pkt_count * ((flags.round_up) ? 1 : 2); i < 8; ++i) {
+		trs->parameter.array[i] = 0;
 	}
 
 	trs->path.legacy.header = tx_config->header;
@@ -197,109 +199,16 @@ int tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 {
 	int sent = 0;
 	int pkt_count;
-
+	int max_pkt = ctx->flags.round_up ? 8 : 4;
 	while(sent < (int)len) {
 		int ret, uc_sent;
 
-		pkt_count = (len - sent) > 4 ? 4 :
+		pkt_count = (len - sent) > max_pkt ? max_pkt :
 			(len - sent);
 
 		uc_sent = _tx_uc_send_packets(tx_config, ctx,
 						&pkt_table[sent], pkt_count,
 						mtu, &ret);
-		sent += uc_sent;
-		if (ret) {
-			if (!sent) {
-				__odp_errno = ret;
-				return -1;
-			}
-			return sent;
-		}
-	}
-
-	return sent;
-}
-
-static int _tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
-				       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
-				       int pkt_count, int mtu, int *err)
-{
-	const uint64_t head = tx_uc_alloc_uc_slots(ctx, 1);
-	const unsigned slot_id = head % MAX_JOB_PER_UC;
-	tx_uc_job_ctx_t * job = &ctx->job_ctxs[slot_id];
-	mOS_uc_transaction_t * const trs =
-		&_scoreboard_start.SCB_UC.trs [ctx->dnoc_uc_id][slot_id];
-	const odp_packet_hdr_t * pkt_hdr;
-
-	*err = 0;
-	job->nofree = tx_config->nofree;
-	for (int i = 0; i < pkt_count; ++i ){
-		job->pkt_table[i] = pkt_table[i];
-		pkt_hdr = odp_packet_hdr(pkt_table[i]);
-
-		int len = pkt_hdr->frame_len;
-		uint8_t * base_addr = (uint8_t*)pkt_hdr->buf_hdr.addr +
-			pkt_hdr->headroom;
-
-		if (len > mtu) {
-			pkt_count = i;
-			*err = EINVAL;
-			break;
-		}
-		if (ctx->flags.add_header){
-			mppa_ethernet_header_t *hdr;
-
-			base_addr -= sizeof(*hdr);
-			hdr = (mppa_ethernet_header_t*) base_addr;
-
-			hdr->timestamp = 8 * head + i;
-			hdr->info.dword = 0ULL;
-			hdr->info._.pkt_id = 8 * head + i;
-			hdr->info._.pkt_size = len +
-				((ctx->flags.exclude_hdr_size) ? 0 : sizeof(*hdr));
-			/* Add the packet end marker */
-			if (ctx->flags.add_end_marker && i == (pkt_count - 1))
-				hdr->info._.hash_key |= END_OF_PACKETS;
-
-			len += sizeof(*hdr);
-		}
-		if (ctx->flags.round_up)
-			len = ( ( len + sizeof(uint64_t) - 1 ) / sizeof(uint64_t) ) * sizeof(uint64_t);
-		trs->parameter.array[i] = len / sizeof(uint64_t);
-
-		trs->pointer.array[i] =
-			(unsigned long)(base_addr - (uint8_t*)&_data_start);
-	}
-
-	for (int i = pkt_count; i < 8; ++i) {
-		trs->parameter.array[i] = 0;
-	}
-
-	trs->path.legacy.header = tx_config->header;
-	trs->path.legacy.config = tx_config->config;
-
-	job->pkt_count = pkt_count;
-
-	tx_uc_commit(ctx, head, 1);
-	return pkt_count;
-}
-
-int tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
-			       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
-			       int len, int mtu)
-{
-	int sent = 0;
-	int pkt_count;
-
-	while(sent < (int)len) {
-		int ret, uc_sent;
-
-		pkt_count = (len - sent) > 8 ? 8 :
-			(len - sent);
-
-		uc_sent = _tx_uc_send_aligned_packets(tx_config, ctx,
-						      &pkt_table[sent], pkt_count,
-						      mtu, &ret);
 		sent += uc_sent;
 		if (ret) {
 			if (!sent) {

@@ -417,8 +417,8 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 
 	while (len > 0) {
 		int count = len > MAX_PKT_PER_UC ? MAX_PKT_PER_UC : len;
-		int ret = tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
-						     pkt_table, count, pcie->mtu);
+		int ret = tx_uc_send_packets(&pcie->tx_config, ctx,
+					     pkt_table, count, pcie->mtu);
 		if (ret < 0){
 			if (sent) {
 				__odp_errno = 0;
