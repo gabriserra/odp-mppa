@@ -258,7 +258,10 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ret = pcie_rpc_send_pcie_open(pcie);
 
 	if (pktio_entry->s.param.out_mode != ODP_PKTOUT_MODE_DISABLED) {
-		tx_uc_init(g_pcie_tx_uc_ctx, NOC_PCIE_UC_COUNT, ucode, 1, 0xff);
+		tx_uc_flags_t flags = TX_UC_FLAGS_DEFAULT;
+		flags.add_header = 1;
+
+		tx_uc_init(g_pcie_tx_uc_ctx, NOC_PCIE_UC_COUNT, ucode, flags, 0xff);
 
 		mppa_routing_get_dnoc_unicast_route(__k1_get_cluster_id(),
 						    pcie->tx_if,

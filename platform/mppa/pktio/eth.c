@@ -37,6 +37,26 @@ _ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
 
 #include "ucode_fw/ucode_eth_v2.h"
 
+typedef union eth_tx_metadata_s {
+  uint64_t reg;
+  uint64_t dword;
+  uint32_t word[2];
+  uint16_t hword[4];
+  uint8_t bword[8];
+  struct {
+    uint32_t packet_size    : 14;
+    uint32_t reserved_0     : 2;
+    uint32_t lane_dest      : 2;
+    uint32_t reserved_1     : 14;
+    uint32_t pkt_sending_nb : 16;
+    uint32_t pkt_grp_id     : 3;
+    uint32_t ordered_en     : 1;
+    uint32_t drop           : 1;
+    uint32_t icrc_en        : 1;
+    uint32_t reserved_2     : 10;
+  } _;
+} eth_tx_metadata_t;
+
 /**
  * #############################
  * PKTIO Interface
@@ -294,7 +314,9 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	}
 
 	if (pktio_entry->s.param.out_mode != ODP_PKTOUT_MODE_DISABLED) {
-		tx_uc_init(g_eth_tx_uc_ctx, NOC_ETH_UC_COUNT, ucode, 0, 0xf);
+		tx_uc_flags_t flags = TX_UC_FLAGS_DEFAULT;
+
+		tx_uc_init(g_eth_tx_uc_ctx, NOC_ETH_UC_COUNT, ucode, flags, 0xf);
 
 		mppa_routing_get_dnoc_unicast_route(__k1_get_cluster_id(),
 						    eth->tx_if,
