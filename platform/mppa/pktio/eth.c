@@ -293,7 +293,6 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	eth->min_payload = min_payload;
 	eth->max_payload = max_payload;
 	eth->tx_config.nofree = nofree;
-	eth->tx_config.add_end_marker = 0;
 
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
 		/* Setup Rx threads */

@@ -159,7 +159,6 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->pool = pool;
 	ioddr->log2_fragments = log2_fragments;
 	ioddr->tx_config.nofree = 0;
-	ioddr->tx_config.add_end_marker = 0;
 	if (rx_opts.min_rx == -1 || rx_opts.max_rx == -1) {
 		ODP_ERR("min_rx and max_rx options must be specified\n");
 		return -1;

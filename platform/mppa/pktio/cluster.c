@@ -271,7 +271,6 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	pkt_cluster->clus_id = cluster_id;
 	pkt_cluster->pool = pool;
 	pkt_cluster->tx_config.nofree = nofree;
-	pkt_cluster->tx_config.add_end_marker = 0;
 	pkt_cluster->remote.cnoc_rx = pkt_cluster->local.cnoc_rx = -1;
 	pkt_cluster->remote.min_rx = pkt_cluster->remote.max_rx = -1;
 	pkt_cluster->mtu = odp_buffer_pool_segment_size(pool) -

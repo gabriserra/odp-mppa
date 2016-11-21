@@ -44,7 +44,6 @@ typedef struct {
 
 	struct {
 		uint8_t nofree : 1;
-		uint8_t add_end_marker:1;
 	};
 } pkt_tx_uc_config;
 

@@ -234,7 +234,6 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	pcie->pool = pool;
 	odp_spinlock_init(&pcie->wlock);
 	pcie->tx_config.nofree = nofree;
-	pcie->tx_config.add_end_marker = 1;
 
 	pcie->mtu = ((pool_entry_t*)pool)->s.params.pkt.len;
 	/* Setup Rx threads */
@@ -262,7 +261,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		flags.add_header = 1;
 		flags.exclude_hdr_size = 1;
 		flags.round_up = 1;
-
+		flags.add_end_marker = 1;
 		tx_uc_init(g_pcie_tx_uc_ctx, NOC_PCIE_UC_COUNT, ucode, flags, 0xff);
 
 		mppa_routing_get_dnoc_unicast_route(__k1_get_cluster_id(),
