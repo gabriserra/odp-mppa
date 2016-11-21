@@ -31,9 +31,10 @@ typedef struct eth_uc_job_ctx {
 typedef struct {
 	uint8_t add_header : 1;
 	uint8_t exclude_hdr_size : 1;
+	uint8_t round_up : 1;
 } tx_uc_flags_t;
 
-#define TX_UC_FLAGS_DEFAULT { .add_header = 0, .exclude_hdr_size = 0 }
+#define TX_UC_FLAGS_DEFAULT { .add_header = 0, .exclude_hdr_size = 0, .round_up = 0 }
 
 typedef struct {
 	uint8_t init;

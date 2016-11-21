@@ -261,6 +261,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		tx_uc_flags_t flags = TX_UC_FLAGS_DEFAULT;
 		flags.add_header = 1;
 		flags.exclude_hdr_size = 1;
+		flags.round_up = 1;
 
 		tx_uc_init(g_pcie_tx_uc_ctx, NOC_PCIE_UC_COUNT, ucode, flags, 0xff);
 
