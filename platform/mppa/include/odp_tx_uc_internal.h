@@ -58,10 +58,6 @@ void tx_uc_commit(tx_uc_ctx_t *ctx, uint64_t slot,
 int tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 		       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
 		       int len, int mtu);
-/* Round up packet size to 8B to send more at once */
-int tx_uc_send_aligned_packets(const pkt_tx_uc_config *tx_config,
-			       tx_uc_ctx_t *ctx, odp_packet_t pkt_table[],
-			       int len, int mtu);
 void tx_uc_flush(tx_uc_ctx_t *ctx);
 
 #ifdef __cplusplus
