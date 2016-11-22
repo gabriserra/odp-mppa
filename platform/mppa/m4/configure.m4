@@ -23,8 +23,6 @@ AS_CASE([$host],
 AS_CASE([$host],
   [k1*simu], [k1_hw=no
 			  RUN_TARGET=k1-cluster],
-  [k1*emb01],[k1_hw=yes
-			  RUN_TARGET=k1-remote-runner],
   [k1*],     [k1_hw=yes
   			  RUN_TARGET=k1-jtag],
   [*]
