@@ -234,7 +234,6 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	pcie->pool = pool;
 	odp_spinlock_init(&pcie->wlock);
 	pcie->tx_config.nofree = nofree;
-	pcie->tx_config.add_end_marker = 1;
 
 	pcie->mtu = ((pool_entry_t*)pool)->s.params.pkt.len;
 	/* Setup Rx threads */
@@ -258,7 +257,12 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ret = pcie_rpc_send_pcie_open(pcie);
 
 	if (pktio_entry->s.param.out_mode != ODP_PKTOUT_MODE_DISABLED) {
-		tx_uc_init(g_pcie_tx_uc_ctx, NOC_PCIE_UC_COUNT, ucode, 1, 0xff);
+		tx_uc_flags_t flags = TX_UC_FLAGS_DEFAULT;
+		flags.add_header = 1;
+		flags.exclude_hdr_size = 1;
+		flags.round_up = 1;
+		flags.add_end_marker = 1;
+		tx_uc_init(g_pcie_tx_uc_ctx, NOC_PCIE_UC_COUNT, ucode, flags, 0xff);
 
 		mppa_routing_get_dnoc_unicast_route(__k1_get_cluster_id(),
 						    pcie->tx_if,
@@ -413,8 +417,8 @@ static int pcie_send(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 
 	while (len > 0) {
 		int count = len > MAX_PKT_PER_UC ? MAX_PKT_PER_UC : len;
-		int ret = tx_uc_send_aligned_packets(&pcie->tx_config, ctx,
-						     pkt_table, count, pcie->mtu);
+		int ret = tx_uc_send_packets(&pcie->tx_config, ctx,
+					     pkt_table, count, pcie->mtu);
 		if (ret < 0){
 			if (sent) {
 				__odp_errno = 0;
