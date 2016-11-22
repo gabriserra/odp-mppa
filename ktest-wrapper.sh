@@ -13,6 +13,10 @@ fi
 case "$RUN_TARGET" in
     "k1-jtag")
 	BOARD_TYPE=$(cat /mppa/board0/type)
+	if [ $? -ne 0 ]; then
+	    # Try a remote board
+	    BOARD_TYPE=$(k1-remote-runner -H --nomultibinary -- /bin/cat /mppa/board0/type)
+	fi
 	FIRMWARES=""
 	case "$BOARD_TYPE" in
 	    "ab01")
@@ -37,8 +41,12 @@ case "$RUN_TARGET" in
 		FIRMWARES="--exec-file IOETH1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/explorer/k1b/ioeth.kelf"
 		;;
 	    "")
+		echo "Could not find board type"
+		exit 1
 		;;
 	    *)
+		echo "Unsupported board type '${BOARD_TYPE}'"
+		exit 1
 		;;
 	esac
 
