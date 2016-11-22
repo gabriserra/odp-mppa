@@ -25,7 +25,13 @@ case "$RUN_TARGET" in
 		FIRMWARES="--exec-file IODDR0:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/ab04/k1b/iounified.kelf --exec-file IODDR1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/ab04/k1b/iounified.kelf "
 		;;
 	    "emb01")
-		FIRMWARES="--exec-file IODDR0:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/emb01/k1b/iounified.kelf --exec-file IODDR1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/emb01/k1b/iounified.kelf "
+		TMP=$(mktemp -d -p $(pwd) remote-runer.XXXX)
+		cp -R ${ODP_TOOLCHAIN_DIR}/share/odp/firmware/emb01/k1b/iounified.kelf $ELF ${TMP}
+		cd ${TMP}
+		echo k1-remote-runner -H -M  -u iounified.kelf,$(basename $ELF) -- \
+		     k1-jtag-runner --exec-file IODDR0:iounified.kelf --exec-file Cluster0:$(basename $ELF) -- $*
+		exec k1-remote-runner -H -M  -u iounified.kelf,$(basename $ELF) -- \
+		     k1-jtag-runner --exec-file IODDR0:iounified.kelf --exec-file Cluster0:$(basename $ELF) -- $*
 		;;
 	    "explorer")
 		FIRMWARES="--exec-file IOETH1:${ODP_TOOLCHAIN_DIR}/share/odp/firmware/explorer/k1b/ioeth.kelf"
@@ -38,15 +44,6 @@ case "$RUN_TARGET" in
 
 	echo k1-jtag-runner ${FIRMWARES} --exec-file "Cluster0:$ELF" -- $*
 	exec k1-jtag-runner ${FIRMWARES} --exec-file "Cluster0:$ELF" -- $*
-	;;
-    "k1-remote-runner")
-	TMP=$(mktemp -d -p $(pwd) remote-runer.XXXX)
-	cp -R ${ODP_TOOLCHAIN_DIR}/share/odp/firmware/emb01/k1b/iounified.kelf -u $ELF ${TMP}
-	cd ${TMP}
-	echo k1-remote-runner -H -M  -u iounified.kelf,$(basename $ELF) -- \
-	     k1-jtag-runner --exec-file IODDR0:iounified.kelf --exec-file Cluster0:$(basename $ELF) -- $*
-	exec k1-remote-runner -H -M  -u iounified.kelf,$(basename $ELF) -- \
-	     k1-jtag-runner --exec-file IODDR0:iounified.kelf --exec-file Cluster0:$(basename $ELF) -- $*
 	;;
     "k1-cluster")
 	echo k1-cluster   --functional --dcache-no-check  --mboard=developer --march=bostan \
