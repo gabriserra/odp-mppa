@@ -170,6 +170,15 @@ iounified_CONFIGS += k1b-kalray_konic80
 iounified_CONFIGS += k1b-kalray_ab04
 iounified_CONFIGS += k1b-kalray_emb01
 
+#
+# IOUNIFIED-JUMBO
+#
+iounified-jumbo_CONFIGS += k1b-kalray_developer
+iounified-jumbo_CONFIGS += k1b-kalray_simu
+iounified-jumbo_CONFIGS += k1b-kalray_konic80
+iounified-jumbo_CONFIGS += k1b-kalray_ab04
+iounified-jumbo_CONFIGS += k1b-kalray_emb01
+
 
 #
 # IOETH
