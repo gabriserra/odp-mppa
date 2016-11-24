@@ -162,6 +162,16 @@ iopcie_CONFIGS += k1b-kalray_simu
 _iopcie_CONFIGS += k1b-kalray_explorer
 
 #
+# IOPCIE-JUMBO
+#
+iopcie-jumbo_CONFIGS += k1b-kalray_developer
+iopcie-jumbo_CONFIGS += k1b-kalray_konic80
+iopcie-jumbo_CONFIGS += k1b-kalray_ab04
+iopcie-jumbo_CONFIGS += k1b-kalray_emb01
+iopcie-jumbo_CONFIGS += k1b-kalray_simu
+_iopcie-jumbo_CONFIGS += k1b-kalray_explorer
+
+#
 # IOUNIFIED
 #
 iounified_CONFIGS += k1b-kalray_developer
