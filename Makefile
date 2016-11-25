@@ -27,8 +27,10 @@ FIRMWARES := $(patsubst firmware/%/Makefile, %, $(wildcard firmware/*/Makefile))
 APPS      := $(patsubst apps/%/Makefile, %, $(wildcard apps/*/Makefile))
 LONGS     := $(patsubst long/%/Makefile, %, $(wildcard long/*/Makefile))
 RPCINCLUDES := $(shell find $(RPCFIRMWARE_PATH)/include/ -name *.h)
+RPCSRCS     := $(shell find $(RPCFIRMWARE_PATH)/platform/ -type f)
 RPCMODS    := $(shell find $(RPCFIRMWARE_PATH)/firmware/ -type f)
 RPCINCLUDES_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, platform/mppa/%, $(RPCINCLUDES))
+RPCSRCS_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, %, $(RPCSRCS))
 RPCMODS_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, %, $(RPCMODS))
 
 RULE_LIST_SERIAL   :=  install valid
@@ -40,9 +42,9 @@ CHECK_LIST :=
 FIRMWARE_FILES := $(shell find firmware/common -type f -or -type l) firmware/Makefile
 TEMPLATE_FILES := $(shell find apps/skel -type f -or -type l)
 install_DEPS := build
-firmware-build_DEPS := $(RPCMODS_INST)
+firmware-build_DEPS := $(RPCMODS_INST) $(RPCINCLUDES_INST)
 firmware-install_DEPS := firmware-common-install
-odp-build_DEPS := $(RPCINCLUDES_INST)
+odp-build_DEPS := $(RPCINCLUDES_INST) $(RPCSRCS_INST)
 
 include mk/platforms.inc
 include mk/rules.inc
@@ -150,6 +152,8 @@ rpc-clean:
 $(RPCINCLUDES_INST): platform/mppa/% : $(RPCFIRMWARE_PATH)/%
 	install -D $< $@
 $(RPCMODS_INST): % : $(RPCFIRMWARE_PATH)/%
+	install -D $< $@
+$(RPCSRCS_INST): % : $(RPCFIRMWARE_PATH)/%
 	install -D $< $@
 list-rpc-files:
 	@echo  $(RPCINCLUDES_INST) $(RPCMODS_INST)
