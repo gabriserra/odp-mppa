@@ -58,6 +58,7 @@ platform/mppa/include/odp/rpc/bas.h
 platform/mppa/include/odp/rpc/defines.h
 platform/mppa/include/odp/rpc/rpc.h
 platform/mppa/include/odp/rpc/eth.h
+platform/mppa/include/odp/rpc/fp.h
 platform/mppa/include/odp/rpc/helpers.h
 platform/mppa/include/odp/rpc/api.h
 firmware/common/internal/debug.h
@@ -79,3 +80,4 @@ firmware/common/rpc/rpc-server.h
 firmware/common/rpc/internal/rpc-server.h
 firmware/common/rpc/rpc.c
 firmware/common/rpc/rpc-server.c
+platform/mppa/odp_rpc.c

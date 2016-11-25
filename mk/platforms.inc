@@ -162,6 +162,16 @@ iopcie_CONFIGS += k1b-kalray_simu
 _iopcie_CONFIGS += k1b-kalray_explorer
 
 #
+# IOPCIE-JUMBO
+#
+iopcie-jumbo_CONFIGS += k1b-kalray_developer
+iopcie-jumbo_CONFIGS += k1b-kalray_konic80
+iopcie-jumbo_CONFIGS += k1b-kalray_ab04
+iopcie-jumbo_CONFIGS += k1b-kalray_emb01
+iopcie-jumbo_CONFIGS += k1b-kalray_simu
+_iopcie-jumbo_CONFIGS += k1b-kalray_explorer
+
+#
 # IOUNIFIED
 #
 iounified_CONFIGS += k1b-kalray_developer
@@ -169,6 +179,15 @@ iounified_CONFIGS += k1b-kalray_simu
 iounified_CONFIGS += k1b-kalray_konic80
 iounified_CONFIGS += k1b-kalray_ab04
 iounified_CONFIGS += k1b-kalray_emb01
+
+#
+# IOUNIFIED-JUMBO
+#
+iounified-jumbo_CONFIGS += k1b-kalray_developer
+iounified-jumbo_CONFIGS += k1b-kalray_simu
+iounified-jumbo_CONFIGS += k1b-kalray_konic80
+iounified-jumbo_CONFIGS += k1b-kalray_ab04
+iounified-jumbo_CONFIGS += k1b-kalray_emb01
 
 
 #

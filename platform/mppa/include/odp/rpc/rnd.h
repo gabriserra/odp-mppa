@@ -3,6 +3,9 @@
 
 #include <odp/rpc/defines.h>
 
+/** Mark RND Rpc has available */
+#define HAS_ODP_RPC_PCIE
+
 /** Version of the RND CoS */
 #define MPPA_RPC_ODP_RND_VERSION 0x2
 

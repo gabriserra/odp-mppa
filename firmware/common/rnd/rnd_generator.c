@@ -99,7 +99,7 @@ rnd_send_buffer(unsigned remoteClus, mppa_rpc_odp_t * msg) {
 	assert( rnd.rnd_len <= sizeof(rnd.rnd_data));
 
 	rnd.rnd_len = odp_rnd_gen_get((char*)rnd.rnd_data, rnd.rnd_len);
-	rpc_server_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
+	mppa_rpc_odp_send_msg(interface, msg->dma_id, msg->dnoc_tag, msg, NULL);
 }
 
 static int rnd_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)
@@ -128,5 +128,5 @@ void  __attribute__ ((constructor)) __rnd_rpc_constructor()
 	return;
 #endif
 	odp_rnd_gen_init();
-	__rpc_handlers[MPPA_RPC_ODP_CLASS_RND] = rnd_rpc_handler;
+	register_rpc_service(MPPA_RPC_ODP_CLASS_RND, rnd_rpc_handler);
 }
