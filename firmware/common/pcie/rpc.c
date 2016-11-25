@@ -259,5 +259,5 @@ void  __attribute__ ((constructor)) __pcie_rpc_constructor()
 #if defined(MAGIC_SCALL)
 	return;
 #endif
-	__rpc_handlers[MPPA_RPC_ODP_CLASS_PCIE] = pcie_rpc_handler;
+	register_rpc_service(MPPA_RPC_ODP_CLASS_PCIE, pcie_rpc_handler);
 }

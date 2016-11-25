@@ -127,5 +127,5 @@ void  __attribute__ ((constructor)) __rnd_rpc_constructor()
 	return;
 #endif
 	odp_rnd_gen_init();
-	__rpc_handlers[MPPA_RPC_ODP_CLASS_RND] = rnd_rpc_handler;
+	register_rpc_service(MPPA_RPC_ODP_CLASS_RND, rnd_rpc_handler);
 }
