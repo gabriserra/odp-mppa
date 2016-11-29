@@ -213,7 +213,7 @@ void eth_get_stat(unsigned remoteClus __attribute__((unused)),
 		ETH_RPC_ERR_MSG(answer, "Trying to get stats on 40G lane while lane is closed or in a different mode\n");
 		return;
 	} else if (data.ifId < N_ETH_LANE &&
-		   status[data.ifId].initialized !=! ETH_LANE_ON) {
+		   status[data.ifId].initialized != ETH_LANE_ON) {
 		   ETH_RPC_ERR_MSG(answer, "Trying to get stats for 1/10G lane while lane is closed or in 40G\n");
 		   return;
 	}
