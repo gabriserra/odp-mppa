@@ -338,7 +338,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 			readl(desc_info_addr(smem_vaddr, config->c2h_addr[i],
 					     addr));
 		rxq->ring =
-			kzalloc(rxq->size * sizeof(struct mpodp_rx), GFP_ATOMIC);
+			kzalloc(rxq->size * sizeof(struct mpodp_rx), GFP_KERNEL);
 		if (rxq->ring == NULL) {
 			dev_err(&pdev->dev, "RX ring allocation failed\n");
 			goto rx_alloc_failed;
@@ -394,7 +394,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 
 		/* Setup Host TX Ring */
 		txq->ring =
-			kzalloc(txq->size * sizeof(struct mpodp_tx), GFP_ATOMIC);
+			kzalloc(txq->size * sizeof(struct mpodp_tx), GFP_KERNEL);
 		if (txq->ring == NULL) {
 			dev_err(&pdev->dev, "TX ring allocation failed\n");
 			goto tx_alloc_failed;
@@ -407,7 +407,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		/* Pre cache MPPA TX Ring */
 		txq->cache =
 			kzalloc(txq->mppa_size * sizeof(*txq->cache),
-				GFP_ATOMIC);
+				GFP_KERNEL);
 		if (txq->cache == NULL) {
 			dev_err(&pdev->dev, "TX cache allocation failed\n");
 			goto tx_alloc_failed;
