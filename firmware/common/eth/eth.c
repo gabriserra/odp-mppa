@@ -210,11 +210,11 @@ void eth_get_stat(unsigned remoteClus __attribute__((unused)),
 		return;
 	}
 	if (data.ifId == 4 && status[0].initialized != ETH_LANE_ON_40G) {
-		ETH_RPC_ERR_MSG(answer, "Tring to get stats on 40G lane while lane is closed or in a different mode\n");
+		ETH_RPC_ERR_MSG(answer, "Trying to get stats on 40G lane while lane is closed or in a different mode\n");
 		return;
 	} else if (data.ifId < N_ETH_LANE &&
 		   status[data.ifId].initialized !=! ETH_LANE_ON) {
-		   ETH_RPC_ERR_MSG(answer, "Tring to set state for 1/10G lane while lane is closed or in 40G\n");
+		   ETH_RPC_ERR_MSG(answer, "Trying to get stats for 1/10G lane while lane is closed or in 40G\n");
 		   return;
 	}
 	answer->ack.cmd.eth_get_stat.link_status = ethtool_poll_lane(data.ifId);
