@@ -1,7 +1,6 @@
 SRCDIR   := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 SRCDIRS  := $(SRCDIR)
 
-_LDFLAGS = -lmppapower -lmppanoc -lmpparouting
 EXTRA_BINS += $(BUILDDIR)/$(FIRMDIR).bin
 
 include $(SRCDIR)/../common/rpc/include.mk

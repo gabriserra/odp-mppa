@@ -2,9 +2,6 @@ SRCDIR   := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 SRCDIRS  := $(SRCDIR)
 FIRMDIR := $(realpath $(ODP_TOOLCHAIN_DIR)/share/odp/build/firmware)
 
-_LDFLAGS = -lmppapower -lmppanoc -lmpparouting
-
-
 ####################################
 # Choose the wanted RPC modules    #
 # for the firmware                 #
