@@ -4,8 +4,8 @@ CUR_DIR=$(readlink -e $(dirname $0))
 cd $CUR_DIR
 
 #Start jtag runner in the BG
-k1-jtag-runner --multibinary=pcie_fwd_jumbo_multibin.mpk --exec-multibin=IODDR0:firmware \
-			   --exec-multibin=IODDR1:firmware --chip-freq=400 -- \
+k1-jtag-runner --multibinary=pcie_fwd_jumbo_multibin.mpk --exec-multibin=IODDR0:firmware.kelf \
+			   --exec-multibin=IODDR1:firmware.kelf --chip-freq=400 -- \
 			   -c 0  &
 sleep 4
 sudo /usr/sbin/ifconfig modp0.0.0.0 mtu 9000
