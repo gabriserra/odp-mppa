@@ -48,7 +48,7 @@ mppa-bin :=
 cluster-bin :=
 cluster-tests :=
 mppa-tests :=
-sim-runner-opts := --mboard=developer --march=bostan
+sim-runner-opts := --mboard=developer
 
 # Setting ODP_MAKEFILE_NO_RULES=1 Disable the default rule so the user can override them
 ifndef ODP_MAKEFILE_NO_RULES
