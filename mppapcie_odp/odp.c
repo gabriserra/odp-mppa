@@ -200,13 +200,13 @@ static void mpodp_remove(struct net_device *netdev)
 	}
 
 	for (i = 0; i < priv->n_txqs; ++i) {
-		kfree(priv->txqs[i].cache);
-		kfree(priv->txqs[i].ring);
+		vfree(priv->txqs[i].cache);
+		vfree(priv->txqs[i].ring);
 	}
 
 	dma_release_channel(priv->rx_chan);
 	for (i = 0; i < priv->n_rxqs; ++i) {
-		kfree(priv->rxqs[i].ring);
+		vfree(priv->rxqs[i].ring);
 		pci_free_consistent(priv->pdev,
 				    priv->rxqs[i].size * sizeof(struct mpodp_c2h_entry),
 				    priv->rxqs[i].mppa_entries,
@@ -337,8 +337,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		entries_addr =
 			readl(desc_info_addr(smem_vaddr, config->c2h_addr[i],
 					     addr));
-		rxq->ring =
-			kzalloc(rxq->size * sizeof(struct mpodp_rx), GFP_KERNEL);
+		rxq->ring =vmalloc(rxq->size * sizeof(struct mpodp_rx));
 		if (rxq->ring == NULL) {
 			dev_err(&pdev->dev, "RX ring allocation failed\n");
 			goto rx_alloc_failed;
@@ -393,8 +392,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 				       head);
 
 		/* Setup Host TX Ring */
-		txq->ring =
-			kzalloc(txq->size * sizeof(struct mpodp_tx), GFP_KERNEL);
+		txq->ring = vmalloc(txq->size * sizeof(struct mpodp_tx));
 		if (txq->ring == NULL) {
 			dev_err(&pdev->dev, "TX ring allocation failed\n");
 			goto tx_alloc_failed;
@@ -405,9 +403,7 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		}
 
 		/* Pre cache MPPA TX Ring */
-		txq->cache =
-			kzalloc(txq->mppa_size * sizeof(*txq->cache),
-				GFP_KERNEL);
+		txq->cache = vmalloc(txq->mppa_size * sizeof(*txq->cache));
 		if (txq->cache == NULL) {
 			dev_err(&pdev->dev, "TX cache allocation failed\n");
 			goto tx_alloc_failed;
@@ -478,16 +474,16 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
       tx_alloc_failed:
 	for (i = 0; i < priv->n_txqs; ++i){
 		if(priv->txqs[i].cache)
-			kfree(priv->txqs[i].cache);
+			vfree(priv->txqs[i].cache);
 		if(priv->txqs[i].ring)
-			kfree(priv->txqs[i].ring);
+			vfree(priv->txqs[i].ring);
 	}
 	dma_release_channel(priv->rx_chan);
       rx_chan_failed:
       rx_alloc_failed:
 	for (i = 0; i < priv->n_rxqs; ++i){
 		if(priv->rxqs[i].ring)
-			kfree(priv->rxqs[i].ring);
+			vfree(priv->rxqs[i].ring);
 		if(priv->rxqs[i].mppa_entries) {
 			pci_free_consistent(pdev,
 					    priv->rxqs[i].size * sizeof(struct mpodp_c2h_entry),
