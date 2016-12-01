@@ -71,6 +71,33 @@ The K1-ODP files will be installed under the
 \texttt{/usr/local/k1tools} directory.
 
 \section{What's new}
+\subsection{K1-ODP 1.6.k6}
+\begin{itemize}
+\item[-]{ODP netdev driver for x86 is available}
+\item[-]{Added AB04 support}
+\item[-]{ODP firmwares can support both Linux in IO and ODP in
+  clusters}
+\item[-]{pktio can now be tied to a specific Rx thread}
+\item[-]{Add a refcount system on packets}
+\item[-]{Add a pktio to receive data from IO clusters}
+\end{itemize}
+
+\subsubsection{Bug Fixes}
+\begin{itemize}
+\item[-]{Fix packet leaks in Rx thread.}
+\item[-]{Fix ethernet MAC generation when using k1-gdb}
+\item[-]{Auto reinit Ethernet phy if link failed to start when using
+  loopback}
+\item[-]{Fix a bug in packet Tx which might cause extra data to be sent}
+\end{itemize}
+
+\subsection{K1-ODP 1.6.k5}
+\begin{itemize}
+\item[-]{Rx threads now use only odd PE to allow access to all crypto
+  accelerators}
+\item[-]{Added EMB01b support}
+\end{itemize}
+
 \subsection{K1-ODP 1.6.k4}
 \begin{itemize}
 \item[-]{New firmware system}
@@ -155,6 +182,7 @@ now returns 0 instead of -2}
 \item[-]{Fix packet ordering issue, even when only on Rx thread is used.}
 \end{itemize}
 
+\newpage
 \section{Choosing a version}
 K1-ODP is available in multiple ports in the k1-odp package, one for
 each of the platforms available for executing ODP applications.
@@ -188,6 +216,7 @@ In the current version, this port supports these interfaces:
 \item[-]{magic:$<$if\_name$>$}
 \end{itemize}
 
+\newpage
 \section{Platform Settings}
 \subsection{Rx Threads}
 ODP internally allocates 2 cores (Rx Threads) per cluster to convert the incoming
@@ -213,6 +242,15 @@ The number of threads can be configured by providing a
 	}
 \end{lstlisting}
 
+When only one Rx thread is used, it is guaranteed that packets will be
+received in order. This is automactically disabled when \texttt{n\_rx\_thr} is
+larger than 1. If pktio are configured so that they only use no more
+than one Rx thread each (a rx thread might still handle more than one
+pktio), it is possible to force ordering to be kept by setting
+\texttt{sort\_buffers} = 1 in the \texttt{odp\_platform\_init\_t} structure.
+
+
+\newpage
 \section{Packet IO Interfaces}
 
 K1-ODP provides multiple pktio types that can be used to communicate
@@ -224,8 +262,11 @@ with Ethernet ports, or clusters.
 \item[-]{\texttt{e<X>p<Y>}: 1/10G Ethernet interface \texttt{<Y>} of
   IOETH \texttt{<X>}}
 \item[-]{\texttt{cluster<X>}: Interface to cluster \texttt{<X>}}
+\item[-]{\texttt{p<X>p<Y>}: Netdev to host using \texttt{Y}th
+  interface of IODDR \texttt{<X>}}
 \item[-]{\texttt{magic:<if>}: Link to the x86 interface
   \texttt{<if>}. This is only available on simu platforms}
+\item[-]{\texttt{ioddr<X>}: Interface to IODDR \texttt{X}. Receive only}
 \end{itemize}
 
 \subsection{Customizing Ethernet interface behavior}
@@ -378,6 +419,7 @@ output messages for debugging link issues.
 e0:verbose
 \end{lstlisting}
 
+\newpage
 \section{Compiling and Running}
 
 \subsection{Template Project}
