@@ -70,7 +70,7 @@ pre-build-hooks := build-firmware
 clean-hooks := clean-firmware
 
 $(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf-nameinmpk := firmware.kelf
-$(TEST_MULTIBIN_NAME)-objs := $(cluster-bin) $(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf
+$(TEST_MULTIBIN_NAME)-objs := $(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf
 
 build-firmware:
 	+mkdir -p ./firmware-$(OS_BOARD_NAME) && cd ./firmware-$(OS_BOARD_NAME) && \

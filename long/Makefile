@@ -62,7 +62,7 @@ install: all
 
 ifndef LONG_NO_DEFAULT_RULES
 cluster-bin += $(TEST_NAME)
-$(TEST_MULTIBIN_NAME)-objs += $(TEST_NAME) $(TEST_STD_FIRMWARE)
+$(TEST_MULTIBIN_NAME)-objs += $(TEST_STD_FIRMWARE) $(TEST_NAME)
 mppa-bin += $(TEST_MULTIBIN_NAME)
 $(TEST_NAME)-multibinary := $(TEST_MULTIBIN_NAME).mpk
 endif
