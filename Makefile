@@ -17,7 +17,6 @@ APST_DIR:= $(K1ST_DIR)/share/odp/apps/
 LONT_DIR:= $(K1ST_DIR)/share/odp/long
 CUNIT_INST_DIR:= $(INST_DIR)/local/k1tools/kalray_internal/cunit/
 MAKE_AMS:= $(shell find $(TOP_DIR) -name Makefile.am)
-PERF_FILES := $(wildcard perf/*/regex) perf/run_single
 MAKE_M4S:= $(shell find $(TOP_DIR) -name "*.m4")
 MAKE_DEPS:= $(MAKE_AMS) $(MAKE_M4S) $(TOP_DIR)/Makefile $(wildcard $(TOP_DIR)/mk/*.inc)
 FIRMWARE_VERSION= $(shell $(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
@@ -37,7 +36,7 @@ RULE_LIST_SERIAL   :=  install valid
 RULE_LIST_PARALLEL := clean configure build
 RULE_LIST := $(RULE_LIST_SERIAL) $(RULE_LIST_PARALLEL)
 ARCH_COMPONENTS := odp cunit
-COMPONENTS := extra doc $(ARCH_COMPONENTS) firmware perf rpc
+COMPONENTS := extra doc $(ARCH_COMPONENTS) firmware rpc
 CHECK_LIST :=
 FIRMWARE_FILES := $(shell find firmware/common -type f -or -type l) firmware/Makefile
 TEMPLATE_FILES := $(shell find apps/skel -type f -or -type l)
@@ -94,17 +93,6 @@ doc-valid:
 doc-install:
 	$(MAKE) -C$(TOP_DIR)/doc-kalray install DOCDIR=$(K1ST_DIR)/share/doc/ODP/
 
-
-#
-# Perf rules
-#
-perf-clean:
-perf-configure:
-perf-build:
-perf-long:
-perf-valid:
-perf-install:$(patsubst %, $(K1ST_DIR)/share/odp/%, $(PERF_FILES))
-
 #
 # Extra rules:
 #  * Cleanup all
@@ -116,7 +104,7 @@ extra-clean:
 extra-configure:
 extra-build:
 extra-valid:
-extra-install: $(K1ST_DIR)/lib64/libodp_syscall.so $(K1ST_DIR)/share/odp/build/mk/platforms.inc $(K1ST_DIR)/share/odp/build/apps/Makefile.apps $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh template-install $(K1ST_DIR)/share/odp/perf/run_single $(K1ST_DIR)/share/odp/perf/pktio_perf/regex $(K1ST_DIR)/share/odp/perf/atomic_perf/regex
+extra-install: $(K1ST_DIR)/lib64/libodp_syscall.so $(K1ST_DIR)/share/odp/build/mk/platforms.inc $(K1ST_DIR)/share/odp/build/apps/Makefile.apps $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh template-install
 extra-long:
 
 $(K1ST_DIR)/lib64/libodp_syscall.so: $(TOP_DIR)/syscall/run.sh
@@ -139,8 +127,7 @@ $(patsubst apps/skel/%, $(K1ST_DIR)/share/odp/skel/%, $(TEMPLATE_FILES)): $(K1ST
 $(K1ST_DIR)/share/odp/tests/ktest-wrapper.sh: ktest-wrapper.sh
 	install -D $< $@
 
-$(patsubst %, $(K1ST_DIR)/share/odp/%, $(PERF_FILES)): $(K1ST_DIR)/share/odp/%: %
-	install -D $< $@
+
 #
 # RPC rules:
 #

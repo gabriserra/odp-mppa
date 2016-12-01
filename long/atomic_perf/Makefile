@@ -1,17 +1,17 @@
-DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-TEST_NAME := $(lastword $(subst /, ,$(DIR)))
+APP_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+LONG_NO_DEFAULT_RULES := 1
 
-include $(DIR)/../Makefile 
+include $(APP_DIR)/../Makefile
 
 VALID_TYPE=hw
+$(TEST_NAME)-scripts += ../../perf/run_single ../../perf/$(TEST_NAME)/regex
+$(TEST_NAME)-extras  += $(ODP_TOOLCHAIN_DIR)/share/odp/tests/$(ODP_FLAVOUR)/$(OS_PLAT_NAME)/test/performance/odp_atomic.kelf
 
 ifeq ($(board),$(BOARD_explorer))
 
-
 else
 	$(TEST_NAME)-hw-timeout := 500
-
-	 $(TEST_NAME)-hw-cmd := ./../../../../perf/run_single ./../../../../tests/$(ODP_FLAVOUR)/$(OS_PLAT_NAME)/test/performance/odp_atomic.kelf --perf-file "\$$$$ENV{perf_files_path}"/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME).perf --regex-file ./../../../../perf/$(TEST_NAME)/regex --args t [1]
+	$(TEST_NAME)-hw-cmd := run_single odp_atomic.kelf --perf-file "\$$$$ENV{perf_files_path}"/$(OS_BOARD_NAME)/$(OS_PLAT_NAME)/$(TEST_NAME).perf --regex-file ./regex --args t [1]
 
 	$(TEST_NAME)-hw-no-remote := 1
 

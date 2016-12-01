@@ -6,6 +6,8 @@ TOPDIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 ODP_ARCH ?= k1b-kalray-mos_konic80
 APST_DIR ?= $(shell pwd)/install
 ODP_TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
+TEST_MULTIBIN_NAME ?= $(TEST_NAME)
+
 include $(ODP_TOOLCHAIN_DIR)/share/odp/build/mk/platforms.inc
 
 # Kalray internal system name
@@ -36,7 +38,7 @@ endif
 
 FIRMWARE_DIR = $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/
 
-cluster-cflags := -I$(ODP_TOOLCHAIN_DIR)/$(INCLUDE_DIR)/include
+cluster-cflags := -I$(ODP_TOOLCHAIN_DIR)/$(INCLUDE_DIR)/include $($(REAL_ODP_ARCH)_CFLAGS)
 cluster-lflags := -L$(ODP_TOOLCHAIN_DIR)/lib/odp/$(ODP_FLAVOUR)/$(OS_PLAT_NAME)/
 cluster-lflags += -lodphelper -lodp -lcrypto  $(LIB_NOC_LFLAGS) $($(REAL_ODP_ARCH)_LDFLAGS) -Wl,--gc-sections
 
@@ -46,20 +48,29 @@ mppa-bin :=
 cluster-bin :=
 cluster-tests :=
 mppa-tests :=
-sim-runner-opts := --mboard=developer --march=bostan
+sim-runner-opts := --mboard=developer
 
-$(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf-nameinmpk := firmware.kelf
-$(TEST_NAME)-objs := $(cluster-bin) $(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf
-
+# Setting ODP_MAKEFILE_NO_RULES=1 Disable the default rule so the user can override them
+ifndef ODP_MAKEFILE_NO_RULES
 build: all
 
 install: all
 		 @if [ "$(APST_DIR)" == "" ]; then echo "ERROR: APST_DIR" not set; exit 1; fi
 		 mkdir -p $(APST_DIR)/$(TEST_NAME)
 		 install $(addprefix output/bin/,$($(TEST_NAME)-multibinary)) $(addprefix $(APP_DIR)/,$($(TEST_NAME)-scripts)) $($(TEST_NAME)-extras) $(APST_DIR)/$(TEST_NAME)
+endif
+
+# If ODP_MAKEFILE_STD_FIRMWARE = 1, user has prebuild his firmware
+# and need to add it to io-bin and $(TEST_NAME)-objs manually
+# If not, add rules to build the available firmware
+ifndef ODP_MAKEFILE_STD_FIRMWARE
+ifndef ODP_MAKEFILE_NO_FIRMWARE
 
 pre-build-hooks := build-firmware
 clean-hooks := clean-firmware
+
+$(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf-nameinmpk := firmware.kelf
+$(TEST_MULTIBIN_NAME)-objs := $(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.kelf
 
 build-firmware:
 	+mkdir -p ./firmware-$(OS_BOARD_NAME) && cd ./firmware-$(OS_BOARD_NAME) && \
@@ -70,5 +81,5 @@ clean-firmware:
 	if [ -d ./firmware-$(OS_BOARD_NAME) ]; then cd ./firmware-$(OS_BOARD_NAME) && \
 	$(MAKE) -f $(APP_DIR)/firmware/Makefile ODP_FIRMWARE_CONFIG="k1b-kalray_$(OS_BOARD_NAME)" \
 	ODP_TOOLCHAIN_DIR="$(ODP_TOOLCHAIN_DIR)" clean; else true; fi
-
-
+endif
+endif
