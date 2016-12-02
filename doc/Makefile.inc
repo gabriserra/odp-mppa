@@ -1,5 +1,3 @@
-VPATH=$(top_builddir)/doc/images
-
 .msc.svg:
 	mscgen -T svg -i $^ -o $@
 
