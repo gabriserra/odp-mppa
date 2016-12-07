@@ -12,6 +12,105 @@
 #include <odp/rpc/api.h>
 #include <odp_rx_internal.h>
 #include <errno.h>
+#include <mOS_scoreboard_c.h>
+
+/**
+ * WARNING: this file must be aligned with mOS one.
+ * if mOS update its internal structures, this file must be updated too
+ */
+
+/**************************************************************************************************/
+/************************* START : CUSTOM MMU SETUP ***********************************************/
+/**************************************************************************************************/
+
+#define TLB_INVAL_ENTRY_LOW  TLB_INVAL_ENTRY_LOW_K1B
+#define TLB_INVAL_ENTRY_HIGH TLB_INVAL_ENTRY_HIGH_K1B
+#define MOS_ETHERNET_TLB_ENTRY (0x0442000004400093ULL)
+
+extern int TLB_INVAL_ENTRY_LOW  __attribute__((weak));
+extern int TLB_INVAL_ENTRY_HIGH __attribute__((weak));
+
+extern int _bin_size __attribute__((weak));
+extern int _bin_start_frame;
+extern int _bin_end_frame;
+
+extern int _scoreboard_offset;
+extern int _scb_mem_frames_array_offset;
+extern int _vstart;
+
+extern int MOS_RESERVED;
+extern int BINARY_SIZE          __attribute__((weak));
+extern int _LIBMPPA_DSM_CLIENT_PAGE_SIZE    __attribute__((weak));
+extern int _MOS_SECURITY_LEVEL;
+
+#define ADDR_0(A)           (A - 1)
+#define ADDR_1(A)           (ADDR_0(A) | (ADDR_0(A) >> 1))
+#define ADDR_2(A)           (ADDR_1(A) | (ADDR_1(A) >> 2))
+#define ADDR_3(A)           (ADDR_2(A) | (ADDR_2(A) >> 4))
+#define ADDR_4(A)           (ADDR_3(A) | (ADDR_3(A) >> 8))
+#define ADDR_5(A)           (ADDR_4(A) | (ADDR_4(A) >> 16))
+#define MEM_SIZE_ALIGN(A)   (ADDR_5(A) + 1)
+
+extern int __MPPA_BURN_TX;
+extern int __MPPA_BURN_FDIR;
+// APPLICATION REQUIREMENTS
+
+#ifdef __k1dp__
+#undef MOS_ETHERNET_TLB_ENTRY
+#define MOS_ETHERNET_TLB_ENTRY MOS_NULL_TLB_ENTRY
+#endif
+
+#define AF_ALG_BUF_PTR_PHYS 0xe0000
+#define AF_ALG_BUF_PTR_VIRT 0x600000
+#define AF_ALG_BUF_PTR_SIZE 0x100000
+
+volatile mOS_bin_desc_t bin_descriptor __attribute__((section (".locked.binaries"))) = {
+	.pe_pool            = (0x1 << ((BSP_NB_PE_P & ~(0x3)))) - 1,      // don't touch
+	.smem_start_frame        = (int)&_bin_start_frame,                // don't touch
+	.smem_end_frame          = (int)&_bin_end_frame,                  // don't touch
+
+	.ddr_start_frame        = 0,                                      // don't touch
+	.ddr_end_frame          = 0,                                      // don't touch
+
+	.tlb_small_size         = 0x10000,    // 64K                       <---  YOU CAN TOUCH , must fit entries in jtlb
+	.tlb_big_size           = 0x100000,   // 1M                        <---  YOU CAN TOUCH , must fit entries in jtlb
+	.entry_point               = (uint32_t) & _vstart,
+	.security_level     = (int) &_MOS_SECURITY_LEVEL,                 // don't touch
+	.scoreboard_offset  = ( int ) &(_scoreboard_offset),              // don't touch
+	.ltlb               = {
+		{._dword        = MOS_NULL_TLB_ENTRY                                }, // <---- YOU CAN TOUCH
+		{._dword        = MOS_NULL_TLB_ENTRY                                }, // <---- YOU CAN TOUCH
+		{
+			._dword     = (0x00000000000000dbULL) | (((uint64_t)MEM_SIZE_ALIGN(BSP_CLUSTER_INTERNAL_MEM_SIZE_P)) << 31) // <---- YOU CAN TOUCH, Here 0->2Mo RWX entry
+		},
+		{
+			._dword     = (0x00000000000000dFULL) | (((uint64_t)MEM_SIZE_ALIGN(BSP_CLUSTER_INTERNAL_MEM_SIZE_P)) << 31) | (((uint64_t)MEM_SIZE_ALIGN(BSP_CLUSTER_INTERNAL_MEM_SIZE_P)) << 32)// <---- YOU CAN TOUCH, Here 2->4Mo RWX entry (uncached alias)
+		},
+		[ 4 ... (MOS_VC_NB_USER_LTLB - 1) ] = {
+			._dword        = MOS_NULL_TLB_ENTRY                                // <---- YOU CAN TOUCH
+		},
+	},
+
+	.jtlb               = {
+		/* 64 x 64K entries, we map a two sections 0x600000+1M segment and  0x700000+1M at same physical address 0x50000 */
+
+		[ 0 ... 127 ] = {
+			._dword        = MOS_NULL_TLB_ENTRY                                // <---- YOU CAN TOUCH
+		},	},
+
+	.rx_pool    = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] = {  .array64_bit = { ~(0x0ULL),         ~(0x0ULL),~(0x0ULL), ~(0x0ULL)}}},
+	.uc_pool    = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] = ~(0x0)},
+	//.tx_pool    = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] = ((0x1 << MOS_NB_TX_CHANNELS)-1) & 0x3F}, /* All tx from 0 to 6 exclusted */
+	.tx_pool    = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] = ((0x1 << MOS_NB_TX_CHANNELS)-1)}, /* All tx */
+	.mb_pool    = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] = { .array64_bit = { ~(0x0ULL),         ~(0x0ULL)}}},
+	.mb_tx_pool = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] = 0xF},
+	.fdir_pool  = { . interface [ 0 ... MOS_NB_DMA_MAX -1 ] =  0x1F},  /* Only loopback dir */
+	.burn_tx    = (int)&__MPPA_BURN_TX,             // don't touch
+	.burn_fdir  = (int)&__MPPA_BURN_FDIR,             // don't touch
+	.hook_rm    = 0             // don't touch
+};
+
+mOS_scoreboard_t scoreboard __attribute__((section (".locked.scoreboard")));
 
 struct odp_global_data_s odp_global_data;
 
