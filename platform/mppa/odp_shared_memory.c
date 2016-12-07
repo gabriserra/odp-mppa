@@ -79,7 +79,7 @@ int odp_shm_init_global(void)
 	if (addr == NULL)
 		return -1;
 
-	odp_shm_tbl = addr;
+	odp_shm_tbl = CACHED_TO_UNCACHED(addr);
 
 	memset(odp_shm_tbl, 0, sizeof(odp_shm_table_t));
 	odp_spinlock_init(&odp_shm_tbl->lock);
@@ -89,7 +89,7 @@ int odp_shm_init_global(void)
 
 int odp_shm_term_global(void)
 {
-	free(odp_shm_tbl);
+	free(UNCACHED_TO_CACHED(odp_shm_tbl));
 
 	return 0;
 }
