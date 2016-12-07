@@ -114,7 +114,7 @@ int odp_schedule_init_global(void)
 			      sizeof(sched_t),
 			      ODP_CACHE_LINE_SIZE, 0);
 
-	sched = odp_shm_addr(shm);
+	sched = CACHED_TO_UNCACHED(odp_shm_addr(shm));
 
 	if (sched == NULL) {
 		ODP_ERR("Schedule init: Shm reserve failed.\n");
@@ -251,8 +251,7 @@ int odp_schedule_term_local(void)
 static odp_queue_t pri_set(int prio)
 {
 	odp_spinlock_lock(&sched->mask_lock);
-	int count = LOAD_U32(sched->pri_count[prio]);
-	STORE_U32(sched->pri_count[prio], count + 1);
+	sched->pri_count[prio] += 1;
 	odp_spinlock_unlock(&sched->mask_lock);
 
 	return sched->pri_queue[prio];
@@ -263,8 +262,7 @@ static void pri_clr(int prio)
 	odp_spinlock_lock(&sched->mask_lock);
 
 	/* Clear mask bit when last queue is removed*/
-	int count = LOAD_U32(sched->pri_count[prio]);
-	STORE_U32(sched->pri_count[prio], count - 1);
+	sched->pri_count[prio] -= 1;
 
 	odp_spinlock_unlock(&sched->mask_lock);
 }
@@ -395,7 +393,7 @@ static int schedule(odp_queue_t *out_queue, odp_event_t out_ev[],
 
 	for (i = 0; i < ODP_CONFIG_SCHED_PRIOS; i++) {
 
-		if (LOAD_U32(sched->pri_count[i]) == 0)
+		if (sched->pri_count[i] == 0)
 			continue;
 
 		odp_queue_t  pri_q;
@@ -406,15 +404,14 @@ static int schedule(odp_queue_t *out_queue, odp_event_t out_ev[],
 		int num;
 		int qe_grp;
 
-		pri_q = LOAD_PTR(sched->pri_queue[i]);
+		pri_q = sched->pri_queue[i];
 		ev    = odp_queue_deq(pri_q);
 
 		if (ev == ODP_EVENT_INVALID)
 			continue;
 
 		buf   = odp_buffer_from_event(ev);
-		sched_cmd = odp_buffer_addr(buf);
-		INVALIDATE(sched_cmd);
+		sched_cmd = CACHED_TO_UNCACHED(odp_buffer_addr(buf));
 
 		if (sched_cmd->cmd == SCHED_CMD_POLL_PKTIN) {
 			/* Poll packet input */
@@ -436,7 +433,7 @@ static int schedule(odp_queue_t *out_queue, odp_event_t out_ev[],
 
 		if (qe_grp > ODP_SCHED_GROUP_ALL) {
 			const odp_thrmask_t *mask =
-				LOAD_PTR(sched->sched_grp[qe_grp].mask);
+				sched->sched_grp[qe_grp].mask;
 
 			if(!odp_thrmask_isset(mask, thr)) {
 				/* This thread is not eligible for work from
@@ -592,7 +589,6 @@ odp_schedule_group_t odp_schedule_group_create(const char *name,
 	int i;
 
 	odp_spinlock_lock(&sched->grp_lock);
-	INVALIDATE(sched);
 
 	for (i = _ODP_SCHED_GROUP_NAMED; i < ODP_CONFIG_SCHED_GRPS; i++) {
 		if (sched->sched_grp[i].name[0] == 0) {
@@ -613,7 +609,6 @@ int odp_schedule_group_destroy(odp_schedule_group_t group)
 	int ret;
 
 	odp_spinlock_lock(&sched->grp_lock);
-	INVALIDATE(sched);
 
 	if (group < ODP_CONFIG_SCHED_GRPS &&
 	    group >= _ODP_SCHED_GROUP_NAMED &&
@@ -636,7 +631,6 @@ odp_schedule_group_t odp_schedule_group_lookup(const char *name)
 	int i;
 
 	odp_spinlock_lock(&sched->grp_lock);
-	INVALIDATE(sched);
 
 	for (i = _ODP_SCHED_GROUP_NAMED; i < ODP_CONFIG_SCHED_GRPS; i++) {
 		if (strcmp(name, sched->sched_grp[i].name) == 0) {
@@ -655,7 +649,6 @@ int odp_schedule_group_join(odp_schedule_group_t group,
 	int ret;
 
 	odp_spinlock_lock(&sched->grp_lock);
-	INVALIDATE(sched);
 
 	if (group < ODP_CONFIG_SCHED_GRPS &&
 	    group >= _ODP_SCHED_GROUP_NAMED &&
@@ -678,7 +671,6 @@ int odp_schedule_group_leave(odp_schedule_group_t group,
 	int ret;
 
 	odp_spinlock_lock(&sched->grp_lock);
-	INVALIDATE(sched);
 
 	if (group < ODP_CONFIG_SCHED_GRPS &&
 	    group >= _ODP_SCHED_GROUP_NAMED &&
@@ -704,7 +696,6 @@ int odp_schedule_group_thrmask(odp_schedule_group_t group,
 	int ret;
 
 	odp_spinlock_lock(&sched->grp_lock);
-	INVALIDATE(sched);
 
 	if (group < ODP_CONFIG_SCHED_GRPS &&
 	    group >= _ODP_SCHED_GROUP_NAMED &&
