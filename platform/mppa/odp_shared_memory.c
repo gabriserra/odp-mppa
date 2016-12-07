@@ -7,6 +7,7 @@
 /*ftruncate _POSIX_C_SOURCE 200809L */
 #define _POSIX_C_SOURCE 200809L
 
+#include <odp/atomic.h>
 #include <odp/shared_memory.h>
 #include <odp_internal.h>
 #include <odp/spinlock.h>
@@ -263,7 +264,10 @@ void *odp_shm_addr(odp_shm_t shm)
 	if (i > (ODP_CONFIG_SHM_BLOCKS - 1))
 		return NULL;
 
-	return odp_shm_tbl->block[i].addr;
+	if (odp_shm_tbl->block[i].flags & _ODP_SHM_UNCACHED)
+		return CACHED_TO_UNCACHED(odp_shm_tbl->block[i].addr);
+	else
+		return odp_shm_tbl->block[i].addr;
 }
 
 
