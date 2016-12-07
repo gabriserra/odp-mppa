@@ -77,6 +77,14 @@ typedef struct odp_atomic_u32_s odp_atomic_u32_t;
 #define STORE_PTR(p, val) STORE_U32((p), (unsigned long)(val))
 #define STORE_PTR_IMM(p, val) STORE_U32_IMM((p), (unsigned long)(val))
 
+#define UNCACHED_ADDR_BIT 21
+#define UNCACHED_ADDR_MASK (1UL << UNCACHED_ADDR_BIT)
+#define CACHED_ADDR_MASK (~(1UL << UNCACHED_ADDR_BIT))
+#define CACHED_TO_UNCACHED(p) ((typeof(p))\
+			       (((unsigned long)(p)) | UNCACHED_ADDR_MASK))
+#define UNCACHED_TO_CACHED(p) ((typeof(p))\
+			       (((unsigned long)(p)) & CACHED_ADDR_MASK))
+
 #define CAS_PTR(ptr, new, cur) ((void*)(unsigned long)(__builtin_k1_acwsu((void *)(ptr),	\
 									  (unsigned long)(new),	\
 									  (unsigned long)(cur))))
