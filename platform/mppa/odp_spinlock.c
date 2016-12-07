@@ -42,6 +42,7 @@ int odp_spinlock_trylock(odp_spinlock_t *spinlock)
 void odp_spinlock_unlock(odp_spinlock_t *spinlock)
 {
 	__builtin_k1_wpurge();
+	__builtin_k1_fence();
 	_odp_atomic_flag_clear(&spinlock->lock);
 }
 
