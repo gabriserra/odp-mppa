@@ -112,9 +112,9 @@ int odp_schedule_init_global(void)
 
 	shm = odp_shm_reserve("odp_scheduler",
 			      sizeof(sched_t),
-			      ODP_CACHE_LINE_SIZE, 0);
+			      ODP_CACHE_LINE_SIZE, _ODP_SHM_UNCACHED);
 
-	sched = CACHED_TO_UNCACHED(odp_shm_addr(shm));
+	sched = odp_shm_addr(shm);
 
 	if (sched == NULL) {
 		ODP_ERR("Schedule init: Shm reserve failed.\n");
