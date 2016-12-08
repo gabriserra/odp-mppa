@@ -73,6 +73,7 @@ typedef struct {
 	int src_change;		/**< Change source eth addresses */
 	int error_check;        /**< Check packet errors */
 	int pktio_stats;        /**< Show pktio stats before exit */
+	int allow_fail;         /**< Allow some pktios to not be available */
 } appl_args_t;
 
 static int exit_threads;	/**< Break workers loop if set to 1 */
@@ -483,6 +484,7 @@ int main(int argc, char *argv[])
 	odp_pool_param_t params;
 	int ret;
 	stats_t *stats;
+	uint32_t n_pktios = 0;
 
 	/* Init ODP before calling anything else */
 	if (odp_init_global(NULL, NULL)) {
@@ -549,12 +551,35 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < gbl_args->appl.if_count; ++i) {
 		pktio = create_pktio(gbl_args->appl.if_names[i], pool);
-		if (pktio == ODP_PKTIO_INVALID)
-			exit(EXIT_FAILURE);
-		gbl_args->pktios[i] = pktio;
+		if (pktio == ODP_PKTIO_INVALID) {
+			if (!gbl_args->appl.allow_fail)
+				exit(EXIT_FAILURE);
+			/* This couple is broken. Remove them from the list. */
+			if (gbl_args->appl.if_count % 2 != 0) {
+				/* Odd number of if. It's RR so just cancel this one */
+				printf("WARNING: Failed to open interface %s. Skipping it\n",
+				       gbl_args->appl.if_names[i]);
+				continue;
+			} else if (i % 2 == 0) {
+				/* First of the couple. Skip the next one */
+				printf("WARNING: Failed to open interface %s. Skipping it and '%s'\n",
+				       gbl_args->appl.if_names[i],
+				       gbl_args->appl.if_names[i + 1]);
+				i++;
+				continue;
+			} else {
+				/* Second of the couple. Cancel the previous one */
+				printf("WARNING: Failed to open interface %s. Skipping it and '%s'\n",
+				       gbl_args->appl.if_names[i],
+				       gbl_args->appl.if_names[i - 1]);
+				n_pktios--;
+				continue;
+			}
+		}
+		gbl_args->pktios[n_pktios] = pktio;
 
 		/* Save interface ethernet address */
-		if (odp_pktio_mac_addr(pktio, gbl_args->port_eth_addr[i].addr,
+		if (odp_pktio_mac_addr(pktio, gbl_args->port_eth_addr[n_pktios].addr,
 				       ODPH_ETHADDR_LEN) != ODPH_ETHADDR_LEN) {
 			LOG_ERR("Error: interface ethernet address unknown\n");
 			exit(EXIT_FAILURE);
@@ -566,14 +591,22 @@ int main(int argc, char *argv[])
 			memset(&new_addr, 0, sizeof(odph_ethaddr_t));
 			new_addr.addr[0] = 0x02;
 			new_addr.addr[5] = i;
-			gbl_args->dst_eth_addr[i] = new_addr;
+			gbl_args->dst_eth_addr[n_pktios] = new_addr;
 		}
 
 		/* Save interface destination port */
-		gbl_args->dst_port[i] = find_dest_port(i);
+		gbl_args->dst_port[n_pktios] = find_dest_port(n_pktios);
+		n_pktios++;
 	}
 
-	gbl_args->pktios[i] = ODP_PKTIO_INVALID;
+	gbl_args->pktios[n_pktios] = ODP_PKTIO_INVALID;
+	gbl_args->appl.if_count = n_pktios;
+
+	/* If all are broken, exit */
+	if (gbl_args->appl.if_count == 0) {
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
 
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
@@ -723,6 +756,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{"src_change", required_argument, NULL, 's'},
 		{"error_check", required_argument, NULL, 'e'},
 		{"pktio_stats", no_argument, NULL, 'S'},
+		{"allow_fail", no_argument, NULL, 'A'},
 		{"help", no_argument, NULL, 'h'},
 		{NULL, 0, NULL, 0}
 	};
@@ -732,6 +766,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	appl_args->src_change = 1; /* change eth src address by default */
 	appl_args->error_check = 0; /* don't check packet errors by default */
 	appl_args->pktio_stats = 0;
+	appl_args->allow_fail = 0;
 
 	while (1) {
 		opt = getopt_long(argc, argv, "+c:+t:+a:i:m:d:Ss:e:h",
@@ -812,6 +847,9 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 		case 'e':
 			appl_args->error_check = atoi(optarg);
+			break;
+		case 'A':
+			appl_args->allow_fail = 1;
 			break;
 		case 'h':
 			usage(argv[0]);
@@ -903,6 +941,7 @@ static void usage(char *progname)
 	       "  -e, --error_check 0: Don't check packet errors (default)\n"
 	       "                    1: Check packet errors\n"
 	       "  -S, --pktio_stats  : Display pktio statistics before exiting\n"
+	       "  -A, --allow_fail   : Allow a pktio to fail to open. In this case, skip this forward.\n"
 	       "  -h, --help           Display help and exit.\n\n"
 	       " environment variables: ODP_PKTIO_DISABLE_NETMAP\n"
 	       "                        ODP_PKTIO_DISABLE_SOCKET_MMAP\n"
