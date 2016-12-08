@@ -285,6 +285,7 @@ b.target("package") do
     depends = []
     depends.push b.depends_info_struct.new("k1-re","=", options["k1version"], "")
     depends.push b.depends_info_struct.new("k1-dev","=", options["k1version"], "")
+    depends.push b.depends_info_struct.new("k1-mppapcie-odp-dkms","=", release_info.full_version)
 
     if not options["librariesversion"].to_s.empty? then
       depends.push b.depends_info_struct.new("k1-libraries","=", options["librariesversion"], "")
