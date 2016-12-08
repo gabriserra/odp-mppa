@@ -270,7 +270,8 @@ b.target("package") do
     b.logtitle = "Report for odp package."
     cd odp_path
 
-    b.run(:cmd => "cd install/; tar cf ../odp.tar local/k1tools/lib/ local/k1tools/share/odp/firmware local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ local/k1tools/k1*/include local/k1tools/share/doc/ local/k1tools/lib64", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp.tar local/k1tools/lib/ local/k1tools/share/odp/firmware local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ local/k1tools/k1*/include local/k1tools/lib64", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-doc.tar local/k1tools/share/doc/ ", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-tests.tar local/k1tools/share/odp/tests local/k1tools/share/odp/long", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-apps-internal.tar local/k1tools/share/odp/apps", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
@@ -285,6 +286,7 @@ b.target("package") do
     depends = []
     depends.push b.depends_info_struct.new("k1-re","=", options["k1version"], "")
     depends.push b.depends_info_struct.new("k1-dev","=", options["k1version"], "")
+    depends.push b.depends_info_struct.new("k1-odp-doc","=", release_info.full_version)
     depends.push b.depends_info_struct.new("k1-mppapcie-odp-dkms","=", release_info.full_version)
 
     if not options["librariesversion"].to_s.empty? then
@@ -294,6 +296,15 @@ b.target("package") do
     package_description = "K1 ODP package (k1-odp-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp", release_info,
                            package_description,
+                           depends, "/usr", workspace)
+    b.create_package(tar_package, pinfo)
+
+    #K1 ODP Documentation
+    tar_package = File.expand_path("odp-doc.tar")
+    depends = []
+    package_description = "K1 ODP Documentation (k1-odp-doc-#{version}-#{releaseID} sha1 #{sha1})."
+    pinfo = b.package_info("k1-odp-doc", release_info,
+                           package_description, 
                            depends, "/usr", workspace)
     b.create_package(tar_package, pinfo)
 
