@@ -80,6 +80,8 @@ The K1-ODP files will be installed under the
 \item[-]{pktio can now be tied to a specific Rx thread}
 \item[-]{Add a refcount system on packets}
 \item[-]{Add a pktio to receive data from IO clusters}
+\item[-]{Added a default application that allows using a KONIC80 as a
+  dual port netdev.}
 \end{itemize}
 
 \subsubsection{Bug Fixes}
@@ -90,6 +92,24 @@ The K1-ODP files will be installed under the
   loopback}
 \item[-]{Fix a bug in packet Tx which might cause extra data to be sent}
 \end{itemize}
+
+\subsubsection{Netdev}
+A default application to use a KONIC80 is available in the
+K1-odp-runtime package.
+
+It can be started by running
+\begin{lstlisting}
+/usr/local/k1tools/share/odp/apps/odp-netdev/run.sh
+\end{lstlisting}
+
+Once started and if the mppapcie\_odp module is loaded, up to two netdev
+interfaces should be visible from the host.
+Interfaces will only show up if the associated Ethernet port has a
+40Gbps cable plugged in.
+
+These interfaces called \texttt{mpodp0.0.0.0} and
+\texttt{mpodp0.0.1.0} will respectively forward packet to/from the
+first and second 40G port of the KONIC80.
 
 \subsection{K1-ODP 1.6.k5}
 \begin{itemize}
