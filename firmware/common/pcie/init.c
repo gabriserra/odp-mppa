@@ -14,13 +14,16 @@
 #include "netdev.h"
 #include "internal/netdev.h"
 
+#ifndef DDR_BASE_ADDR
 #define DDR_BASE_ADDR			0x80000000
+#endif
+
 #define DIRECTORY_SIZE			(32 * 1024 * 1024)
 #define DDR_BUFFER_BASE_ADDR		(DDR_BASE_ADDR + DIRECTORY_SIZE)
 
 #define MAX_DNOC_TX_PER_PCIE_ETH_IF	16
 
-#define RING_BUFFER_ENTRIES	16
+#define RING_BUFFER_ENTRIES	17
 
 #define BUF_POOL_COUNT	(1 + MPODP_MAX_IF_COUNT)
 
@@ -77,6 +80,9 @@ int pcie_init(int if_count)
 #if defined(MAGIC_SCALL)
 	return 0;
 #endif
+
+	netdev_init();
+
 	if (if_count > MPPA_PCIE_ETH_IF_MAX)
 		return 1;
 
@@ -88,12 +94,12 @@ int pcie_init(int if_count)
 		if_cfgs[i].flags = 0;
 		if_cfgs[i].if_id = i;
 		memcpy(if_cfgs[i].mac_addr, "\x02\xde\xad\xbe\xef", 5);
-		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((odp_rpc_get_cluster_id(0) - 128) << 1);
+		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((mppa_rpc_odp_get_cluster_id(0) - 128) << 1);
 	}
 
-	netdev_init(if_count, if_cfgs);
+	netdev_configure(if_count, if_cfgs);
 	for (int i = 0; i < if_count; ++i){
-		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_control.configs[i].c2h_ring_buf_desc_addr;
+		g_eth_if_cfg[i].rx = (void*)(unsigned long)eth_ctrl->configs[i].c2h_ring_buf_desc_addr;
 	}
 
 	__k1_mb();

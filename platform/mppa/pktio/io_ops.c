@@ -17,5 +17,6 @@ const pktio_if_ops_t * const pktio_if_ops[]  = {
 	&cluster_pktio_ops,
 	&eth_pktio_ops,
 	&pcie_pktio_ops,
+	&ioddr_pktio_ops,
 	NULL
 };

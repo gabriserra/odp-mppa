@@ -784,6 +784,8 @@ int _odp_pktio_stats(odp_pktio_t pktio,
 
 	if (entry->s.ops->stats)
 		ret = entry->s.ops->stats(entry, stats);
+	else
+		memset(stats, 0, sizeof(*stats));
 	unlock_entry(entry);
 	return ret;
 }

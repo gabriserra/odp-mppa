@@ -10,6 +10,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/api/cpu.h>
 
 #ifdef K1_NODEOS
 #include <pthread.h>
@@ -32,6 +33,8 @@ _ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
 
 #include <mppa_noc.h>
 #include <mppa_routing.h>
+
+#include "odp_trace.h"
 
 #include "ucode_fw/ucode_eth_v2.h"
 
@@ -68,15 +71,15 @@ static int eth_destroy(void)
 static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int nb_rules, pkt_rule_t *rules)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
 	uint8_t *payload;
 
 	/*
 	 * RPC Msg to IOETH  #N so the LB will dispatch to us
 	 */
-	odp_rpc_cmd_eth_open_t open_cmd = {
+	mppa_rpc_odp_cmd_eth_open_t open_cmd = {
 		{
 			.ifId = eth->port_id,
 			.dma_if = __k1_get_cluster_id() + eth->rx_config.dma_if,
@@ -98,20 +101,20 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 		if (params->out_mode == ODP_PKTOUT_MODE_DISABLED)
 			open_cmd.tx_enabled = 0;
 	}
-	odp_rpc_t cmd = {
+	mppa_rpc_odp_t cmd = {
 		.data_len = nb_rules * sizeof(pkt_rule_t),
-		.pkt_class = ODP_RPC_CLASS_ETH,
-		.pkt_subtype = ODP_RPC_CMD_ETH_OPEN,
-		.cos_version = ODP_RPC_ETH_VERSION,
+		.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_OPEN,
+		.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 		.inl_data = open_cmd.inl_data,
 		.flags = 0,
 	};
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(eth->slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(eth->slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, rules);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 30 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
@@ -125,6 +128,8 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 
 	eth->tx_if = ack.cmd.eth_open.tx_if;
 	eth->tx_tag = ack.cmd.eth_open.tx_tag;
+	eth->lb_ts_off = ack.cmd.eth_open.lb_ts_off;
+
 	memcpy(eth->mac_addr, ack.cmd.eth_open.mac, 6);
 	eth->mtu = ack.cmd.eth_open.mtu;
 
@@ -325,6 +330,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int ret = 0;
 	int nRx = N_RX_P_ETH;
 	int rr_policy = -1;
+	int rr_offset = 0;
 	int port_id, slot_id;
 	int loopback = 0;
 	int nofree = 0;
@@ -381,7 +387,15 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -467,9 +481,13 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		/* Setup Rx threads */
 		eth->rx_config.dma_if = 0;
 		eth->rx_config.pool = pool;
-		eth->rx_config.pktio_id = slot_id * MAX_ETH_PORTS + port_id;
+		eth->rx_config.if_type = RX_IF_TYPE_ETH;
+		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		ret = rx_thread_link_open(&eth->rx_config, nRx, rr_policy);
+		eth->rx_config.flow_controlled = 0;
+		eth->rx_config.pktio = &pktio_entry->s;
+		ret = rx_thread_link_open(&eth->rx_config, nRx, rr_policy,
+					  rr_offset, -1, -1);
 		if(ret < 0)
 			return -1;
 	}
@@ -516,22 +534,22 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	int slot_id = eth->slot_id;
 	int port_id = eth->port_id;
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
-	odp_rpc_cmd_eth_clos_t close_cmd = {
+	mppa_rpc_odp_cmd_eth_clos_t close_cmd = {
 		{
 			.ifId = port_id
 
 		}
 	};
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t cmd = {
-		.pkt_class = ODP_RPC_CLASS_ETH,
-		.pkt_subtype = ODP_RPC_CMD_ETH_CLOS,
+	mppa_rpc_odp_t cmd = {
+		.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_CLOS,
 		.data_len = 0,
 		.flags = 0,
-		.cos_version = ODP_RPC_ETH_VERSION,
+		.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 		.inl_data = close_cmd.inl_data
 	};
 	uint8_t *payload;
@@ -539,11 +557,11 @@ static int eth_close(pktio_entry_t * const pktio_entry)
 	/* Free packets being sent by DMA */
 	tx_uc_flush(eth_get_ctx(eth));
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
@@ -566,31 +584,31 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	int slot_id = eth->slot_id;
 	int port_id = eth->port_id;
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
-	odp_rpc_cmd_eth_state_t state_cmd = {
+	mppa_rpc_odp_cmd_eth_state_t state_cmd = {
 		{
 			.ifId = port_id,
 			.enabled = enabled,
 		}
 	};
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t cmd = {
-		.pkt_class = ODP_RPC_CLASS_ETH,
-		.pkt_subtype = ODP_RPC_CMD_ETH_STATE,
+	mppa_rpc_odp_t cmd = {
+		.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_STATE,
 		.data_len = 0,
 		.flags = 0,
-		.cos_version = ODP_RPC_ETH_VERSION,
+		.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 		.inl_data = state_cmd.inl_data
 	};
 	uint8_t *payload;
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
@@ -631,10 +649,11 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 {
 	int n_packet;
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+	const unsigned int core = odp_cpu_id();
 
-	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring,
+	n_packet = odp_buffer_ring_get_multi(eth->rx_config.ring[core],
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	for (int i = 0; i < n_packet; ++i) {
 		odp_packet_t pkt = pkt_table[i];
@@ -642,6 +661,8 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		uint8_t * const base_addr =
 			((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			pkt_hdr->headroom;
+
+		mppa_tracepoint(odp, eth_recv, pkt_hdr);
 
 		INVALIDATE(pkt_hdr);
 		packet_parse_reset(pkt_hdr);
@@ -704,36 +725,36 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 {
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
 	uint8_t *payload;
-	odp_rpc_payload_eth_get_stat_t *rpc_stats;
+	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats;
 
 	/*
 	 * RPC Msg to IOETH  #N so the LB will dispatch to us
 	 */
-	odp_rpc_cmd_eth_get_stat_t stat_cmd = {
+	mppa_rpc_odp_cmd_eth_get_stat_t stat_cmd = {
 		{
 			.ifId = eth->port_id,
 			.link_stats = 1,
 		}
 	};
 
-	odp_rpc_t cmd = {
+	mppa_rpc_odp_t cmd = {
 		.data_len = 0,
-		.pkt_class = ODP_RPC_CLASS_ETH,
-		.pkt_subtype = ODP_RPC_CMD_ETH_GET_STAT,
-		.cos_version = ODP_RPC_ETH_VERSION,
+		.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_GET_STAT,
+		.cos_version = MPPA_RPC_ODP_ETH_VERSION,
 		.inl_data = stat_cmd.inl_data,
 		.flags = 0,
 	};
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(eth->slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(eth->slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 2 * ODP_RPC_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 2 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return -1;
 
@@ -745,10 +766,10 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 		return -1;
 	}
 
-	if (ack_msg->data_len != sizeof(odp_rpc_payload_eth_get_stat_t))
+	if (ack_msg->data_len != sizeof(mppa_rpc_odp_payload_eth_get_stat_t))
 		return -1;
 
-	rpc_stats = (odp_rpc_payload_eth_get_stat_t*)payload;
+	rpc_stats = (mppa_rpc_odp_payload_eth_get_stat_t*)payload;
 
 	stats->in_octets         = rpc_stats->in_octets;
 	stats->in_ucast_pkts     = rpc_stats->in_ucast_pkts;

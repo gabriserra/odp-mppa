@@ -6,6 +6,7 @@ include $(top_srcdir)/platform/Makefile.inc
 AM_CFLAGS +=  -I$(srcdir)/include
 AM_CFLAGS +=  -I$(top_srcdir)/include
 AM_CFLAGS +=  -I$(top_srcdir)/helper/include
+AM_CFLAGS +=  -DMPPA_TRACE_ENABLE
 
 include_HEADERS = \
 		  $(top_srcdir)/include/odp.h
@@ -93,10 +94,12 @@ odprpcinclude_HEADERS = \
 		  $(srcdir)/include/odp/rpc/helpers.h \
 		  $(srcdir)/include/odp/rpc/pcie.h \
 		  $(srcdir)/include/odp/rpc/rnd.h \
+		  $(srcdir)/include/odp/rpc/fp.h \
 		  $(srcdir)/include/odp/rpc/rpc.h
 
 
-noinst_HEADERS = \
+odpinternalincludedir= $(oldincludedir)/odp/internal
+odpinternalinclude_HEADERS = \
 		  $(srcdir)/include/odp_align_internal.h \
 		  $(srcdir)/include/odp_atomic_internal.h \
 		  $(srcdir)/include/odp_buffer_inlines.h \
@@ -109,6 +112,7 @@ noinst_HEADERS = \
 		  $(srcdir)/include/odp_debug_internal.h \
 		  $(srcdir)/include/odp_forward_typedefs_internal.h \
 		  $(srcdir)/include/odp_internal.h \
+		  $(srcdir)/include/odp_macros_internal.h \
 		  $(srcdir)/include/odp_packet_internal.h \
 		  $(srcdir)/include/odp_packet_io_internal.h \
 		  $(srcdir)/include/odp_packet_io_queue.h \
@@ -119,7 +123,9 @@ noinst_HEADERS = \
 		  $(srcdir)/include/odp_spin_internal.h \
 		  $(srcdir)/include/odp_timer_internal.h \
 		  $(srcdir)/include/odp_timer_types_internal.h \
-		  $(srcdir)/include/odp_tx_uc_internal.h \
+		  $(srcdir)/include/odp_tx_uc_internal.h
+
+noinst_HEADERS = \
 		  $(srcdir)/Makefile.inc
 
 
@@ -144,6 +150,7 @@ __LIB__libodp_la_SOURCES = \
 			   pktio/io_ops.c \
 			   pktio/eth.c \
 			   pktio/pcie.c \
+			   pktio/ioddr.c \
 			   pktio/cluster.c \
 			   pktio/drop.c \
 			   pktio/magic.c \

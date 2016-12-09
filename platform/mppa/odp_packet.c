@@ -20,6 +20,12 @@
 #include <errno.h>
 #include "odp_rx_internal.h"
 
+
+#define MPPA_TRACEPOINT_DEFINE
+#include "odp_trace.h"
+
+#define MPPA_CREATE_TRACEPOINT
+#include "mppa_trace.h"
 /*
  *
  * Alloc and free
@@ -49,16 +55,25 @@ void packet_parse_reset(odp_packet_hdr_t *pkt_hdr)
 	pkt_hdr->l4_protocol      = 0;
 }
 
+void _odp_packet_mark_nofree(odp_packet_t pkt)
+{
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	odp_atomic_store_u32(&pkt_hdr->nofree, 1);
+}
+
 /**
  * Initialize packet buffer
  */
 void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 		 size_t size, int parse)
 {
+	mppa_tracepoint(odp, packet_init, pkt_hdr);
+
        /*
 	* Reset parser metadata.  Note that we clear via memset to make
 	* this routine indepenent of any additional adds to packet metadata.
 	*/
+
 	const size_t start_offset = ODP_FIELD_SIZEOF(odp_packet_hdr_t, buf_hdr);
 	uint8_t *start;
 	size_t len;
@@ -67,11 +82,15 @@ void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 	len = sizeof(odp_packet_hdr_t) - start_offset;
 	memset(start, 0, len);
 
+	memset(pkt_hdr->sub_packets, 0,
+	       sizeof(odp_packet_hdr_t*) * _ODP_MAX_SUBPACKETS);
+
 	/* Set metadata items that initialize to non-zero values */
 	pkt_hdr->l2_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->l3_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->l4_offset = ODP_PACKET_OFFSET_INVALID;
 	pkt_hdr->payload_offset = ODP_PACKET_OFFSET_INVALID;
+	odp_atomic_init_u32(&pkt_hdr->nofree, 0);
 
  	/* Disable lazy parsing on user allocated packets */
 	if (!parse)
@@ -142,6 +161,10 @@ int odp_packet_alloc_multi(odp_pool_t pool_hdl, uint32_t len,
 void odp_packet_free(odp_packet_t pkt)
 {
 	odp_packet_hdr_t *const pkt_hdr = (odp_packet_hdr_t *)(pkt);
+	if (odp_global_data.enable_pkt_nofree)
+		if (_odp_atomic_u32_fetch_sub_mm(&pkt_hdr->nofree, 1, 0) != 0)
+			return;
+
 	if (pkt_hdr->input != ODP_PKTIO_INVALID){
 		ret_buf(&((pool_entry_t*)pkt_hdr->buf_hdr.pool_hdl)->s,
 			(odp_buffer_hdr_t **)&pkt_hdr, 1);
@@ -152,7 +175,21 @@ void odp_packet_free(odp_packet_t pkt)
 
 void odp_packet_free_multi(const odp_packet_t pkt[], int num)
 {
-	odp_buffer_free_multi((const odp_buffer_t *)pkt, num);
+	int free_base = 0;
+	if (odp_global_data.enable_pkt_nofree) {
+		for (int i = 0; i < num; ++i) {
+			/* If it's 1 someone else will free it. If it's -1 someone else freed
+			 * it and it should not have happened. */
+			if (_odp_atomic_u32_fetch_sub_mm(&odp_packet_hdr(pkt[i])->nofree, 1, 0) == 0)
+				continue;
+
+			/* We should not free this one. Free previous ones and skip to next */
+			odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), i - free_base);
+			free_base = i + 1;
+		}
+	}
+	if (free_base < num)
+		odp_buffer_free_multi((const odp_buffer_t *)(pkt + free_base), num - free_base);
 }
 
 int odp_packet_reset(odp_packet_t pkt, uint32_t len)
@@ -174,6 +211,44 @@ int odp_packet_reset(odp_packet_t pkt, uint32_t len)
  * ********************************************************
  *
  */
+
+int odp_packet_is_segmented(odp_packet_t pkt)
+{
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	return pkt_hdr->sub_packets[0] != NULL;
+}
+
+int odp_packet_num_segs(odp_packet_t pkt)
+{
+	int i;
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+
+	for (i = 0; i < _ODP_MAX_SUBPACKETS; ++i) {
+		if (!pkt_hdr->sub_packets[i])
+			return i + 1;
+	}
+	return 1 ;
+}
+
+int _odp_packet_fragment(odp_packet_t pkt,
+			 odp_packet_t sub_pkts[_ODP_MAX_SUBPACKETS + 1])
+{
+	int i, count = 1;
+	odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t *)pkt;
+	sub_pkts[0] = pkt;
+
+	for (i = 0; i < _ODP_MAX_SUBPACKETS; ++i) {
+		if(!pkt_hdr->sub_packets[i])
+			break;
+
+		sub_pkts[count++] = pkt_hdr->sub_packets[i];
+	}
+
+	memset(pkt_hdr->sub_packets, 0,
+	       sizeof(odp_packet_hdr_t*) * _ODP_MAX_SUBPACKETS);
+
+	return count;
+}
 
 void *odp_packet_head(odp_packet_t pkt)
 {

@@ -99,7 +99,7 @@ static void mppa_pcie_pcie_tx_sender()
 	unsigned int i = 0;
 
 	while(1) {
-		for (i = 0; i < *(volatile uint32_t*)&(eth_control.if_count); i++)
+		for (i = 0; i < *(volatile uint32_t*)&(eth_ctrl->if_count); i++)
 			poll_noc_rx_buffer(i);
 	}
 }
@@ -159,7 +159,7 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
-		  tx_credit_t *tx_credit, odp_rpc_answer_t *answer)
+		  tx_credit_t *tx_credit, mppa_rpc_odp_answer_t *answer)
 {
 	int rx_thread_num = if_id / RX_THREAD_COUNT;
 	int th_iface_id = if_id % IF_PER_THREAD;

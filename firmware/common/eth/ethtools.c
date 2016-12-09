@@ -19,8 +19,10 @@
 #include "internal/eth.h"
 #include <odp/rpc/helpers.h>
 
+uint64_t lb_timestamp = 0xFFFFFFFFFFFFFFFULL;
+
 enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
-							odp_rpc_answer_t *answer)
+							mppa_rpc_odp_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	enum mppa_eth_mac_ethernet_mode_e link_speed =
@@ -42,11 +44,15 @@ enum mppa_eth_mac_ethernet_mode_e ethtool_get_mac_speed(unsigned if_id,
 	}
 	return link_speed;
 }
-
+static int first_header = 0;
 int ethtool_init_lane(int eth_if)
 {
 	mppabeth_lb_cfg_header_mode((void *)&(mppa_ethernet[0]->lb),
 				    eth_if, MPPABETHLB_ADD_HEADER);
+	if(first_header == 0){
+		lb_timestamp = __k1_read_dsu_timestamp();
+		first_header = 1;
+	}
 
 	mppabeth_lb_cfg_table_rr_dispatch_trigger((void *)&(mppa_ethernet[0]->lb),
 						  ETH_MATCHALL_TABLE_ID,
@@ -58,7 +64,7 @@ int ethtool_init_lane(int eth_if)
 }
 
 int ethtool_open_cluster(unsigned remoteClus, unsigned if_id,
-			 odp_rpc_answer_t *answer)
+			 mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 	if (if_id == 4) {
@@ -89,7 +95,7 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 			   int nocIf, int externalAddress,
 			   int min_rx, int max_rx,
 			   int min_payload, int max_payload,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_answer_t *answer)
 {
 	int ret;
 
@@ -101,9 +107,50 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 	if (!status[eth_if].cluster[remoteClus].rx_enabled)
 		return 0;
 
-	ret = mppa_routing_get_dnoc_unicast_route(externalAddress,
-						  odp_rpc_undensify_cluster_id(remoteClus),
+	int src_node=-1;
+	/* Because of a HW bug, we route all outgoing flows through the flying noc link.
+	   Easiest way to do this is calculate the route from the opposite IO DMA and 
+	   then shift in the flying noc at the beginning. See T1600. Note that obviously
+	   this trick won't work once the bug is fixed in the librouting as the resulting
+	   route will leave the opposite IO over the flying NoC... TODO: Fix me */
+	switch(externalAddress){
+	case 160:
+		src_node = 224;
+		break;
+	case 161:
+		src_node = 225;
+		break;
+	case 162:
+		src_node = 226;
+		break;
+	case 163:
+		src_node = 227;
+		break;
+	case 224:
+		src_node = 160;
+		break;
+	case 225:
+		src_node = 161;
+		break;
+	case 226:
+		src_node = 162;
+		break;
+	case 227:
+		src_node = 163;
+		break;
+	default:
+		printf("Bad external address\n");
+		return -1;
+	}
+
+	ret = mppa_routing_get_dnoc_unicast_route(src_node,
+						  mppa_rpc_odp_undensify_cluster_id(remoteClus),
 						  &config, &header);
+
+	/* Shift the first direction calculated by the lib routing into the route */
+	header._.route = (header._.route << 2) | (config._.first_dir & 3);
+	config._.first_dir = 2; /* East, AKA Flying NoC from the IOs */
+
 	if (ret != MPPA_ROUTING_RET_SUCCESS) {
 		ETH_RPC_ERR_MSG(answer,
 				"Failed to route to cluster %d\n", remoteClus);
@@ -169,9 +216,10 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 	return 0;
 }
 
+extern int phy_status;
 
 int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_answer_t *answer)
 {
 	int ret;
 	unsigned rx_port;
@@ -252,7 +300,7 @@ int ethtool_setup_clus2eth(unsigned remoteClus, int if_id, int nocIf,
 }
 
 int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
-		       odp_rpc_answer_t *answer)
+		       mppa_rpc_odp_answer_t *answer)
 {
 	int ret;
 	int eth_if = if_id % 4;
@@ -272,6 +320,16 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 
 	switch (status[eth_if].initialized) {
 	case ETH_LANE_OFF:
+		if (if_id == 4) {
+			for (int i = 0; i < N_ETH_LANE; ++i) {
+				if (status[i].initialized != ETH_LANE_ON)
+					continue;
+				ETH_RPC_ERR_MSG(answer,
+						"One lane was enabled in 1 or 10G. Cannot set lane %d in 40G\n",
+						eth_if);
+				return -1;
+			}
+		}
 		if (loopback) {
 			if (verbose)
 				printf("[ETH] Initializing lane %d in loopback\n", eth_if);
@@ -296,8 +354,9 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 			ret = mppa_eth_utils_init_mac(eth_if, link_speed);
 			switch(ret){
 			case BAD_VENDOR:
-				fprintf(stderr,
-					"[ETH] Warning: QSFP coonector is not supported\n");
+				ETH_RPC_ERR_MSG(answer,
+						"[ETH] Warning: QSFP coonector is not supported\n");
+				return -1;
 				break;
 			case -EBUSY:
 				/* lane is already configured. Ignore */
@@ -358,7 +417,7 @@ int ethtool_start_lane(unsigned if_id, int loopback, int verbose,
 }
 
 int ethtool_stop_lane(unsigned if_id,
-		      odp_rpc_answer_t *answer __attribute__((unused)))
+		      mppa_rpc_odp_answer_t *answer __attribute__((unused)))
 {
 	const int eth_if = if_id % 4;
 
@@ -403,7 +462,7 @@ static int compare_rule_entries(const pkt_rule_entry_t entry1,
 }
 
 static int check_rules_identical(const pkt_rule_t *rules, int nb_rules,
-				 odp_rpc_answer_t *answer)
+				 mppa_rpc_odp_answer_t *answer)
 {
 	for ( int rule_id = 0; rule_id < nb_rules; ++rule_id ) {
 		for ( int entry_id = 0; entry_id < rules[rule_id].nb_entries; ++entry_id ) {
@@ -494,84 +553,181 @@ static uint64_t h2n_order(uint64_t host_value, uint8_t cmp_mask)
 	return reordered_value.d;
 }
 
-int ethtool_apply_rules(unsigned remoteClus, unsigned if_id,
-			int nb_rules, const pkt_rule_t rules[nb_rules],
-			odp_rpc_answer_t *answer )
+static void
+ethtool_add_mac_match_entry(int hw_rule_id, uint64_t mac)
+{
+	/* Add a filter to make sure we match the target mac */
+	unsigned entry_id = 9;
+
+#ifdef VERBOSE
+		printf("[ETH] Entry[%d] added to rule [%d] for Mac %llx added\n",
+		       entry_id, hw_rule_id, (long long unsigned)mac);
+#endif
+	mppabeth_lb_cfg_rule((void *) &(mppa_ethernet[0]->lb),
+			     hw_rule_id, entry_id,
+			     0, 0x3f, h2n_order(mac, 0x3f), 0);
+	mppabeth_lb_cfg_min_max_swap((void *) &(mppa_ethernet[0]->lb),
+				     hw_rule_id, (entry_id >> 1), 0);
+}
+
+static void
+ethtool_add_entry(int hw_rule_id, const pkt_rule_t *rule,
+		  int rule_id __attribute__((unused)), int entry_id)
+{
+#ifdef VERBOSE
+	printf("Rule[%d] => HWRule[%d] (P%d) Entry[%d]: offset %d cmp_mask 0x%02x cmp_value "
+	       "0x%016llx hash_mask 0x%02x>\n",
+	       rule_id, hw_rule_id,
+	       rule->priority,
+	       entry_id,
+	       rule->entries[entry_id].offset,
+	       rule->entries[entry_id].cmp_mask,
+	       rule->entries[entry_id].cmp_value,
+	       rule->entries[entry_id].hash_mask);
+#endif
+	mppabeth_lb_cfg_rule((void *) &(mppa_ethernet[0]->lb),
+			     hw_rule_id, entry_id,
+			     rule->entries[entry_id].offset,
+			     rule->entries[entry_id].cmp_mask,
+			     rule->entries[entry_id].cmp_value,
+			     rule->entries[entry_id].hash_mask);
+	mppabeth_lb_cfg_min_max_swap((void *) &(mppa_ethernet[0]->lb),
+				     hw_rule_id, (entry_id >> 1), 0);
+}
+
+static void
+ethtool_add_rule(int hw_rule_id, const pkt_rule_t *rule, int rule_id, uint64_t mac)
+{
+	for ( int entry_id = 0; entry_id < rule->nb_entries; ++entry_id) {
+		ethtool_add_entry(hw_rule_id, rule, rule_id, entry_id);
+	}
+	if (lb_status.dual_mac) {
+		ethtool_add_mac_match_entry(hw_rule_id, mac);
+	}
+}
+
+static int
+ethtool_configure_rules(int hw_rule_id, int nb_rules,
+			const pkt_rule_t rules[nb_rules],
+			uint64_t mac)
+{
+	for (int rule_id = 0; rule_id < nb_rules; ++rule_id, ++hw_rule_id) {
+		ethtool_add_rule(hw_rule_id, &rules[rule_id], rule_id, mac);
+		/* Set rule to DROP mode by default.
+		 * It'll be enabled when a cluster is enabled */
+		mppabeth_lb_cfg_extract_table_mode((void *) &(mppa_ethernet[0]->lb),
+						   hw_rule_id,
+						   rules[rule_id].priority,
+						   MPPA_ETHERNET_DISPATCH_POLICY_DROP);
+	}
+
+	/* Note: in MAC_MATCH, we end up here but did nothing to the LB
+	 * because nb_rules = 0. Rules will be created when a cluster first enables
+	 * a lane with rule_id = lane_id */
+
+	return hw_rule_id;
+}
+
+static inline uint64_t
+ethtool_mac_to_64(unsigned eth_if) {
+	uint64_t mac;
+	memcpy(&mac, status[eth_if].mac_address[1], ETH_ALEN);
+	return __builtin_bswap64(mac << 16);
+}
+
+int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
+			     int fallthrough, int nb_rules,
+			     const pkt_rule_t rules[nb_rules],
+			     mppa_rpc_odp_answer_t *answer )
 {
 	const int eth_if = if_id % 4;
-
-	if (!nb_rules) {
+	eth_cluster_policy_t policy;
+	if (fallthrough) {
+		policy = ETH_CLUS_POLICY_FALLTHROUGH;
+	} else if (!nb_rules) {
 		if (lb_status.dual_mac)
-			status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_MAC_MATCH;
-		else
-			status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_FALLTHROUGH;
-		return 0;
+			policy = ETH_CLUS_POLICY_MAC_MATCH;
+		else {
+			policy = ETH_CLUS_POLICY_FALLTHROUGH;
+		}
+	} else {
+		policy = ETH_CLUS_POLICY_HASH;
 	}
+
+	status[eth_if].cluster[remoteClus].policy = policy;
+	status[eth_if].refcounts.policy[policy]++;
+
+	/* In fallthrough, the LB should not be touched */
+	if (policy == ETH_CLUS_POLICY_FALLTHROUGH)
+		return 0;
 
 #ifdef VERBOSE
 	printf("Applying %d rules for cluster %d\n", nb_rules, remoteClus);
 #endif
 
-	if (!lb_status.enabled) {
-		/* No Hash rules yet. Make sure no one opened anything yet */
-		for (int i =0; i < N_ETH_LANE; ++i){
-			if (status[i].initialized != ETH_LANE_OFF) {
-				ETH_RPC_ERR_MSG(answer, "Lane %d already opened without hashpolicy\n", i);
-				return -1;
-			}
+	if (lb_status.enabled) {
+		/* Some one already configure the LB.
+		 * Just make sure rules are a match */
+		if ( check_rules_identical(rules, nb_rules, answer) ) {
+			ETH_RPC_ERR_MSG(answer, "Lane already opened with different rules\n");
+			return -1;
 		}
-		/* Configure the LB */
-		for (int i = 0, hw_rule_id = 0; i < ((lb_status.dual_mac && if_id < 4) ? 4 : 1); ++i) {
-			uint64_t mac = 0;
-
-			for (int rule_id = 0; rule_id < nb_rules; ++rule_id, ++hw_rule_id) {
-				for ( int entry_id = 0; entry_id < rules[rule_id].nb_entries; ++entry_id) {
-#ifdef VERBOSE
-					printf("Rule[%d] => [%d] (P%d) Entry[%d]: offset %d cmp_mask 0x%02x cmp_value "
-					       "0x%016llx hash_mask 0x%02x>\n",
-					       rule_id, hw_rule_id,
-					       rules[rule_id].priority,
-					       entry_id,
-					       rules[rule_id].entries[entry_id].offset,
-					       rules[rule_id].entries[entry_id].cmp_mask,
-					       rules[rule_id].entries[entry_id].cmp_value,
-					       rules[rule_id].entries[entry_id].hash_mask);
-#endif
-					mppabeth_lb_cfg_rule((void *) &(mppa_ethernet[0]->lb),
-							     hw_rule_id, entry_id,
-							     rules[rule_id].entries[entry_id].offset,
-							     rules[rule_id].entries[entry_id].cmp_mask,
-							     rules[rule_id].entries[entry_id].cmp_value,
-							     rules[rule_id].entries[entry_id].hash_mask);
-					mppabeth_lb_cfg_min_max_swap((void *) &(mppa_ethernet[0]->lb),
-								     hw_rule_id, (entry_id >> 1), 0);
-				}
-				if (lb_status.dual_mac) {
-					/* Add a filter to make sure we match the target mac */
-					unsigned entry_id = rules[rule_id].nb_entries;
-					mppabeth_lb_cfg_rule((void *) &(mppa_ethernet[0]->lb),
-							     hw_rule_id, entry_id,
-							     0, 0x3f, h2n_order(mac, 0x3f), 0);
-					mppabeth_lb_cfg_min_max_swap((void *) &(mppa_ethernet[0]->lb),
-								     hw_rule_id, (entry_id >> 1), 0);
-				}
-				mppabeth_lb_cfg_extract_table_mode((void *) &(mppa_ethernet[0]->lb),
-								   hw_rule_id,
-								   rules[rule_id].priority,
-								   MPPA_ETHERNET_DISPATCH_POLICY_DROP);
-			}
-		}
-		lb_status.enabled = 1;
-		lb_status.nb_rules = ((lb_status.dual_mac && if_id < 4) ? 4 : 1) * nb_rules;
-	} else if ( check_rules_identical(rules, nb_rules, answer) ) {
-		return -1;
+		return 0;
 	}
-	status[eth_if].cluster[remoteClus].policy = ETH_CLUS_POLICY_HASH;
+
+	/* If we are in MAC MATCH mode, we have nothing to do here.
+	 * Rule is created when ENABLE command is received */
+	if (!nb_rules)
+		return 0;
+	/* No Hash rules yet. Make sure no one opened anything yet */
+	for (int i =0; i < N_ETH_LANE; ++i){
+		if (status[i].initialized == ETH_LANE_OFF)
+			continue;
+
+		/* In standard (not dual mac) mode, a cluster opened
+		 * the interface without rules. This is not allowed */
+		if(!lb_status.dual_mac)
+			goto lane_opened_err;
+
+		/* In dual mac mode, check for OPEN_DEF might have been executed
+		 * this is allowed as they are in passthrough.
+		 * We need to make sure no cluster opened the interface
+		 * without rules (MAC_MATCH) */
+		for(int j = 0; j < RPC_MAX_CLIENTS; ++j) {
+			if(status[i].cluster[j].opened != ETH_CLUS_STATUS_OFF &&
+			   status[i].cluster[j].policy == ETH_CLUS_POLICY_MAC_MATCH)
+				goto lane_opened_err;
+		}
+	}
+
+	/* Configure the LB */
+	/* This is a little bit tricky.
+	 * - In non dual mac mode, rules are the one the user provided.
+	 * - In dual mac / 40G, we setup the rules once and add an entry that matches the 40G MAC
+	 * address at the end.
+	 * - In dual mac / 1-10G, we setup the rules 4 times each time adding
+	 *   an entry that matches the mac of the N-th ethernet lane */
+	int hw_rule_id = 0;
+	for (int i = 0; i < ((lb_status.dual_mac && if_id < 4) ? 4 : 1); ++i) {
+		uint64_t mac = ethtool_mac_to_64(i);
+
+		/* Setup the rules */
+		hw_rule_id = ethtool_configure_rules(hw_rule_id, nb_rules, rules, mac);
+	}
+
+	lb_status.enabled = 1;
+	lb_status.nb_rules = hw_rule_id;
+
 	return 0;
+
+ lane_opened_err:
+	ETH_RPC_ERR_MSG(answer, "Lane already opened without hashpolicy\n");
+	return -1;
+
 }
 
 int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
-			   odp_rpc_answer_t *answer)
+			   mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 	const int noc_if = status[eth_if].cluster[remoteClus].nocIf;
@@ -608,20 +764,33 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 
 		unsigned long long start = __k1_read_dsu_timestamp();
 		int up = 0;
-		while (__k1_read_dsu_timestamp() - start < 3ULL * __bsp_frequency) {
-			if (!mppa_eth_utils_mac_poll_state(eth_if, link_speed)) {
-				up = 1;
-				break;
+		int attempt = 0;
+		int max_attempt = 10;
+		do
+		{
+			while (__k1_read_dsu_timestamp() - start < 3ULL * __bsp_frequency) {
+				if (mppa_eth_utils_mac_poll_state(eth_if, link_speed) == 0) {
+					up = 1;
+					break;
+				}
 			}
-		}
+			if(up != 1) {
+				phy_status = -1;
+				mppa_eth_utils_init_mac(eth_if, link_speed);
+				attempt++;
+				printf("[ETH] Reinitializing lane %d (%d times over %d\n", eth_if,attempt, max_attempt);
+			}
+			start = __k1_read_dsu_timestamp();
+		}while(!up && attempt <= max_attempt);
+
 		if (!up) {
 			ETH_RPC_ERR_MSG(answer, "No carrier on lane %d\n", eth_if);
 			return -1;
 		}
+
 	}
 
 	status[eth_if].cluster[remoteClus].enabled = 1;
-	status[eth_if].refcounts.policy[policy]++;
 	status[eth_if].refcounts.enabled++;
 
 	if (!status[eth_if].cluster[remoteClus].rx_enabled)
@@ -651,15 +820,12 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 		break;
 	case ETH_CLUS_POLICY_MAC_MATCH:
 		if (!status[eth_if].rx_refcounts.policy[ETH_CLUS_POLICY_MAC_MATCH]) {
-			const uint64_t mac = 0ULL;
-			/* "MATCH_ALL" Rule */
-			mppabeth_lb_cfg_rule((void *)&(mppa_ethernet[0]->lb),
-					     eth_if, ETH_MATCHALL_RULE_ID,
-					     /* offset */ 0, /* Cmp Mask */0x3f,
-					     /* Espected Value */ h2n_order(mac, 0x3f),
-					     /* Hash. Unused */0);
+			/* First enable on this lane. Configure a MAC match
+			 * only rules in round robin to dispatch matching
+			 * traffic to all MAC_MATCH clusters */
+			ethtool_add_mac_match_entry(eth_if, ethtool_mac_to_64(eth_if));
 			mppabeth_lb_cfg_extract_table_mode((void *)&(mppa_ethernet[0]->lb),
-							   ETH_MATCHALL_TABLE_ID, /* Priority */ 0,
+							   eth_if, /* Priority */ 0,
 							   MPPABETHLB_DISPATCH_POLICY_RR);
 		}
 		status[eth_if].rx_refcounts.policy[ETH_CLUS_POLICY_MAC_MATCH]++;
@@ -678,7 +844,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
-			    odp_rpc_answer_t *answer)
+			    mppa_rpc_odp_answer_t *answer)
 {
 
 	const int eth_if = if_id % 4;
@@ -706,7 +872,6 @@ int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
 		return -1;
 	}
 	status[eth_if].cluster[remoteClus].enabled = 0;
-	status[eth_if].refcounts.policy[policy]--;
 	status[eth_if].refcounts.enabled--;
 
 	if (!status[eth_if].cluster[remoteClus].rx_enabled)
@@ -749,13 +914,14 @@ int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
-			  odp_rpc_answer_t *answer)
+			  mppa_rpc_odp_answer_t *answer)
 {
 	int eth_if = if_id % 4;
 	int noc_if = status[eth_if].cluster[remoteClus].nocIf;
 	int tx_id = status[eth_if].cluster[remoteClus].txId;
 	int rx_tag = status[eth_if].cluster[remoteClus].rx_tag;
 	int fifo_id = status[eth_if].cluster[remoteClus].eth_tx_fifo;
+	const eth_cluster_policy_t policy = status[eth_if].cluster[remoteClus].policy;
 
 	if (if_id == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i)
@@ -790,12 +956,18 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
 
 	}
 	status[eth_if].refcounts.opened--;
+	status[eth_if].refcounts.policy[policy]--;
 
-	if (!status[eth_if].refcounts.opened)
-		if(ethtool_stop_lane(if_id, answer))
-			return -1;
+	if (status[eth_if].refcounts.opened)
+		goto cleanup_cluster_status;
 
-	if (status[eth_if].cluster[remoteClus].policy == ETH_CLUS_POLICY_HASH) {
+	/* From now on, we know we are closing the last
+	 * cluster that was using this lane */
+
+	if(ethtool_stop_lane(if_id, answer))
+		return -1;
+
+	if (policy == ETH_CLUS_POLICY_HASH) {
 		/* If we were the last hash policy. Clear up the tables
 		 * and reset the LB hash data */
 		int hash_global_count = 0;
@@ -811,6 +983,8 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
 			lb_status.enabled = 0;
 		}
 	}
+
+ cleanup_cluster_status:
 	if (if_id == 4) {
 		for (int i = 0; i < N_ETH_LANE; ++i) {
 			_eth_cluster_status_init(&status[i].cluster[remoteClus]);
@@ -822,7 +996,7 @@ int ethtool_close_cluster(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_set_dual_mac(int enable,
-			 odp_rpc_answer_t *answer)
+			 mppa_rpc_odp_answer_t *answer)
 {
 	if (lb_status.dual_mac == enable)
 		return 0;
@@ -854,7 +1028,7 @@ int ethtool_poll_lane(unsigned if_id)
 	return 0;
 }
 int ethtool_lane_stats(unsigned if_id,
-		       odp_rpc_answer_t *answer)
+		       mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
 
@@ -864,8 +1038,8 @@ int ethtool_lane_stats(unsigned if_id,
 		return -1;
 	}
 
-	odp_rpc_payload_eth_get_stat_t *stats =
-		(odp_rpc_payload_eth_get_stat_t *)answer->payload;
+	mppa_rpc_odp_payload_eth_get_stat_t *stats =
+		(mppa_rpc_odp_payload_eth_get_stat_t *)answer->payload;
 	answer->payload_len = sizeof(*stats);
 
 	if (lb_status.loopback){

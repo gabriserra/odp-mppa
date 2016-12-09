@@ -1,5 +1,5 @@
-#ifndef __ODP_RPC_API_H__
-#define __ODP_RPC_API_H__
+#ifndef __MPPA_RPC_ODP_API_H__
+#define __MPPA_RPC_ODP_API_H__
 
 #include <odp/rpc/rpc.h>
 
@@ -7,23 +7,23 @@
  * Initialize the RPC client.
  * Allocate recption buffer and Rx
  */
-int odp_rpc_client_init(void);
+int mppa_rpc_odp_client_init(void);
 
 /**
  * Close a RPC client
- * Free resource allocated by #odp_rpc_client_init
+ * Free resource allocated by #mppa_rpc_odp_client_init
  */
-int odp_rpc_client_term(void);
+int mppa_rpc_odp_client_term(void);
 
 /**
  * Returns the dma address of the default server to sync with (for C2C)
  */
-int odp_rpc_client_get_default_server(void);
+int mppa_rpc_odp_client_get_default_server(void);
 
 /**
  * Print the content of a RPC command
  */
-void odp_rpc_print_msg(const struct odp_rpc * cmd, const uint8_t *payload);
+void mppa_rpc_odp_print_msg(const struct mppa_rpc_odp * cmd, const uint8_t *payload);
 
 /**
  * Send a RPC command
@@ -33,19 +33,19 @@ void odp_rpc_print_msg(const struct odp_rpc * cmd, const uint8_t *payload);
  * @param[in] cmd RPC command to send
  * @param[in] payload Associated payload. The payload length must be stored in cmd->data_len
  */
-int odp_rpc_send_msg(uint16_t local_interface, uint16_t dest_id, uint16_t dest_tag,
-		     const struct odp_rpc * cmd, const void * payload);
+int mppa_rpc_odp_send_msg(uint16_t local_interface, uint16_t dest_id, uint16_t dest_tag,
+		     const struct mppa_rpc_odp * cmd, const void * payload);
 
 /**
  * Auto fill a RPC command headers with reply informations and
- * send it through #odp_rpc_send_msg
+ * send it through #mppa_rpc_odp_send_msg
  */
-int odp_rpc_do_query(uint16_t dest_id, uint16_t dest_tag,
-		     struct odp_rpc * cmd, void * payload);
+int mppa_rpc_odp_do_query(uint16_t dest_id, uint16_t dest_tag,
+		     struct mppa_rpc_odp * cmd, void * payload);
 
 /**
  * Wait for a ACK.
- * This must be called after a call to odp_rpc_send_msg to wait for a reply
+ * This must be called after a call to mppa_rpc_odp_send_msg to wait for a reply
  * @param[out] cmd Address where to store Ack message address.
  * Ack message is only valid until a new RPC command is sent
  * @param[out] payload Address where to store Ack message payload address.
@@ -56,7 +56,7 @@ int odp_rpc_do_query(uint16_t dest_id, uint16_t dest_tag,
  * @retval 0 Timeout
  * @retval 1 OK
  */
-odp_rpc_cmd_err_e odp_rpc_wait_ack(struct odp_rpc ** cmd, void ** payload, uint64_t timeout,
+mppa_rpc_odp_cmd_err_e mppa_rpc_odp_wait_ack(struct mppa_rpc_odp ** cmd, void ** payload, uint64_t timeout,
 				   const char* mod);
 
-#endif /* __ODP_RPC_API_H__ */
+#endif /* __MPPA_RPC_ODP_API_H__ */

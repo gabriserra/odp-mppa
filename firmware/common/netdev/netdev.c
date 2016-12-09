@@ -13,13 +13,16 @@
 #include "netdev.h"
 #include "internal/cache.h"
 
-#define DDR_BUFFER_BASE_ADDR	0x80000000
+extern uint64_t RamBase;
+static uintptr_t g_current_pkt_addr = (uintptr_t)&RamBase;
 
-static uintptr_t g_current_pkt_addr = DDR_BUFFER_BASE_ADDR;
-
+#ifndef LINUX_FIRMWARE
 __attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 	.magic = 0xDEADBEEF,
 };
+#endif
+
+struct mpodp_control *eth_ctrl;
 
 int netdev_c2h_is_full(struct mpodp_if_config *cfg)
 {
@@ -186,15 +189,27 @@ static int netdev_setup_h2c(struct mpodp_if_config *if_cfg,
 	return 0;
 }
 
-int netdev_init_interface(const eth_if_cfg_t *cfg)
+int netdev_init()
+{
+#ifdef LINUX_FIRMWARE
+	eth_ctrl = malloc(sizeof(*eth_ctrl));
+#else
+	eth_ctrl = &eth_control;
+#endif
+	return 0;
+}
+int netdev_configure_interface(const eth_if_cfg_t *cfg)
 {
 	struct mpodp_if_config *if_cfg;
 	int ret;
 
+	if (!eth_ctrl)
+		return -1;
+
 	if (cfg->if_id >= MPODP_MAX_IF_COUNT)
 		return -1;
 
-	if_cfg = &eth_control.configs[cfg->if_id];
+	if_cfg = &eth_ctrl->configs[cfg->if_id];
 	if_cfg->mtu = cfg->mtu;
 	if_cfg->flags = cfg->flags;
 	if_cfg->interrupt_status = 1;
@@ -210,37 +225,50 @@ int netdev_init_interface(const eth_if_cfg_t *cfg)
 	return 0;
 }
 
-int netdev_init(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
+int netdev_configure(uint8_t n_if, const eth_if_cfg_t cfg[n_if]) {
 	uint8_t i;
 	int ret;
+
+	if (!eth_ctrl)
+		return -1;
 
 	if (n_if > MPODP_MAX_IF_COUNT)
 		return -1;
 
 	for (i = 0; i < n_if; ++i) {
-		ret = netdev_init_interface(&cfg[i]);
+		ret = netdev_configure_interface(&cfg[i]);
 		if (ret)
 			return ret;
 	}
-	eth_control.if_count = n_if;
+	eth_ctrl->if_count = n_if;
 
 	return 0;
 }
 
 int netdev_start()
 {
+	pcie_control *pcie_ctrl;
+
+	if (!eth_ctrl)
+		return -1;
+
+#ifndef LINUX_FIRMWARE
 	pcie_open();
+#endif
+
+	pcie_ctrl = (pcie_control *)(unsigned long)
+		mppa_pcie_read_doorbell_user_reg(PCIE_REG_CONTROL_ADDR);
 
 	/* Ensure coherency */
 	__k1_mb();
 	/* Cross fingers for everything to be setup correctly ! */
-	__builtin_k1_swu(&eth_control.magic, MPODP_CONTROL_STRUCT_MAGIC);
+	__builtin_k1_swu(&eth_ctrl->magic, MPODP_CONTROL_STRUCT_MAGIC);
 	/* Ensure coherency */
 	__k1_mb();
 
-	__mppa_pcie_control.services[PCIE_SERVICE_ODP].addr = (unsigned int)&eth_control;
+	pcie_ctrl->services[PCIE_SERVICE_ODP].addr = (unsigned int)eth_ctrl;
 	__k1_wmb();
-	__mppa_pcie_control.services[PCIE_SERVICE_ODP].magic = PCIE_SERVICE_MAGIC;
+	pcie_ctrl->services[PCIE_SERVICE_ODP].magic = PCIE_SERVICE_MAGIC;
 	__k1_wmb();
 
 
@@ -255,4 +283,3 @@ int netdev_start()
 #endif
 	return 0;
 }
-

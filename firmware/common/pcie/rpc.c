@@ -41,7 +41,7 @@ static int pcie_setup_tx(unsigned int iface_id, unsigned int *tx_id,
 
 	MPPA_NOC_DNOC_TX_CONFIG_INITIALIZER_DEFAULT(config, 0);
 
-	rret = mppa_routing_get_dnoc_unicast_route(odp_rpc_get_cluster_id(iface_id),
+	rret = mppa_routing_get_dnoc_unicast_route(mppa_rpc_odp_get_cluster_id(iface_id),
 											   cluster_id, &config, &header);
 	if (rret) {
 		dbg_printf("Routing failed\n");
@@ -71,7 +71,7 @@ static int pcie_setup_tx(unsigned int iface_id, unsigned int *tx_id,
 
 static inline int pcie_add_forward(unsigned int pcie_eth_if_id,
 				   struct mppa_pcie_eth_dnoc_tx_cfg *dnoc_tx_cfg,
-				   odp_rpc_answer_t *answer)
+				   mppa_rpc_odp_answer_t *answer)
 {
 	struct mpodp_if_config * cfg = netdev_get_eth_if_config(pcie_eth_if_id);
 	struct mpodp_h2c_ring_buff_entry entry;
@@ -99,10 +99,10 @@ static inline int pcie_get_cnoc_tx_tag(int if_id)
 	return cnoc_tx_tags[if_id];
 }
 
-static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
-		      odp_rpc_answer_t *answer)
+static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
+		      mppa_rpc_odp_answer_t *answer)
 {
-	odp_rpc_cmd_pcie_open_t open_cmd = {.inl_data = msg->inl_data};
+	mppa_rpc_odp_cmd_pcie_open_t open_cmd = {.inl_data = msg->inl_data};
 	struct mppa_pcie_eth_dnoc_tx_cfg *tx_cfg;
 	int if_id = remoteClus % MPPA_PCIE_USABLE_DNOC_IF;
 	unsigned int tx_id;
@@ -167,7 +167,7 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 
 	tx_credit->credit = MPPA_PCIE_NOC_RX_NB;
 	tx_credit->header._.tag = tx_credit->remote_cnoc_rx = open_cmd.cnoc_rx;
-	rret = mppa_routing_get_cnoc_unicast_route(odp_rpc_get_cluster_id(if_id),
+	rret = mppa_routing_get_cnoc_unicast_route(mppa_rpc_odp_get_cluster_id(if_id),
 						   remoteClus, &tx_credit->config,
 						   &tx_credit->header);
 	assert(rret == 0);
@@ -201,46 +201,46 @@ static void pcie_open(unsigned remoteClus, odp_rpc_t * msg,
 
 	answer->ack.cmd.pcie_open.min_tx_tag = min_tx_tag; /* RX ID ! */
 	answer->ack.cmd.pcie_open.max_tx_tag = max_tx_tag; /* RX ID ! */
-	answer->ack.cmd.pcie_open.tx_if = odp_rpc_get_cluster_id(if_id);
+	answer->ack.cmd.pcie_open.tx_if = mppa_rpc_odp_get_cluster_id(if_id);
 	/* FIXME, we send the same MTU as the one received */
 	answer->ack.cmd.pcie_open.mtu = open_cmd.pkt_size;
 	memcpy(answer->ack.cmd.pcie_open.mac,
-	       eth_control.configs[open_cmd.pcie_eth_if_id].mac_addr,
+	       eth_ctrl->configs[open_cmd.pcie_eth_if_id].mac_addr,
 	       MAC_ADDR_LEN);
 
 	return;
 }
 
 static void pcie_close(__attribute__((unused)) unsigned remoteClus,
-		       __attribute__((unused)) odp_rpc_t * msg,
-		       __attribute__((unused)) odp_rpc_answer_t *answer)
+		       __attribute__((unused)) mppa_rpc_odp_t * msg,
+		       __attribute__((unused)) mppa_rpc_odp_answer_t *answer)
 {
 	return;
 }
 
-static int pcie_rpc_handler(unsigned remoteClus, odp_rpc_t *msg, uint8_t *payload)
+static int pcie_rpc_handler(unsigned remoteClus, mppa_rpc_odp_t *msg, uint8_t *payload)
 {
-	odp_rpc_answer_t answer = ODP_RPC_ANSWER_INITIALIZER(msg);
+	mppa_rpc_odp_answer_t answer = MPPA_RPC_ODP_ANSWER_INITIALIZER(msg);
 
-	if (msg->pkt_class != ODP_RPC_CLASS_PCIE)
-		return -ODP_RPC_ERR_INTERNAL_ERROR;
-	if (msg->cos_version != ODP_RPC_PCIE_VERSION)
-		return -ODP_RPC_ERR_VERSION_MISMATCH;
+	if (msg->pkt_class != MPPA_RPC_ODP_CLASS_PCIE)
+		return -MPPA_RPC_ODP_ERR_INTERNAL_ERROR;
+	if (msg->cos_version != MPPA_RPC_ODP_PCIE_VERSION)
+		return -MPPA_RPC_ODP_ERR_VERSION_MISMATCH;
 
 	(void)payload;
 	switch (msg->pkt_subtype){
-	case ODP_RPC_CMD_PCIE_OPEN:
+	case MPPA_RPC_ODP_CMD_PCIE_OPEN:
 		pcie_open(remoteClus, msg, &answer);
 		break;
-	case ODP_RPC_CMD_PCIE_CLOS:
+	case MPPA_RPC_ODP_CMD_PCIE_CLOS:
 		pcie_close(remoteClus, msg, &answer);
 		break;
 	default:
-		return -ODP_RPC_ERR_BAD_SUBTYPE;
+		return -MPPA_RPC_ODP_ERR_BAD_SUBTYPE;
 	}
 
-	odp_rpc_server_ack(&answer);
-	return -ODP_RPC_ERR_NONE;
+	mppa_rpc_odp_server_ack(&answer);
+	return -MPPA_RPC_ODP_ERR_NONE;
 }
 
 void  __attribute__ ((constructor)) __pcie_rpc_constructor()
@@ -248,5 +248,5 @@ void  __attribute__ ((constructor)) __pcie_rpc_constructor()
 #if defined(MAGIC_SCALL)
 	return;
 #endif
-	__rpc_handlers[ODP_RPC_CLASS_PCIE] = pcie_rpc_handler;
+	__rpc_handlers[MPPA_RPC_ODP_CLASS_PCIE] = pcie_rpc_handler;
 }

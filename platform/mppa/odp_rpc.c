@@ -18,15 +18,15 @@
 #define INVALIDATE(p) INVALIDATE_AREA((p), sizeof(*p))
 
 static struct {
-	odp_rpc_t rpc_cmd;
+	mppa_rpc_odp_t rpc_cmd;
 	uint8_t payload[RPC_MAX_PAYLOAD];
-} odp_rpc_ack_buf;
+} mppa_rpc_odp_ack_buf;
 static unsigned rx_port = -1;
 static int rpc_default_server_id = -1;
 
 int g_rpc_init = 0;
 
-int odp_rpc_client_init(void){
+int mppa_rpc_odp_client_init(void){
 	/* Already initialized */
 	if(rx_port < (unsigned)(-1))
 		return 0;
@@ -38,8 +38,8 @@ int odp_rpc_client_init(void){
 	if (ret != MPPA_NOC_RET_SUCCESS)
 		return -1;
 
-	conf.buffer_base = (uintptr_t)&odp_rpc_ack_buf;
-	conf.buffer_size = sizeof(odp_rpc_ack_buf),
+	conf.buffer_base = (uintptr_t)&mppa_rpc_odp_ack_buf;
+	conf.buffer_size = sizeof(mppa_rpc_odp_ack_buf),
 	conf.activation = MPPA_NOC_ACTIVATED;
 	conf.reload_mode = MPPA_NOC_RX_RELOAD_MODE_INCR_DATA_NOTIF;
 
@@ -48,7 +48,7 @@ int odp_rpc_client_init(void){
 
 	return 0;
 }
-int odp_rpc_client_term(void){
+int mppa_rpc_odp_client_term(void){
  	if (!g_rpc_init)
 		return -1;
 
@@ -59,7 +59,7 @@ int odp_rpc_client_term(void){
 	return 0;
 }
 
-int odp_rpc_client_get_default_server(void)
+int mppa_rpc_odp_client_get_default_server(void)
 {
 	if (rpc_default_server_id >= 0)
 		return rpc_default_server_id;
@@ -68,56 +68,62 @@ int odp_rpc_client_get_default_server(void)
 	if (__k1_spawn_type() == __MPPA_MPPA_SPAWN)
 		io_id = __k1_spawner_id() / 128 - 1;
 
-	rpc_default_server_id = odp_rpc_get_io_dma_id(io_id,
+	rpc_default_server_id = mppa_rpc_odp_get_io_dma_id(io_id,
 						      __k1_get_cluster_id());
 
 	if (getenv("SYNC_IODDR_ID")) {
 		rpc_default_server_id = atoi(getenv("SYNC_IODDR_ID"))
-			+ odp_rpc_get_dma_offset(__k1_get_cluster_id());
+			+ mppa_rpc_odp_get_dma_offset(__k1_get_cluster_id());
 	}
 
 	return rpc_default_server_id;
 }
 
-static const char * const rpc_cmd_bas_names[ODP_RPC_CMD_BAS_N_CMD] = {
-	ODP_RPC_CMD_NAMES_BAS
+static const char * const rpc_cmd_bas_names[MPPA_RPC_ODP_CMD_BAS_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_BAS
 };
 
-static const char * const rpc_cmd_eth_names[ODP_RPC_CMD_ETH_N_CMD] = {
-	ODP_RPC_CMD_NAMES_ETH
+static const char * const rpc_cmd_eth_names[MPPA_RPC_ODP_CMD_ETH_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_ETH
 };
 
-static const char * const rpc_cmd_pcie_names[ODP_RPC_CMD_PCIE_N_CMD] = {
-	ODP_RPC_CMD_NAMES_PCIE
+static const char * const rpc_cmd_pcie_names[MPPA_RPC_ODP_CMD_PCIE_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_PCIE
 };
 
-static const char * const rpc_cmd_c2c_names[ODP_RPC_CMD_C2C_N_CMD] = {
-	ODP_RPC_CMD_NAMES_C2C
+static const char * const rpc_cmd_c2c_names[MPPA_RPC_ODP_CMD_C2C_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_C2C
 };
 
-static const char * const rpc_cmd_rnd_names[ODP_RPC_CMD_RND_N_CMD] = {
-	ODP_RPC_CMD_NAMES_RND
+static const char * const rpc_cmd_rnd_names[MPPA_RPC_ODP_CMD_RND_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_RND
 };
 
-static const char * const * const rpc_cmd_names[ODP_RPC_N_CLASS] = {
-	[ODP_RPC_CLASS_BAS] = rpc_cmd_bas_names,
-	[ODP_RPC_CLASS_ETH] = rpc_cmd_eth_names,
-	[ODP_RPC_CLASS_PCIE] = rpc_cmd_pcie_names,
-	[ODP_RPC_CLASS_C2C] = rpc_cmd_c2c_names,
-	[ODP_RPC_CLASS_RND] = rpc_cmd_rnd_names,
+static const char * const rpc_cmd_fp_names[MPPA_RPC_ODP_CMD_FP_N_CMD] = {
+	MPPA_RPC_ODP_CMD_NAMES_FP
 };
 
-static const int rpc_n_cmds[ODP_RPC_N_CLASS] = {
-	[ODP_RPC_CLASS_BAS] = ODP_RPC_CMD_BAS_N_CMD,
-	[ODP_RPC_CLASS_ETH] = ODP_RPC_CMD_ETH_N_CMD,
-	[ODP_RPC_CLASS_PCIE] = ODP_RPC_CMD_PCIE_N_CMD,
-	[ODP_RPC_CLASS_C2C] = ODP_RPC_CMD_C2C_N_CMD,
-	[ODP_RPC_CLASS_RND] = ODP_RPC_CMD_RND_N_CMD,
+static const char * const * const rpc_cmd_names[MPPA_RPC_ODP_N_CLASS] = {
+	[MPPA_RPC_ODP_CLASS_BAS] = rpc_cmd_bas_names,
+	[MPPA_RPC_ODP_CLASS_ETH] = rpc_cmd_eth_names,
+	[MPPA_RPC_ODP_CLASS_PCIE] = rpc_cmd_pcie_names,
+	[MPPA_RPC_ODP_CLASS_C2C] = rpc_cmd_c2c_names,
+	[MPPA_RPC_ODP_CLASS_RND] = rpc_cmd_rnd_names,
+	[MPPA_RPC_ODP_CLASS_FP] = rpc_cmd_fp_names,
 };
 
-void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
+static const int rpc_n_cmds[MPPA_RPC_ODP_N_CLASS] = {
+	[MPPA_RPC_ODP_CLASS_BAS] = MPPA_RPC_ODP_CMD_BAS_N_CMD,
+	[MPPA_RPC_ODP_CLASS_ETH] = MPPA_RPC_ODP_CMD_ETH_N_CMD,
+	[MPPA_RPC_ODP_CLASS_PCIE] = MPPA_RPC_ODP_CMD_PCIE_N_CMD,
+	[MPPA_RPC_ODP_CLASS_C2C] = MPPA_RPC_ODP_CMD_C2C_N_CMD,
+	[MPPA_RPC_ODP_CLASS_RND] = MPPA_RPC_ODP_CMD_RND_N_CMD,
+	[MPPA_RPC_ODP_CLASS_FP] = MPPA_RPC_ODP_CMD_FP_N_CMD,
+};
+
+void mppa_rpc_odp_print_msg(const mppa_rpc_odp_t * cmd, const uint8_t *payload)
 {
-	if (cmd->pkt_class >=  ODP_RPC_N_CLASS) {
+	if (cmd->pkt_class >=  MPPA_RPC_ODP_N_CLASS) {
 		printf("Invalid packet class ! Class = %d\n", cmd->pkt_class);
 		return;
 	}
@@ -143,19 +149,19 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 	       cmd->dnoc_tag, cmd->ack, cmd->err_str, cmd->rpc_err);
 
 	if (cmd->ack) {
-		odp_rpc_ack_t ack = { .inl_data = cmd->inl_data };
+		mppa_rpc_odp_ack_t ack = { .inl_data = cmd->inl_data };
 		printf("\t\tAck status: %d\n", ack.status);
 	}
 
 	switch (cmd->pkt_class){
-	case ODP_RPC_CLASS_BAS:
+	case MPPA_RPC_ODP_CLASS_BAS:
 		break;
-	case ODP_RPC_CLASS_ETH:
+	case MPPA_RPC_ODP_CLASS_ETH:
 		switch(cmd->pkt_subtype) {
-		case ODP_RPC_CMD_ETH_OPEN:
-		case ODP_RPC_CMD_ETH_OPEN_DEF:
+		case MPPA_RPC_ODP_CMD_ETH_OPEN:
+		case MPPA_RPC_ODP_CMD_ETH_OPEN_DEF:
 			{
-				odp_rpc_cmd_eth_open_t open = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_eth_open_t open = { .inl_data = cmd->inl_data };
 				printf("\t\tifId: %d\n"
 				       "\t\tRx(s): [%d:%d]\n"
 				       "\t\tLoopback: %u\n"
@@ -170,31 +176,31 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 				       open.jumbo, open.nb_rules);
 			}
 			break;
-		case ODP_RPC_CMD_ETH_CLOS:
-		case ODP_RPC_CMD_ETH_CLOS_DEF:
+		case MPPA_RPC_ODP_CMD_ETH_CLOS:
+		case MPPA_RPC_ODP_CMD_ETH_CLOS_DEF:
 			{
-				odp_rpc_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
 				printf("\t\tifId: %d\n", clos.ifId);
 			}
 			break;
-		case ODP_RPC_CMD_ETH_DUAL_MAC:
+		case MPPA_RPC_ODP_CMD_ETH_DUAL_MAC:
 			{
-				odp_rpc_cmd_eth_dual_mac_t dmac = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_eth_dual_mac_t dmac = { .inl_data = cmd->inl_data };
 				printf("\t\tenabled: %d\n", dmac.enabled);
 			}
 			break;
-		case ODP_RPC_CMD_ETH_PROMISC:
-		case ODP_RPC_CMD_ETH_STATE:
+		case MPPA_RPC_ODP_CMD_ETH_PROMISC:
+		case MPPA_RPC_ODP_CMD_ETH_STATE:
 			{
-				odp_rpc_cmd_eth_promisc_t promisc = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_eth_promisc_t promisc = { .inl_data = cmd->inl_data };
 				printf("\t\tifId: %d\n"
 				       "\t\tEnabled: %d\n",
 				       promisc.ifId, promisc.enabled);
 			}
 			break;
-		case ODP_RPC_CMD_ETH_GET_STAT:
+		case MPPA_RPC_ODP_CMD_ETH_GET_STAT:
 			{
-				odp_rpc_cmd_eth_get_stat_t stats =
+				mppa_rpc_odp_cmd_eth_get_stat_t stats =
 					{ .inl_data = cmd->inl_data };
 				printf("\t\tifId: %d\n"
 				       "\t\tLaneStats: %d\n",
@@ -205,20 +211,20 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 			break;
 		}
 		break;
-	case ODP_RPC_CLASS_PCIE:
+	case MPPA_RPC_ODP_CLASS_PCIE:
 		switch(cmd->pkt_subtype) {
-		case ODP_RPC_CMD_PCIE_OPEN:
+		case MPPA_RPC_ODP_CMD_PCIE_OPEN:
 			{
-				odp_rpc_cmd_pcie_open_t open = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_pcie_open_t open = { .inl_data = cmd->inl_data };
 				printf("\t\tpcie_eth_id: %d\n"
 				       "\t\tRx(s): [%d:%d]\n",
 				       open.pcie_eth_if_id,
 				       open.min_rx, open.max_rx);
 			}
 			break;
-		case ODP_RPC_CMD_PCIE_CLOS:
+		case MPPA_RPC_ODP_CMD_PCIE_CLOS:
 			{
-				odp_rpc_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_eth_clos_t clos = { .inl_data = cmd->inl_data };
 				printf("\t\tifId: %d\n", clos.ifId);
 			}
 			break;
@@ -226,11 +232,11 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 			break;
 		}
 		break;
-	case ODP_RPC_CLASS_C2C:
+	case MPPA_RPC_ODP_CLASS_C2C:
 		switch(cmd->pkt_subtype) {
-		case ODP_RPC_CMD_C2C_OPEN:
+		case MPPA_RPC_ODP_CMD_C2C_OPEN:
 			{
-				odp_rpc_cmd_c2c_open_t open = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_c2c_open_t open = { .inl_data = cmd->inl_data };
 				printf("\t\tdstClus: %d\n"
 				       "\t\tRx(s): [%d:%d]\n"
 				       "\t\tMTU: %d\n",
@@ -239,9 +245,9 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 				       open.mtu);
 			}
 			break;
-		case ODP_RPC_CMD_C2C_CLOS:
+		case MPPA_RPC_ODP_CMD_C2C_CLOS:
 			{
-				odp_rpc_cmd_c2c_clos_t clos = { .inl_data = cmd->inl_data };
+				mppa_rpc_odp_cmd_c2c_clos_t clos = { .inl_data = cmd->inl_data };
 				printf("\t\tdstClus: %d\n", clos.cluster_id);
 			}
 			break;
@@ -249,9 +255,9 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 			break;
 		}
 		break;
-	case ODP_RPC_CLASS_RND:
+	case MPPA_RPC_ODP_CLASS_RND:
 		switch(cmd->pkt_subtype) {
-		case ODP_RPC_CMD_RND_GET:
+		case MPPA_RPC_ODP_CMD_RND_GET:
 			{
 				int i;
 				for ( i = 0; i < 4; ++i ) {
@@ -272,8 +278,8 @@ void odp_rpc_print_msg(const odp_rpc_t * cmd, const uint8_t *payload)
 	}
 }
 
-int odp_rpc_send_msg(uint16_t local_interface, uint16_t dest_id,
-		     uint16_t dest_tag, const odp_rpc_t * cmd,
+int mppa_rpc_odp_send_msg(uint16_t local_interface, uint16_t dest_id,
+		     uint16_t dest_tag, const mppa_rpc_odp_t * cmd,
 		     const void * payload)
 {
 	if ( cmd->data_len > RPC_MAX_PAYLOAD ) {
@@ -316,12 +322,12 @@ int odp_rpc_send_msg(uint16_t local_interface, uint16_t dest_id,
 	header._.tag = dest_tag;
 	header._.valid = 1;
 
-	int externalAddress = odp_rpc_get_cluster_id(local_interface);
+	int externalAddress = mppa_rpc_odp_get_cluster_id(local_interface);
 
 #ifdef VERBOSE
 	printf("[RPC] Sending message from %d (%d) to %d/%d\n",
 	       local_interface, externalAddress, dest_id, dest_tag);
-	odp_rpc_print_msg(cmd, payload);
+	mppa_rpc_odp_print_msg(cmd, payload);
 #endif
 	rret = mppa_routing_get_dnoc_unicast_route(externalAddress,
 						   dest_id, &config, &header);
@@ -355,8 +361,8 @@ int odp_rpc_send_msg(uint16_t local_interface, uint16_t dest_id,
 	return 1;
 }
 
-int odp_rpc_do_query(uint16_t dest_id,
-		     uint16_t dest_tag, odp_rpc_t * cmd,
+int mppa_rpc_odp_do_query(uint16_t dest_id,
+		     uint16_t dest_tag, mppa_rpc_odp_t * cmd,
 		     void * payload)
 {
  	if (!g_rpc_init)
@@ -364,10 +370,10 @@ int odp_rpc_do_query(uint16_t dest_id,
 
 	cmd->dma_id = __k1_get_cluster_id();
 	cmd->dnoc_tag = rx_port;
-	return odp_rpc_send_msg(0, dest_id, dest_tag, cmd, payload);
+	return mppa_rpc_odp_send_msg(0, dest_id, dest_tag, cmd, payload);
 }
 
-odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t timeout,
+mppa_rpc_odp_cmd_err_e mppa_rpc_odp_wait_ack(mppa_rpc_odp_t ** cmd, void ** payload, uint64_t timeout,
 				   const char* mod)
 {
 	int ret;
@@ -384,10 +390,10 @@ odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t t
 	}
 	if (!ret) {
 		fprintf(stderr, "%s Query timed out\n", mod);
-		return -ODP_RPC_ERR_TIMEOUT;
+		return -MPPA_RPC_ODP_ERR_TIMEOUT;
 	}
 
-	odp_rpc_t * msg = &odp_rpc_ack_buf.rpc_cmd;
+	mppa_rpc_odp_t * msg = &mppa_rpc_odp_ack_buf.rpc_cmd;
 	INVALIDATE(msg);
 	*cmd = msg;
 
@@ -398,8 +404,8 @@ odp_rpc_cmd_err_e odp_rpc_wait_ack(odp_rpc_t ** cmd, void ** payload, uint64_t t
 				msg->data_len, RPC_MAX_PAYLOAD);
 			return -1;
 		}
-		INVALIDATE_AREA(&odp_rpc_ack_buf.payload, msg->data_len);
-		*payload = odp_rpc_ack_buf.payload;
+		INVALIDATE_AREA(&mppa_rpc_odp_ack_buf.payload, msg->data_len);
+		*payload = mppa_rpc_odp_ack_buf.payload;
 	}
 
 	/* Handle protocol error */

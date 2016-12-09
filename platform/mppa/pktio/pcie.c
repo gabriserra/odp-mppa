@@ -98,14 +98,14 @@ static int pcie_destroy(void)
 static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
 	uint8_t *payload;
 	/*
 	 * RPC Msg to IOPCIE  #N so the LB will dispatch to us
 	 */
-	odp_rpc_cmd_pcie_open_t open_cmd = {
+	mppa_rpc_odp_cmd_pcie_open_t open_cmd = {
 		{
 			.pcie_eth_if_id = pcie->pcie_eth_if_id,
 			.pkt_size = PKTIO_PKT_MTU,
@@ -114,20 +114,20 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 			.cnoc_rx = pcie->cnoc_rx,
 		}
 	};
-	odp_rpc_t cmd = {
+	mppa_rpc_odp_t cmd = {
 		.data_len = 0,
-		.pkt_class = ODP_RPC_CLASS_PCIE,
-		.pkt_subtype = ODP_RPC_CMD_PCIE_OPEN,
-		.cos_version = ODP_RPC_PCIE_VERSION,
+		.pkt_class = MPPA_RPC_ODP_CLASS_PCIE,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_PCIE_OPEN,
+		.cos_version = MPPA_RPC_ODP_PCIE_VERSION,
 		.inl_data = open_cmd.inl_data,
 		.flags = 0,
 	};
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(pcie->slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(pcie->slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 15 * ODP_RPC_TIMEOUT_1S, "[PCIE]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 15 * MPPA_RPC_ODP_TIMEOUT_1S, "[PCIE]");
 	if (ret <= 0)
 		return 1;
 
@@ -155,6 +155,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int ret = 0;
 	int nRx = N_RX_P_PCIE;
 	int rr_policy = -1;
+	int rr_offset = 0;
 	int port_id, slot_id;
 	int nofree = 0;
 
@@ -204,7 +205,15 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr += strlen("rrpolicy=");
 			rr_policy = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
-				ODP_ERR("Invalid rr_policy %s\n", pptr);
+				ODP_ERR("Invalid rrpolicy %s\n", pptr);
+				return -1;
+			}
+			pptr = eptr;
+		} else if (!strncmp(pptr, "rroffset=", strlen("rroffset="))){
+			pptr += strlen("rroffset=");
+			rr_offset = strtoul(pptr, &eptr, 10);
+			if(pptr == eptr){
+				ODP_ERR("Invalid rroffset %s\n", pptr);
 				return -1;
 			}
 			pptr = eptr;
@@ -244,11 +253,16 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
 		pcie->rx_config.dma_if = 0;
 		pcie->rx_config.pool = pool;
-		pcie->rx_config.pktio_id = slot_id * MAX_PCIE_INTERFACES + port_id +
+		pcie->rx_config.if_type = RX_IF_TYPE_PCI;
+		pcie->rx_config.pktio_id = RX_PCIE_IF_BASE +
+			slot_id * MAX_PCIE_INTERFACES + port_id +
 			MAX_RX_ETH_IF;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy);
+		pcie->rx_config.flow_controlled = 0;
+		pcie->rx_config.pktio = &pktio_entry->s;
+		rx_thread_link_open(&pcie->rx_config, nRx, rr_policy,
+				    rr_offset, -1, -1);
 	}
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();
@@ -294,20 +308,20 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 	int slot_id = pcie->slot_id;
 	int pcie_eth_if_id = pcie->pcie_eth_if_id;
-	odp_rpc_t *ack_msg;
-	odp_rpc_ack_t ack;
+	mppa_rpc_odp_t *ack_msg;
+	mppa_rpc_odp_ack_t ack;
 	int ret;
-	odp_rpc_cmd_pcie_clos_t close_cmd = {
+	mppa_rpc_odp_cmd_pcie_clos_t close_cmd = {
 		{
 			.ifId = pcie->pcie_eth_if_id = pcie_eth_if_id
 
 		}
 	};
 	unsigned cluster_id = __k1_get_cluster_id();
-	odp_rpc_t cmd = {
-		.pkt_class = ODP_RPC_CLASS_PCIE,
-		.pkt_subtype = ODP_RPC_CMD_PCIE_CLOS,
-		.cos_version = ODP_RPC_PCIE_VERSION,
+	mppa_rpc_odp_t cmd = {
+		.pkt_class = MPPA_RPC_ODP_CLASS_PCIE,
+		.pkt_subtype = MPPA_RPC_ODP_CMD_PCIE_CLOS,
+		.cos_version = MPPA_RPC_ODP_PCIE_VERSION,
 		.data_len = 0,
 		.flags = 0,
 		.inl_data = close_cmd.inl_data
@@ -317,11 +331,11 @@ static int pcie_close(pktio_entry_t * const pktio_entry)
 	/* Free packets being sent by DMA */
 	tx_uc_flush(pcie_get_ctx(pcie));
 
-	odp_rpc_do_query(odp_rpc_get_io_dma_id(slot_id, cluster_id),
-					 odp_rpc_get_io_tag_id(cluster_id),
+	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(slot_id, cluster_id),
+					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = odp_rpc_wait_ack(&ack_msg, (void**)&payload, 5 * ODP_RPC_TIMEOUT_1S, "[PCIE]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[PCIE]");
 	ack.inl_data = ack_msg->inl_data;
 
 	if (ret <= 0)
@@ -353,9 +367,9 @@ static int pcie_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	int n_packet;
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 
-	n_packet = odp_buffer_ring_get_multi(pcie->rx_config.ring,
+	n_packet = odp_buffer_ring_get_multi(pcie->rx_config.ring[0],
 					     (odp_buffer_hdr_t **)pkt_table,
-					     len, NULL);
+					     len, 0, NULL);
 
 	for (int i = 0; i < n_packet; ++i) {
 		odp_packet_t pkt = pkt_table[i];
@@ -451,9 +465,23 @@ static int pcie_promisc_mode(pktio_entry_t *const pktio_entry ODP_UNUSED){
 }
 
 static int pcie_mtu_get(pktio_entry_t *const pktio_entry ODP_UNUSED) {
-	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
-	return eth->mtu;
+	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+	return pcie->mtu;
 }
+
+static int pcie_stats(pktio_entry_t *const pktio_entry,
+		      _odp_pktio_stats_t *stats)
+{
+	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+
+	memset(stats, 0, sizeof(*stats));
+
+	if (rx_thread_fetch_stats(pcie->rx_config.pktio_id,
+				  &stats->in_dropped, &stats->in_discards))
+		return -1;
+	return 0;
+}
+
 const pktio_if_ops_t pcie_pktio_ops = {
 	.init = pcie_init,
 	.term = pcie_destroy,
@@ -461,6 +489,7 @@ const pktio_if_ops_t pcie_pktio_ops = {
 	.close = pcie_close,
 	.start = NULL,
 	.stop = NULL,
+	.stats = pcie_stats,
 	.recv = pcie_recv,
 	.send = pcie_send,
 	.mtu_get = pcie_mtu_get,

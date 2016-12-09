@@ -27,6 +27,11 @@ extern "C" {
 /** @ingroup odp_packet
  *  @{
  */
+#define _ODP_MAX_SUBPACKETS         8
+
+int _odp_packet_fragment(odp_packet_t pkt,
+			 odp_packet_t sub_pkts[_ODP_MAX_SUBPACKETS + 1]);
+void _odp_packet_mark_nofree(odp_packet_t pkt);
 
 static inline odp_packet_t odp_packet_from_event(odp_event_t ev)
 {
@@ -36,18 +41,6 @@ static inline odp_packet_t odp_packet_from_event(odp_event_t ev)
 static inline odp_event_t odp_packet_to_event(odp_packet_t pkt)
 {
 	return (odp_event_t)pkt;
-}
-
-static inline int odp_packet_is_segmented(odp_packet_t pkt)
-{
-	(void)pkt;
-	return 0;
-}
-
-static inline int odp_packet_num_segs(odp_packet_t pkt)
-{
-	(void)pkt;
-	return 1;
 }
 
 static inline odp_packet_seg_t odp_packet_first_seg(odp_packet_t pkt)

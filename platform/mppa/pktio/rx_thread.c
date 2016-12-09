@@ -11,6 +11,14 @@
 #include <errno.h>
 #include <mppa_noc.h>
 
+ 
+#define MPPA_TRACEPOINT_DEFINE
+#include "odp_trace.h"
+
+#define MPPA_CREATE_TRACEPOINT
+#include "mppa_trace.h"
+
+
 #ifdef K1_NODEOS
 #include <pthread.h>
 #else
@@ -19,6 +27,8 @@
 
 #include "odp_pool_internal.h"
 #include "odp_rx_internal.h"
+
+#define ARRAY_SIZE(a) sizeof((a))/sizeof((a)[0])
 
 #define N_RX 256
 #define MAX_RX (30 * 4)
@@ -42,7 +52,8 @@ typedef struct {
 } rx_buffer_list_t;
 
 typedef struct {
-	rx_buffer_list_t hdr_list;
+	rx_buffer_list_t hdr_list[MAX_RX_QUEUES];
+	uint32_t queue_mask;
 	uint64_t recv_pkts;
 	uint64_t dropped_pkts;
 	uint64_t oom_pkts;
@@ -53,7 +64,7 @@ typedef struct {
 					   * belong to us */
 	uint8_t pool_id;
 	rx_config_t rx_config;
-	odp_buffer_ring_t ring;
+	odp_buffer_ring_t ring[MAX_RX_QUEUES];
 
 	enum {
 		RX_IFCE_DOWN,
@@ -178,7 +189,8 @@ static int _close_rx(rx_config_t *rx_config ODP_UNUSED, int rx_id)
 		rx_queue->activation.reg = 0x0;
 
 	if (rx_hdl.tag[rx_id].pkt != ODP_PACKET_INVALID)
-		odp_packet_free(rx_hdl.tag[rx_id].pkt);
+		odp_packet_free_multi(&rx_hdl.tag[rx_id].pkt, 1);
+
 	rx_hdl.tag[rx_id].pkt = ODP_PACKET_INVALID;
 
 	mppa_noc_dnoc_rx_free(dma_if, rx_id);
@@ -243,31 +255,52 @@ static void _sort_buffers(odp_buffer_hdr_t **head, odp_buffer_hdr_t ***tail,
 }
 
 
-static uint64_t _reload_rx(int th_id, int rx_id)
+static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 {
 	const int dma_if = 0;
 	const int pktio_id = rx_hdl.tag[rx_id].pktio_id;
 	rx_ifce_th_t *if_th = &rx_hdl.th[th_id].ifce[pktio_id];
+	rx_ifce_t *ifce = &rx_hdl.ifce[pktio_id];
 	const rx_config_t * rx_config = &rx_hdl.ifce[pktio_id].rx_config;
 	rx_pool_t * rx_pool = &rx_hdl.th[th_id].
 		pools[rx_hdl.ifce[pktio_id].pool_id];
 	int mapped_pkt = 0;
+	uint64_t _mask = (*mask) & ifce->ev_masks[rx_id / 64];
+	int n_events = __builtin_k1_cbs(_mask & 0xFFFFFFFF) + __builtin_k1_cbs(_mask >> 32) + 1;
 
-	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 
-	if (odp_unlikely(!rx_pool->n_spares)) {
+	if (rx_config->flow_controlled) {
+		if (n_events > rx_pool->n_spares) {
+			/* Alloc */
+			pool_entry_t * p_entry = (pool_entry_t*) rx_config->pool;
+			struct pool_entry_s *entry = &p_entry->s;
+
+			rx_pool->n_spares +=
+				get_buf_multi(entry,
+					      (odp_buffer_hdr_t **)(rx_pool->spares + rx_pool->n_spares),
+					      MIN(MAX(n_events, rx_pool->n_rx), PKT_BURST_SZ));
+		}
+		if (n_events > rx_pool->n_spares) {
+			/* Clear all bits of this pktio as
+			 * we don't want to break order */
+			*mask = (*mask) & ~(ifce->ev_masks[rx_id / 64]);
+			return 0;
+		}
+	} else if (odp_unlikely(!rx_pool->n_spares)) {
 		/* Alloc */
 		pool_entry_t * p_entry = (pool_entry_t*) rx_config->pool;
 		struct pool_entry_s *entry = &p_entry->s;
-
 		rx_pool->n_spares =
 			get_buf_multi(entry,
 				      (odp_buffer_hdr_t **)rx_pool->spares,
 				      MIN(rx_pool->n_rx, PKT_BURST_SZ));
 	}
 
+	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
+	uint64_t pkt_ts = 0ULL;
+	union mppa_ethernet_header_info_t info;
 
 	if (odp_unlikely(pkt == ODP_PACKET_INVALID)){
 		if (rx_hdl.tag[rx_id].broken) {
@@ -277,19 +310,21 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 			if_th->oom_pkts++;
 		}
 	} else {
-		/* Move timestamp to order so it can be sorted in the ring buf */
 		odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
 		const mppa_ethernet_header_t *header;
 		header = (const mppa_ethernet_header_t*)
 			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			 rx_config->pkt_offset);
-
-		union mppa_ethernet_header_info_t info;
+		
+		pkt_ts = LOAD_U64(header->timestamp);
 		info.dword = LOAD_U64(header->info);
+
+		/* Move timestamp to order so it can be sorted in the ring buf */
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
 		if (info._.pkt_size < sizeof(*header)) {
 			/* Probably a spurious EOT. */
 			STORE_U64(header->info, 0ULL);
+			newpkt = pkt;
 			pkt = ODP_PACKET_INVALID;
 			if_th->dropped_pkts++;
 			mapped_pkt = 1;
@@ -369,7 +404,35 @@ static uint64_t _reload_rx(int th_id, int rx_id)
 	}
 
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
-		rx_buffer_list_t * hdr_list = &if_th->hdr_list;
+		unsigned int queue = 0;
+		if (rx_config->if_type == RX_IF_TYPE_IODDR)
+			queue = (info._.hash_key & 0xff) % MAX_RX_QUEUES;
+		else
+/* eth 14 + ip 20 + udp 8 + ib bth 12 */
+#define UDP_DPORT_LEN_OFFSET 36
+#define IB_BTH_QID_OFFSET_FIRST 44
+#define IB_BTH_QID_OFFSET_SECOND 48
+#define IB_DATA_OFFSET 54
+		if (rx_config->if_type == RX_IF_TYPE_ETH &&
+		    info._.pkt_size - sizeof(mppa_ethernet_header_t) >= IB_DATA_OFFSET) {
+			char * const data = (char *)odp_packet_hdr(pkt)->buf_hdr.addr + odp_packet_hdr(pkt)->headroom;
+			char *ptr = data + UDP_DPORT_LEN_OFFSET;
+			uint32_t udp_dest_len = __builtin_k1_lwu(ptr);
+
+			/* whee endianness whee */
+			if ((udp_dest_len & 0xffff) == 0xb712) {
+				uint32_t qid;
+				ptr = data + IB_BTH_QID_OFFSET_SECOND;
+				qid = (odp_be_to_cpu_32(__builtin_k1_lwu(ptr)) & 0x00ff0000) >> 16;
+
+				queue = qid % MAX_RX_QUEUES;
+			}
+		}
+
+		rx_buffer_list_t * hdr_list = &if_th->hdr_list[queue];
+		if_th->queue_mask |= (1 << queue);
+
+		mppa_tracepoint(odp, rx_thread, pkt, pkt_ts + rx_config->pktio->pkt_eth.lb_ts_off, ((uint32_t) info._.pkt_size));
 
 		if_th->recv_pkts++;
 		*(hdr_list->tail) = (odp_buffer_hdr_t *)pkt;
@@ -406,39 +469,45 @@ static void _poll_masks(int th_id)
 				const int rx_id = mask_bit + i * 64;
 
 				mask = mask ^ (1ULL << mask_bit);
-				if_mask |=  _reload_rx(th_id, rx_id);
+				if_mask |=  _reload_rx(th_id, rx_id, &mask);
 			}
 		}
 
 		if ((iter & FLUSH_PERIOD) == FLUSH_PERIOD) {
 			uint64_t if_mask_incomplete = 0ULL;
+
 			while (if_mask) {
+				int j;
+
 				i = __builtin_k1_ctzdl(if_mask);
 				if_mask ^= (1ULL << i);
 
-				rx_buffer_list_t * hdr_list =
-					&rx_hdl.th[th_id].ifce[i].hdr_list;
+				while (rx_hdl.th[th_id].ifce[i].queue_mask) {
+					j = __builtin_k1_ctz(rx_hdl.th[th_id].ifce[i].queue_mask);
+					rx_hdl.th[th_id].ifce[i].queue_mask ^= (1ULL << j);
 
-				if (hdr_list->tail == &hdr_list->head)
-					continue;
+					rx_buffer_list_t * hdr_list =
+						&rx_hdl.th[th_id].ifce[i].hdr_list[j];
 
-				/* Do not sort if there is more than 1 rx thread.
-				 * order will be broken anyway */
-				if(odp_global_data.n_rx_thr == 1)
+					if (hdr_list->tail == &hdr_list->head)
+						continue;
+
+					/* Do not sort if there is more than 1 rx thread.
+					 * order will be broken anyway */
 					_sort_buffers(&hdr_list->head, &hdr_list->tail,
 						      hdr_list->count);
-				hdr_list->count =
-					odp_buffer_ring_push_list(&rx_hdl.ifce[i].ring,
-								  &hdr_list->head,
-								  hdr_list->count);
-				if (!hdr_list->count) {
-					/* All were flushed */
-					hdr_list->tail = &hdr_list->head;
-				} else {
-					/* Not all buffers were flushed to the ring */
-					if_mask_incomplete = 1ULL << i;
+					hdr_list->count =
+						odp_buffer_ring_push_list(&rx_hdl.ifce[i].ring[j],
+									  &hdr_list->head,
+									  hdr_list->count);
+					if (!hdr_list->count) {
+						/* All were flushed */
+						hdr_list->tail = &hdr_list->head;
+					} else {
+						/* Not all buffers were flushed to the ring */
+						if_mask_incomplete = 1ULL << i;
+					}
 				}
-
 			}
 			if_mask = if_mask_incomplete;
 		}
@@ -450,11 +519,17 @@ static void _poll_masks(int th_id)
 static void *_rx_thread_start(void *arg)
 {
 	int th_id = (unsigned long)(arg);
-	for (int i = 0; i < MAX_RX_IF; ++i) {
-		rx_buffer_list_t * hdr_list =
-			&rx_hdl.th[th_id].ifce[i].hdr_list;
-		hdr_list->tail = &hdr_list->head;
-		hdr_list->count = 0;
+	int i;
+	unsigned int j;
+
+	for (i = 0; i < MAX_RX_IF; ++i) {
+		for (j = 0; j < ARRAY_SIZE(rx_hdl.th[th_id].ifce[i].hdr_list); j++) {
+			rx_buffer_list_t * hdr_list =
+				&rx_hdl.th[th_id].ifce[i].hdr_list[j];
+			hdr_list->tail = &hdr_list->head;
+			hdr_list->count = 0;
+		}
+		rx_hdl.th[th_id].ifce[i].queue_mask = 0;
 	}
 	uint64_t last_update= -1LL;
 
@@ -483,7 +558,7 @@ static void *_rx_thread_start(void *arg)
 			if (!rx_hdl.th[th_id].pools[i].n_spares)
 				continue;
 			/* Free all the spares pre allocated */
-			packet_free_multi(rx_hdl.th[th_id].pools[i].spares,
+			odp_packet_free_multi(rx_hdl.th[th_id].pools[i].spares,
 					  rx_hdl.th[th_id].pools[i].n_spares);
 			rx_hdl.th[th_id].pools[i].n_spares = 0;
 		}
@@ -499,7 +574,9 @@ static void *_rx_thread_start(void *arg)
 	return NULL;
 }
 
-int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
+int rx_thread_link_open(rx_config_t *rx_config, int n_ports,
+			int rr_policy, int rr_offset,
+			int min_rx, int max_rx)
 {
 	const int dma_if = 0;
 	if (rx_config->pktio_id >= MAX_RX_IF) {
@@ -510,21 +587,34 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 		ODP_ERR("asking for too many Rx port");
 		return -1;
 	}
-
 	rx_ifce_t *ifce =
 		&rx_hdl.ifce[rx_config->pktio_id];
 	char loopq_name[ODP_QUEUE_NAME_LEN];
+	int n_rx = 0, first_rx;
 
 	snprintf(loopq_name, sizeof(loopq_name), "%d-pktio_rx",
 		 rx_config->pktio_id);
 
+	if (min_rx >= 0 || max_rx >= 0) {
+		ODP_ASSERT(min_rx >= 0);
+		ODP_ASSERT(max_rx >= 0);
+		ODP_ASSERT(n_ports == max_rx - min_rx + 1);
+	}
+
 	/*
 	 * Allocate contiguous RX ports
 	 */
-	int n_rx, first_rx;
+	if (min_rx < 0)
+		min_rx = 0;
+	if (max_rx < 0)
+		max_rx = MPPA_DNOC_RX_QUEUES_NUMBER - 1;
+	for (first_rx = min_rx; first_rx < max_rx + 2 - n_ports; ++first_rx) {
+		/* If the ifce has "flow control", make sure all events are in the
+		 * dword in DNoC event register */
+		if (rx_config->flow_controlled &&
+		    first_rx / 64 != (first_rx + n_rx) / 64)
+			continue;
 
-	for (first_rx = 0; first_rx <  MPPA_DNOC_RX_QUEUES_NUMBER - n_ports;
-	     ++first_rx) {
 		for (n_rx = 0; n_rx < n_ports; ++n_rx) {
 			mppa_noc_ret_t ret;
 			ret = mppa_noc_dnoc_rx_alloc(dma_if,
@@ -543,8 +633,8 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 		}
 	}
 	if (n_rx < n_ports) {
-		ODP_ASSERT(n_rx == 0);
 		ODP_ERR("failed to allocate %d contiguous Rx ports\n", n_ports);
+		ODP_ASSERT(n_rx == 0);
 		return -1;
 	}
 
@@ -552,6 +642,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 	rx_config->max_port = first_rx + n_rx - 1;
 	rx_config->pkt_offset = ((pool_entry_t *)rx_config->pool)->s.headroom -
 		rx_config->header_sz;
+
 	/*
 	 * Compute event mask to detect events on our own tags later
 	 */
@@ -606,7 +697,7 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 		/* Each thread picks rr_policy Rx every odp_global_data.n_rx_thr */
 		for (int port = rx_config->min_port, th_id = 0;
 		     port <= rx_config->max_port; ++port, ++th_id){
-			int th = (th_id / rr_policy) % odp_global_data.n_rx_thr;
+			int th = ((th_id + rr_offset) / rr_policy) % odp_global_data.n_rx_thr;
 
 			const unsigned word = port / (8 * sizeof(ev_masks[0][0]));
 			const unsigned offset = port % ( 8 * sizeof(ev_masks[0][0]));
@@ -619,18 +710,29 @@ int rx_thread_link_open(rx_config_t *rx_config, int n_ports, int rr_policy)
 		}
 	}
 
-	/* Setup buffer ring */
+	/* Setup buffer rings */
 	int ring_size = 2 * n_rx;
 	if (ring_size < MIN_RING_SIZE)
 		ring_size = MIN_RING_SIZE;
-	void * addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*));
-	if (!addr) {
-		ODP_ERR("Failed to allocate Ring buffer");
-		return -1;
+
+	unsigned int j;
+	unsigned int max_queues = 1;
+
+	if ((rx_config->if_type == RX_IF_TYPE_ETH) ||
+	    (rx_config->if_type == RX_IF_TYPE_IODDR))
+		max_queues = ARRAY_SIZE(ifce->ring);
+
+	for (j = 0; j < max_queues; j++) {
+		void * addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*));
+		if (!addr) {
+			ODP_ERR("Failed to allocate Ring buffer");
+			return -1;
+		}
+
+		odp_buffer_ring_init(&ifce->ring[j], addr, ring_size);
+		rx_config->ring[j] = &ifce->ring[j];
 	}
 
-	odp_buffer_ring_init(&ifce->ring, addr, ring_size);
-	rx_config->ring = &ifce->ring;
 
 	/* Copy config to Thread data */
 	memcpy(&ifce->rx_config, rx_config, sizeof(*rx_config));
@@ -745,21 +847,31 @@ int rx_thread_link_close(uint8_t pktio_id)
 			/** free all the buffers */
 			odp_buffer_hdr_t * buffers[10];
 			int nbufs;
-			while ((nbufs = odp_buffer_ring_get_multi(&ifce->ring,
-								  buffers, 10,
-								  NULL)) > 0) {
-				odp_buffer_free_multi((odp_buffer_t*)buffers,
-						      nbufs);
-			}
-			free(ifce->ring.buf_ptrs);
 
+			unsigned int j;
+			unsigned int max_queues = 1;
+
+
+			if ((ifce->rx_config.if_type == RX_IF_TYPE_ETH) ||
+			    (ifce->rx_config.if_type == RX_IF_TYPE_IODDR))
+				max_queues = ARRAY_SIZE(ifce->ring);
+
+			for (j = 0; j < max_queues; j++) {
+				while ((nbufs = odp_buffer_ring_get_multi(&ifce->ring[j],
+									  buffers, 10, 0,
+									  NULL)) > 0) {
+					odp_buffer_free_multi((odp_buffer_t*)buffers,
+							      nbufs);
+				}
+				free(ifce->ring[j].buf_ptrs);
+			}
 		}
 		ifce->status = RX_IFCE_DOWN;
 		rx_hdl.if_opened--;
 		/* No more interface open. */
 		if (rx_hdl.if_opened == 0 &&
 		    rx_hdl.drop_pkt != ODP_PACKET_INVALID) {
-			odp_packet_free(rx_hdl.drop_pkt);
+			odp_packet_free_multi(&rx_hdl.drop_pkt, 1);
 			rx_hdl.drop_pkt = ODP_PACKET_INVALID;
 		}
 	}

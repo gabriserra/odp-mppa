@@ -1,26 +1,26 @@
-#ifndef __ODP_RPC_DEFINES_H__
-#define __ODP_RPC_DEFINES_H__
+#ifndef __MPPA_RPC_ODP_DEFINES_H__
+#define __MPPA_RPC_ODP_DEFINES_H__
 
-#define _ODP_RPC_STRINGIFY(x) #x
-#define _ODP_RPC_TOSTRING(x) _ODP_RPC_STRINGIFY(x)
+#define _MPPA_RPC_ODP_STRINGIFY(x) #x
+#define _MPPA_RPC_ODP_TOSTRING(x) _MPPA_RPC_ODP_STRINGIFY(x)
 
-#define ODP_RPC_CHECK_STRUCT_SIZE(sname) _Static_assert(sizeof(sname) == sizeof(odp_rpc_inl_data_t),		\
-							"ODP_RPC_CMD_" _ODP_RPC_TOSTRING(sname) "__SIZE_ERROR")
-#define ODP_RPC_TIMEOUT_1S ((uint64_t)__bsp_frequency)
+#define MPPA_RPC_ODP_CHECK_STRUCT_SIZE(sname) _Static_assert(sizeof(sname) == sizeof(mppa_rpc_odp_inl_data_t),		\
+							"MPPA_RPC_ODP_CMD_" _MPPA_RPC_ODP_TOSTRING(sname) "__SIZE_ERROR")
+#define MPPA_RPC_ODP_TIMEOUT_1S ((uint64_t)__bsp_frequency)
 
 
 #define RPC_BASE_RX 10
 #define RPC_MAX_PAYLOAD 168 * 8 /* max payload in bytes */
 
-#ifndef ODP_RPC_PRINT
-#define ODP_RPC_PRINT(x...) printf(##x)
+#ifndef MPPA_RPC_ODP_PRINT
+#define MPPA_RPC_ODP_PRINT(x...) printf(##x)
 #endif
 
-#ifndef ODP_RPC_PREFIX
-#define ODP_RPC_PREFIX odp_rpc
+#ifndef MPPA_RPC_ODP_PREFIX
+#define MPPA_RPC_ODP_PREFIX mppa_rpc_odp
 #endif
 
-#define _ODP_RPC_CONCAT(x, y) x ## _ ## y
-#define _ODP_RPC_FUNCTION(x, y) _ODP_RPC_CONCAT(x, y)
-#define ODP_RPC_FUNCTION(x) _ODP_RPC_FUNCTION(ODP_RPC_PREFIX, x)
-#endif /* __ODP_RPC_DEFINES_H__ */
+#define _MPPA_RPC_ODP_CONCAT(x, y) x ## _ ## y
+#define _MPPA_RPC_ODP_FUNCTION(x, y) _MPPA_RPC_ODP_CONCAT(x, y)
+#define MPPA_RPC_ODP_FUNCTION(x) _MPPA_RPC_ODP_FUNCTION(MPPA_RPC_ODP_PREFIX, x)
+#endif /* __MPPA_RPC_ODP_DEFINES_H__ */

@@ -75,9 +75,13 @@ if ENV["label"].to_s() != "" then
     when /MPPA_EMB01b_centos7-with-eth-loopback/
         valid_configs = [ "k1b-kalray-mos_emb01" ]
         valid_type = "remote"
-    when "debian7-64", /MPPA_AB04_Developers-with-loopback/
+    when /MPPA_AB04_Developers-with-loopback/, "debian8-64"
 	b.run("	echo 'SKIP'");
 	b.log.finish(b.current_target)
+    when "debian7-64"
+	configs = [ "k1b-kalray-mos_developer", "k1b-kalray-mos_konic80" ]
+        # Validate nothing.
+        valid_configs = [ ]
     when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
         # Validate nothing.
         valid_configs = [ ]
@@ -202,6 +206,7 @@ b.target("package") do
     b.run(:cmd => "cd install/; tar cf ../odp-tests.tar local/k1tools/share/odp/tests local/k1tools/share/odp/long", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-apps-internal.tar local/k1tools/share/odp/apps", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-headers-internal.tar local/k1tools/kalray_internal/odp", :env => $env)
 
     (version,releaseID,sha1) = repo.describe()
     release_info = b.release_info(version,releaseID,sha1)
@@ -249,6 +254,16 @@ b.target("package") do
     package_description = "K1 ODP CUnit (k1-odp-cunit-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp-cunit", release_info,
                            package_description,
+                           depends, "/usr", workspace)
+    b.create_package(tar_package, pinfo)
+
+    #K1 ODP Internal Headers
+    tar_package = File.expand_path("odp-headers-internal.tar")
+    depends = []
+    depends.push b.depends_info_struct.new("k1-odp","=", release_info.full_version)
+    package_description = "K1 ODP Internal Headers  (k1-odp-headers-internal-#{version}-#{releaseID} sha1 #{sha1})."
+    pinfo = b.package_info("k1-odp-headers-internal", release_info,
+                           package_description, 
                            depends, "/usr", workspace)
     b.create_package(tar_package, pinfo)
 

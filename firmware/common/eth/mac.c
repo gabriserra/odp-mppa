@@ -15,7 +15,6 @@ void init_debug_cnoc()  {
   // Set return route
   __k1_cnoc_debug_send_set_return_route_first_dir (return_route & 0x7);
   __k1_cnoc_debug_send_set_return_route (0xC0000000 | (return_route>>3));
-  __k1_cnoc_debug_send_set_ctrl_reg (1);
 }
 int mppa_ethernet_generate_mac(unsigned int ioeth_id, unsigned int ifce_id, uint8_t *buffer)
 {
