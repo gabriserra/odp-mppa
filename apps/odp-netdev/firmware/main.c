@@ -33,7 +33,7 @@ int main()
 		{
 			static char const * _argv[] = {
 				"odp_l2fwd.kelf",
-				"-i", "p0p0:tags=50,e0:tags=50,p1p0:tags=50,e1:tags=50",
+				"-i", "e0:tags=50,p0p0:tags=50,e1:tags=50,p1p0:tags=50",
 				"-m", "0",
 				"-s", "0",
 				"-c", "10", "--allow_fail", NULL
