@@ -107,9 +107,50 @@ int ethtool_setup_eth2clus(unsigned remoteClus, int if_id,
 	if (!status[eth_if].cluster[remoteClus].rx_enabled)
 		return 0;
 
-	ret = mppa_routing_get_dnoc_unicast_route(externalAddress,
+	int src_node=-1;
+	/* Because of a HW bug, we route all outgoing flows through the flying noc link.
+	   Easiest way to do this is calculate the route from the opposite IO DMA and 
+	   then shift in the flying noc at the beginning. See T1600. Note that obviously
+	   this trick won't work once the bug is fixed in the librouting as the resulting
+	   route will leave the opposite IO over the flying NoC... TODO: Fix me */
+	switch(externalAddress){
+	case 160:
+		src_node = 224;
+		break;
+	case 161:
+		src_node = 225;
+		break;
+	case 162:
+		src_node = 226;
+		break;
+	case 163:
+		src_node = 227;
+		break;
+	case 224:
+		src_node = 160;
+		break;
+	case 225:
+		src_node = 161;
+		break;
+	case 226:
+		src_node = 162;
+		break;
+	case 227:
+		src_node = 163;
+		break;
+	default:
+		printf("Bad external address\n");
+		return -1;
+	}
+
+	ret = mppa_routing_get_dnoc_unicast_route(src_node,
 						  mppa_rpc_odp_undensify_cluster_id(remoteClus),
 						  &config, &header);
+
+	/* Shift the first direction calculated by the lib routing into the route */
+	header._.route = (header._.route << 2) | (config._.first_dir & 3);
+	config._.first_dir = 2; /* East, AKA Flying NoC from the IOs */
+
 	if (ret != MPPA_ROUTING_RET_SUCCESS) {
 		ETH_RPC_ERR_MSG(answer,
 				"Failed to route to cluster %d\n", remoteClus);

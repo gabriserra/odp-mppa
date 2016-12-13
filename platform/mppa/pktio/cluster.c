@@ -296,6 +296,9 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			return 1;
 
 		ret = rx_thread_link_open(&pkt_cluster->rx_config, &rx_opts);
+
+		pkt_cluster->rx_config.pktio = &pktio_entry->s;
+
 		if(ret < 0) {
 			ODP_ERR("Failed to setup rx threads\n");
 			return -1;
@@ -448,7 +451,6 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 			return 0;
 		}
 	}
-
 
 	ring = rx_get_ring(&clus->rx_config);
 	n_packet = odp_buffer_ring_get_multi(ring,

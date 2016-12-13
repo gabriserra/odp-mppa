@@ -247,6 +247,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		rx_thread_link_open(&pcie->rx_config, &rx_opts);
+		pcie->rx_config.pktio = &pktio_entry->s;
 	}
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();

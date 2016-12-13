@@ -10,6 +10,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/api/cpu.h>
 
 #ifdef K1_NODEOS
 #include <pthread.h>
@@ -33,6 +34,8 @@ _ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
 
 #include <mppa_noc.h>
 #include <mppa_routing.h>
+
+#include "odp_trace.h"
 
 #include "ucode_fw/ucode_eth_v2.h"
 
@@ -301,6 +304,8 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 		ret = rx_thread_link_open(&eth->rx_config, &rx_opts);
+		eth->rx_config.pktio = &pktio_entry->s;
+
 		if(ret < 0)
 			return -1;
 	}
@@ -476,6 +481,8 @@ static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		uint8_t * const base_addr =
 			((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			pkt_hdr->headroom;
+
+		mppa_tracepoint(odp, eth_recv, pkt_hdr);
 
 		INVALIDATE(pkt_hdr);
 		packet_parse_reset(pkt_hdr);

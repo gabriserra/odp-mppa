@@ -10,6 +10,7 @@
 #include <odp/errno.h>
 #include <errno.h>
 #include <odp/rpc/api.h>
+#include <odp/api/cpu.h>
 
 #ifdef K1_NODEOS
 #include <pthread.h>
@@ -178,6 +179,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 	ioddr->rx_config.if_type = RX_IF_TYPE_IODDR;
 	ret = rx_thread_link_open(&ioddr->rx_config, &rx_opts);
+	ioddr->rx_config.pktio = &pktio_entry->s;
 	if(ret < 0)
 		return -1;
 
@@ -260,6 +262,7 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 	const unsigned wanted_segs = len << log2_frag_per_pkt;
 	odp_packet_t tmp_table[wanted_segs];
 	uint64_t pkt_count;
+
 	odp_buffer_ring_t *ring = rx_get_ring(&ioddr->rx_config);
 
 	total_packet =

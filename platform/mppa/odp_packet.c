@@ -20,6 +20,12 @@
 #include <errno.h>
 #include "odp_rx_internal.h"
 
+
+#define MPPA_TRACEPOINT_DEFINE
+#include "odp_trace.h"
+
+#define MPPA_CREATE_TRACEPOINT
+#include "mppa_trace.h"
 /*
  *
  * Alloc and free
@@ -61,10 +67,13 @@ void _odp_packet_mark_nofree(odp_packet_t pkt)
 void packet_init(pool_entry_t *pool, odp_packet_hdr_t *pkt_hdr,
 		 size_t size, int parse)
 {
+	mppa_tracepoint(odp, packet_init, pkt_hdr);
+
        /*
 	* Reset parser metadata.  Note that we clear via memset to make
 	* this routine indepenent of any additional adds to packet metadata.
 	*/
+
 	const size_t start_offset = ODP_FIELD_SIZEOF(odp_packet_hdr_t, buf_hdr);
 	uint8_t *start;
 	size_t len;

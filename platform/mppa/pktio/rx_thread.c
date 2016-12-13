@@ -11,6 +11,14 @@
 #include <errno.h>
 #include <mppa_noc.h>
 
+ 
+#define MPPA_TRACEPOINT_DEFINE
+#include "odp_trace.h"
+
+#define MPPA_CREATE_TRACEPOINT
+#include "mppa_trace.h"
+
+
 #ifdef K1_NODEOS
 #include <pthread.h>
 #else
@@ -19,6 +27,8 @@
 
 #include "odp_pool_internal.h"
 #include "odp_rx_internal.h"
+
+#define ARRAY_SIZE(a) sizeof((a))/sizeof((a)[0])
 
 #define N_RX 256
 #define MAX_RX (30 * 4)
@@ -283,6 +293,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
+	uint64_t pkt_ts = 0ULL;
+	union mppa_ethernet_header_info_t info;
 
 	if (odp_unlikely(pkt == ODP_PACKET_INVALID)){
 		if (rx_hdl.tag[rx_id].broken) {
@@ -292,15 +304,16 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 			if_th->oom_pkts++;
 		}
 	} else {
-		/* Move timestamp to order so it can be sorted in the ring buf */
 		odp_packet_hdr_t *pkt_hdr = (odp_packet_hdr_t*)pkt;
 		const mppa_ethernet_header_t *header;
 		header = (const mppa_ethernet_header_t*)
 			(((uint8_t *)pkt_hdr->buf_hdr.addr) +
 			 rx_config->pkt_offset);
-
-		union mppa_ethernet_header_info_t info;
+		
+		pkt_ts = LOAD_U64(header->timestamp);
 		info.dword = LOAD_U64(header->info);
+
+		/* Move timestamp to order so it can be sorted in the ring buf */
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
 		hash_key = info._.hash_key;
 		if (info._.pkt_size < sizeof(*header)) {
@@ -387,6 +400,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
 		int queue = 0;
+
+		mppa_tracepoint(odp, rx_thread, pkt, pkt_ts + rx_config->pktio->pkt_eth.lb_ts_off, ((uint32_t) info._.pkt_size));
 
 		if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE))
 			queue = hash_key % rx_config->n_rings;
@@ -483,6 +498,7 @@ static void _poll_masks(int th_id)
 
 		if ((iter & FLUSH_PERIOD) == FLUSH_PERIOD) {
 			uint64_t if_mask_incomplete = 0ULL;
+
 			while (if_mask) {
 				uint64_t ret_mask;
 				i = __builtin_k1_ctzdl(if_mask);
@@ -506,6 +522,7 @@ static void _poll_masks(int th_id)
 static void *_rx_thread_start(void *arg)
 {
 	int th_id = (unsigned long)(arg);
+
 	for (int i = 0; i < MAX_RX_IF; ++i) {
 		for (uint32_t j = 0; j < MAX_MQUEUES; ++j) {
 			rx_buffer_list_t * hdr_list =
@@ -711,6 +728,7 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 		addr += ring_size;
 	}
 
+
 	rx_config->flow_controlled = opts->flow_controlled;
 
 	/* Copy config to Thread data */
@@ -826,6 +844,7 @@ int rx_thread_link_close(uint8_t pktio_id)
 			/** free all the buffers */
 			odp_buffer_hdr_t * buffers[10];
 			int nbufs;
+
 			while ((nbufs = odp_buffer_ring_get_multi(&ifce->rings[i],
 								  buffers, 10, 0,
 								  NULL)) > 0) {

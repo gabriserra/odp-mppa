@@ -34,6 +34,8 @@ extern "C" {
 /** Maximum number of threads dedicated for Ethernet */
 #define MAX_RX_THR 6
 
+#define MAX_RX_QUEUES 8
+
 /** Default number of Rx threads */
 #if defined(K1B_EXPLORER)
 #define DEF_N_RX_THR 1
@@ -50,7 +52,10 @@ typedef enum {
 	RX_IF_TYPE_IODDR,
 } rx_if_type_e;
 
+struct pktio_entry; 
+
 typedef struct {
+	struct pktio_entry *pktio;
 	uint8_t pktio_id;        /**< Unique pktio [0..MAX_RX_IF[ */
 	odp_pool_t pool;         /**< pool to alloc packets from */
 	uint8_t dma_if;          /**< DMA Rx Interface */
