@@ -437,7 +437,7 @@ b.target("dkms") do
   package_description = "MPPA Eth package (version:#{version} releaseID=#{buildID} sha1:#{sha1})\n"
   package_description += "This package contains Kalray's mppa ethernet driver module."
 
-  release_info = b.release_info(version,buildID)
+  release_info = b.release_info(version,buildID,sha1)
 
   pack_name = "k1-mppapcie-odp-dkms"
 
