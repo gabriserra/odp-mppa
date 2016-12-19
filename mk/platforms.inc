@@ -193,15 +193,15 @@ iounified-jumbo_CONFIGS += k1b-kalray_emb01
 #
 # IOETH
 #
-ioeth_CONFIGS += k1b-kalray_developer
-ioeth_CONFIGS += k1b-kalray_konic80
-ioeth_CONFIGS += k1b-kalray_ab04
-ioeth_CONFIGS += k1b-kalray_emb01
+_ioeth_CONFIGS += k1b-kalray_developer
+_ioeth_CONFIGS += k1b-kalray_konic80
+_ioeth_CONFIGS += k1b-kalray_ab04
+_ioeth_CONFIGS += k1b-kalray_emb01
 
 #
 # IOETH storage
 #
-ioeth-storage_CONFIGS += k1b-kalray_konic80
+_ioeth-storage_CONFIGS += k1b-kalray_konic80
 
 #
 #
