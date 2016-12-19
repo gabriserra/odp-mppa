@@ -299,7 +299,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	mppa_dnoc[dma_if]->rx_queues[rx_id].event_lac.hword;
 	odp_packet_t pkt = rx_hdl.tag[rx_id].pkt;
 	odp_packet_t newpkt = ODP_PACKET_INVALID;
-	uint64_t pkt_ts = 0ULL;
+	uint64_t pkt_ts __attribute__ ((unused)) = 0ULL;
 	union mppa_ethernet_header_info_t info;
 
 	if (odp_unlikely(pkt == ODP_PACKET_INVALID)){
