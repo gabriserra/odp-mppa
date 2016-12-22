@@ -109,9 +109,10 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 
 	/* Also store the data on the host side of things */
 	uint64_t host_addr = c2h->host_addr;
-	if (!host_addr)
+	if (!host_addr) {
 		__builtin_k1_dinvall(&c2h->host_addr);
-	host_addr = c2h->host_addr;
+		host_addr = c2h->host_addr;
+	}
 
 	if (host_addr) {
 		uint64_t entry_addr = host_addr + tail * sizeof(*data);
@@ -136,6 +137,11 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 	/* __k1_wmb(); */
 
 	uint64_t h_tail_addr = c2h->h_tail_addr;
+	if (!h_tail_addr) {
+		__builtin_k1_dinvall(&c2h->h_tail_addr);
+		h_tail_addr = c2h->h_tail_addr;
+	}
+
 	if (h_tail_addr) {
 		__k1_pcie_write_32(h_tail_addr, next_tail);
 	}
