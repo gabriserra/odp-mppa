@@ -4,16 +4,18 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#define _GNU_SOURCE
-#include <odp/system_info.h>
+#include <odp_posix_extensions.h>
+
+#include <odp/api/system_info.h>
 #include <odp_internal.h>
 #include <odp_debug_internal.h>
-#include <odp/align.h>
-#include <odp/cpu.h>
+#include <odp/api/align.h>
+#include <odp/api/cpu.h>
 #include <pthread.h>
 #include <sched.h>
 #include <string.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 /* sysconf */
 #include <unistd.h>
@@ -23,34 +25,15 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-
-
-typedef struct {
-	const char *cpu_arch_str;
-	int (*cpuinfo_parser)(FILE *file, odp_system_info_t *sysinfo);
-
-} odp_compiler_info_t;
-
 #define CACHE_LNSZ_FILE \
 	"/sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size"
 
-#define HUGE_PAGE_DIR "/sys/kernel/mm/hugepages"
-
-
 /*
- * Report the number of CPUs in the affinity mask of the main thread
+ * Report the number of logical CPUs detected at boot time
  */
 static int sysconf_cpu_count(void)
 {
-	cpu_set_t cpuset;
-	int ret;
-
-	ret = pthread_getaffinity_np(pthread_self(),
-				     sizeof(cpuset), &cpuset);
-	if (ret != 0)
-		return 0;
-
-	return CPU_COUNT(&cpuset);
+	return odp_global_data.num_cpus_installed;
 }
 
 #if defined __x86_64__ || defined __i386__ || defined __OCTEON__ || \
@@ -72,212 +55,51 @@ static int systemcpu_cache_line_size(void)
 
 	if (fgets(str, sizeof(str), file) != NULL) {
 		/* Read cache line size */
-		sscanf(str, "%i", &size);
+		if (sscanf(str, "%i", &size) != 1)
+			size = 0;
 	}
 
 	fclose(file);
 
 	return size;
 }
-#endif
-
-
-static int huge_page_size(void)
-{
-	DIR *dir;
-	struct dirent *dirent;
-	int size = 0;
-
-	dir = opendir(HUGE_PAGE_DIR);
-	if (dir == NULL) {
-		ODP_ERR("%s not found\n", HUGE_PAGE_DIR);
-		return 0;
-	}
-
-	while ((dirent = readdir(dir)) != NULL) {
-		int temp = 0;
-		sscanf(dirent->d_name, "hugepages-%i", &temp);
-
-		if (temp > size)
-			size = temp;
-	}
-
-	if (closedir(dir)) {
-		ODP_ERR("closedir failed\n");
-		return 0;
-	}
-
-	return size*1024;
-}
-
-
-
-/*
- * HW specific /proc/cpuinfo file parsing
- */
-#if defined __x86_64__ || defined __i386__
-
-static int cpuinfo_x86(FILE *file, odp_system_info_t *sysinfo)
-{
-	char str[1024];
-	char *pos;
-	double mhz = 0.0;
-	int model = 0;
-	int count = 2;
-
-	while (fgets(str, sizeof(str), file) != NULL && count > 0) {
-		if (!mhz) {
-			pos = strstr(str, "cpu MHz");
-			if (pos) {
-				sscanf(pos, "cpu MHz : %lf", &mhz);
-				count--;
-			}
-		}
-
-		if (!model) {
-			pos = strstr(str, "model name");
-			if (pos) {
-				int len;
-				pos = strchr(str, ':');
-				strncpy(sysinfo->model_str, pos+2,
-					sizeof(sysinfo->model_str));
-				len = strlen(sysinfo->model_str);
-				sysinfo->model_str[len - 1] = 0;
-				model = 1;
-				count--;
-			}
-		}
-	}
-
-	sysinfo->cpu_hz = (uint64_t) (mhz * 1000000.0);
-
-	return 0;
-}
-
-#elif defined __arm__ || defined __aarch64__
-
-static int cpuinfo_arm(FILE *file ODP_UNUSED,
-odp_system_info_t *sysinfo ODP_UNUSED)
-{
-	return 0;
-}
-
-#elif defined __OCTEON__
-
-static int cpuinfo_octeon(FILE *file, odp_system_info_t *sysinfo)
-{
-	char str[1024];
-	char *pos;
-	double mhz = 0.0;
-	int model = 0;
-	int count = 2;
-
-	while (fgets(str, sizeof(str), file) != NULL && count > 0) {
-		if (!mhz) {
-			pos = strstr(str, "BogoMIPS");
-
-			if (pos) {
-				sscanf(pos, "BogoMIPS : %lf", &mhz);
-				count--;
-			}
-		}
-
-		if (!model) {
-			pos = strstr(str, "cpu model");
-
-			if (pos) {
-				int len;
-				pos = strchr(str, ':');
-				strncpy(sysinfo->model_str, pos+2,
-					sizeof(sysinfo->model_str));
-				len = strlen(sysinfo->model_str);
-				sysinfo->model_str[len - 1] = 0;
-				model = 1;
-				count--;
-			}
-		}
-	}
-
-	/* bogomips seems to be 2x freq */
-	sysinfo->cpu_hz = (uint64_t) (mhz * 1000000.0 / 2.0);
-
-	return 0;
-}
-#elif defined __powerpc__
-static int cpuinfo_powerpc(FILE *file, odp_system_info_t *sysinfo)
-{
-	char str[1024];
-	char *pos;
-	double mhz = 0.0;
-	int model = 0;
-	int count = 2;
-
-	while (fgets(str, sizeof(str), file) != NULL && count > 0) {
-		if (!mhz) {
-			pos = strstr(str, "clock");
-
-			if (pos) {
-				sscanf(pos, "clock : %lf", &mhz);
-				count--;
-			}
-		}
-
-		if (!model) {
-			pos = strstr(str, "cpu");
-
-			if (pos) {
-				int len;
-				pos = strchr(str, ':');
-				strncpy(sysinfo->model_str, pos+2,
-					sizeof(sysinfo->model_str));
-				len = strlen(sysinfo->model_str);
-				sysinfo->model_str[len - 1] = 0;
-				model = 1;
-				count--;
-			}
-		}
-
-		sysinfo->cpu_hz = (uint64_t) (mhz * 1000000.0);
-	}
-
-
-	return 0;
-}
 
 #else
-	#error GCC target not found
+/*
+ * Use dummy data if not available from /sys/devices/system/cpu/
+ */
+static int systemcpu_cache_line_size(void)
+{
+	return 64;
+}
 #endif
 
-static odp_compiler_info_t compiler_info = {
-	#if defined __x86_64__ || defined __i386__
-	.cpu_arch_str = "x86",
-	.cpuinfo_parser = cpuinfo_x86
 
-	#elif defined __arm__ || defined __aarch64__
-	.cpu_arch_str = "arm",
-	.cpuinfo_parser = cpuinfo_arm
+static uint64_t default_huge_page_size(void)
+{
+	char str[1024];
+	unsigned long sz;
+	FILE *file;
 
-	#elif defined __OCTEON__
-	.cpu_arch_str = "octeon",
-	.cpuinfo_parser = cpuinfo_octeon
+	file = fopen("/proc/meminfo", "rt");
 
-	#elif defined __powerpc__
-	.cpu_arch_str = "powerpc",
-	.cpuinfo_parser = cpuinfo_powerpc
+	while (fgets(str, sizeof(str), file) != NULL) {
+		if (sscanf(str, "Hugepagesize:   %8lu kB", &sz) == 1) {
+			ODP_DBG("defaut hp size is %" PRIu64 " kB\n", sz);
+			fclose(file);
+			return (uint64_t)sz * 1024;
+		}
+	}
 
-	#else
-	#error GCC target not found
-	#endif
-};
-
-
-#if defined __x86_64__ || defined __i386__ || defined __OCTEON__ || \
-defined __powerpc__
+	ODP_ERR("unable to get default hp size\n");
+	fclose(file);
+	return 0;
+}
 
 /*
  * Analysis of /sys/devices/system/cpu/ files
  */
-static int systemcpu(odp_system_info_t *sysinfo)
+static int systemcpu(system_info_t *sysinfo)
 {
 	int ret;
 
@@ -303,42 +125,11 @@ static int systemcpu(odp_system_info_t *sysinfo)
 		return -1;
 	}
 
-	odp_global_data.system_info.huge_page_size = huge_page_size();
+	sysinfo->default_huge_page_size = default_huge_page_size();
 
 	return 0;
 }
 
-#else
-
-/*
- * Use sysconf and dummy values in generic case
- */
-
-
-static int systemcpu(odp_system_info_t *sysinfo)
-{
-	int ret;
-
-	ret = sysconf_cpu_count();
-	if (ret == 0) {
-		ODP_ERR("sysconf_cpu_count failed.\n");
-		return -1;
-	}
-
-	sysinfo->cpu_count = ret;
-
-	sysinfo->huge_page_size = huge_page_size();
-
-	/* Dummy values */
-	sysinfo->cpu_hz          = 1400000000;
-	sysinfo->cache_line_size = 64;
-
-	strncpy(sysinfo->model_str, "UNKNOWN", sizeof(sysinfo->model_str));
-
-	return 0;
-}
-
-#endif
 
 /*
  * System info initialisation
@@ -347,7 +138,7 @@ int odp_system_info_init(void)
 {
 	FILE  *file;
 
-	memset(&odp_global_data.system_info, 0, sizeof(odp_system_info_t));
+	memset(&odp_global_data.system_info, 0, sizeof(system_info_t));
 
 	odp_global_data.system_info.page_size = ODP_PAGE_SIZE;
 
@@ -357,7 +148,7 @@ int odp_system_info_init(void)
 		return -1;
 	}
 
-	compiler_info.cpuinfo_parser(file, &odp_global_data.system_info);
+	cpuinfo_parser(file, &odp_global_data.system_info);
 
 	fclose(file);
 
@@ -370,18 +161,46 @@ int odp_system_info_init(void)
 }
 
 /*
+ * System info termination
+ */
+int odp_system_info_term(void)
+{
+	return 0;
+}
+
+/*
  *************************
  * Public access functions
  *************************
  */
-uint64_t odp_sys_cpu_hz(void)
+uint64_t odp_cpu_hz(void)
 {
-	return odp_global_data.system_info.cpu_hz;
+	int id = sched_getcpu();
+
+	return odp_cpu_hz_current(id);
+}
+
+uint64_t odp_cpu_hz_id(int id)
+{
+	return odp_cpu_hz_current(id);
+}
+
+uint64_t odp_cpu_hz_max(void)
+{
+	return odp_cpu_hz_max_id(0);
+}
+
+uint64_t odp_cpu_hz_max_id(int id)
+{
+	if (id >= 0 && id < MAX_CPU_NUMBER)
+		return odp_global_data.system_info.cpu_hz_max[id];
+	else
+		return 0;
 }
 
 uint64_t odp_sys_huge_page_size(void)
 {
-	return odp_global_data.system_info.huge_page_size;
+	return odp_global_data.system_info.default_huge_page_size;
 }
 
 uint64_t odp_sys_page_size(void)
@@ -389,9 +208,17 @@ uint64_t odp_sys_page_size(void)
 	return odp_global_data.system_info.page_size;
 }
 
-const char *odp_sys_cpu_model_str(void)
+const char *odp_cpu_model_str(void)
 {
-	return odp_global_data.system_info.model_str;
+	return odp_cpu_model_str_id(0);
+}
+
+const char *odp_cpu_model_str_id(int id)
+{
+	if (id >= 0 && id < MAX_CPU_NUMBER)
+		return odp_global_data.system_info.model_str[id];
+	else
+		return NULL;
 }
 
 int odp_sys_cache_line_size(void)

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-
 /**
  * @file
  *
@@ -18,10 +17,8 @@
 extern "C" {
 #endif
 
-#include <odp/align.h>
-#include <odp/debug.h>
-#include <odp/byteorder.h>
-
+#include <odp_api.h>
+#include <odp/helper/chksum.h>
 
 /** @addtogroup odph_header ODPH HEADER
  *  @{
@@ -32,62 +29,32 @@ extern "C" {
 
 /** UDP header */
 typedef struct ODP_PACKED {
-	uint16be_t src_port; /**< Source port */
-	uint16be_t dst_port; /**< Destination port */
-	uint16be_t length;   /**< UDP datagram length in bytes (header+data) */
-	uint16be_t chksum;   /**< UDP header and data checksum (0 if not used)*/
+	odp_u16be_t src_port; /**< Source port */
+	odp_u16be_t dst_port; /**< Destination port */
+	odp_u16be_t length;   /**< UDP datagram length in bytes (header+data) */
+	odp_u16be_t chksum;   /**< UDP header and data checksum (0 if not used)*/
 } odph_udphdr_t;
 
 /**
  * UDP checksum
  *
- * This function uses odp packet to calc checksum
+ * This function calculates the UDP checksum given an odp packet.
  *
  * @param pkt  calculate chksum for pkt
- * @return  checksum value
+ * @return  checksum value in BE endianness
  */
 static inline uint16_t odph_ipv4_udp_chksum(odp_packet_t pkt)
 {
-	uint32_t sum = 0;
-	odph_udphdr_t *udph;
-	odph_ipv4hdr_t *iph;
-	uint16_t udplen;
-	uint8_t *buf;
+	uint16_t chksum;
+	int      rc;
 
-	if (!odp_packet_l3_offset(pkt))
-		return 0;
-
-	if (!odp_packet_l4_offset(pkt))
-		return 0;
-
-	iph = (odph_ipv4hdr_t *)odp_packet_l3_ptr(pkt, NULL);
-	udph = (odph_udphdr_t *)odp_packet_l4_ptr(pkt, NULL);
-	udplen = odp_be_to_cpu_16(udph->length);
-
-	/* 32-bit sum of all 16-bit words covered by UDP chksum */
-	sum = (iph->src_addr & 0xFFFF) + (iph->src_addr >> 16) +
-	      (iph->dst_addr & 0xFFFF) + (iph->dst_addr >> 16) +
-	      (uint16_t)iph->proto + udplen;
-	for (buf = (uint8_t *)udph; udplen > 1; udplen -= 2) {
-		sum += ((*buf << 8) + *(buf + 1));
-		buf += 2;
-	}
-
-	/* Fold sum to 16 bits: add carrier to result */
-	while (sum >> 16)
-		sum = (sum & 0xFFFF) + (sum >> 16);
-
-	/* 1's complement */
-	sum = ~sum;
-
-	/* set computation result */
-	sum = (sum == 0x0) ? 0xFFFF : sum;
-
-	return sum;
+	rc = odph_udp_tcp_chksum(pkt, ODPH_CHKSUM_RETURN, &chksum);
+	return (rc == 0) ? chksum : 0;
 }
 
 /** @internal Compile time assert */
-_ODP_STATIC_ASSERT(sizeof(odph_udphdr_t) == ODPH_UDPHDR_LEN, "ODPH_UDPHDR_T__SIZE_ERROR");
+ODP_STATIC_ASSERT(sizeof(odph_udphdr_t) == ODPH_UDPHDR_LEN,
+		  "ODPH_UDPHDR_T__SIZE_ERROR");
 
 /**
  * @}

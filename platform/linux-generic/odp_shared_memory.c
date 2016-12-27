@@ -4,18 +4,18 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-/*ftruncate _POSIX_C_SOURCE 200809L */
-#define _POSIX_C_SOURCE 200809L
+#include <odp_posix_extensions.h>
 
-#include <odp/shared_memory.h>
+#include <odp/api/shared_memory.h>
 #include <odp_internal.h>
-#include <odp/spinlock.h>
-#include <odp/align.h>
-#include <odp/system_info.h>
-#include <odp/debug.h>
+#include <odp/api/spinlock.h>
+#include <odp/api/align.h>
+#include <odp/api/system_info.h>
+#include <odp/api/debug.h>
+#include <odp_shm_internal.h>
 #include <odp_debug_internal.h>
 #include <odp_align_internal.h>
-#include <odp/config.h>
+#include <odp_config_internal.h>
 
 #include <unistd.h>
 #include <sys/mman.h>
@@ -26,9 +26,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 
-_ODP_STATIC_ASSERT(ODP_CONFIG_SHM_BLOCKS >= ODP_CONFIG_POOLS,
-		   "ODP_CONFIG_SHM_BLOCKS < ODP_CONFIG_POOLS");
+ODP_STATIC_ASSERT(ODP_CONFIG_SHM_BLOCKS >= ODP_CONFIG_POOLS,
+		  "ODP_CONFIG_SHM_BLOCKS < ODP_CONFIG_POOLS");
 
 typedef struct {
 	char      name[ODP_SHM_NAME_LEN];
@@ -113,6 +114,16 @@ int odp_shm_init_local(void)
 	return 0;
 }
 
+int odp_shm_capability(odp_shm_capability_t *capa)
+{
+	memset(capa, 0, sizeof(odp_shm_capability_t));
+
+	capa->max_blocks = ODP_CONFIG_SHM_BLOCKS;
+	capa->max_size   = 0;
+	capa->max_align  = 0;
+
+	return 0;
+}
 
 static int find_block(const char *name, uint32_t *index)
 {
@@ -136,6 +147,7 @@ int odp_shm_free(odp_shm_t shm)
 	uint32_t i;
 	int ret;
 	odp_shm_block_t *block;
+	char shm_devname[SHM_DEVNAME_MAXLEN];
 
 	if (shm == ODP_SHM_INVALID) {
 		ODP_DBG("odp_shm_free: Invalid handle\n");
@@ -167,8 +179,17 @@ int odp_shm_free(odp_shm_t shm)
 		return -1;
 	}
 
-	if (block->flags & ODP_SHM_PROC) {
-		ret = shm_unlink(block->name);
+	if (block->flags & ODP_SHM_PROC || block->flags & _ODP_SHM_PROC_NOCREAT) {
+		int shm_ns_id;
+
+		if (odp_global_data.ipc_ns)
+			shm_ns_id = odp_global_data.ipc_ns;
+		else
+			shm_ns_id = odp_global_data.main_pid;
+
+		snprintf(shm_devname, SHM_DEVNAME_MAXLEN,
+			 SHM_DEVNAME_FORMAT, shm_ns_id, block->name);
+		ret = shm_unlink(shm_devname);
 		if (0 != ret) {
 			ODP_DBG("odp_shm_free: shm_unlink failed\n");
 			odp_spinlock_unlock(&odp_shm_tbl->lock);
@@ -184,12 +205,13 @@ odp_shm_t odp_shm_reserve(const char *name, uint64_t size, uint64_t align,
 			  uint32_t flags)
 {
 	uint32_t i;
+	char shm_devname[SHM_DEVNAME_MAXLEN];
 	odp_shm_block_t *block;
 	void *addr;
 	int fd = -1;
 	int map_flag = MAP_SHARED;
 	/* If already exists: O_EXCL: error, O_TRUNC: truncate to zero */
-	int oflag = O_RDWR | O_CREAT | O_TRUNC;
+	int oflag = O_RDWR;
 	uint64_t alloc_size;
 	uint64_t page_sz, huge_sz;
 #ifdef MAP_HUGETLB
@@ -207,12 +229,28 @@ odp_shm_t odp_shm_reserve(const char *name, uint64_t size, uint64_t align,
 	alloc_hp_size = (size + align + (huge_sz - 1)) & (-huge_sz);
 #endif
 
-	if (flags & ODP_SHM_PROC) {
-		/* Creates a file to /dev/shm */
-		fd = shm_open(name, oflag,
+	if (flags & ODP_SHM_PROC)
+		oflag |= O_CREAT | O_TRUNC;
+	if (flags & _ODP_SHM_O_EXCL)
+		oflag |= O_EXCL;
+
+	if (flags & (ODP_SHM_PROC | _ODP_SHM_PROC_NOCREAT)) {
+		int shm_ns_id;
+
+		if (odp_global_data.ipc_ns)
+			shm_ns_id = odp_global_data.ipc_ns;
+		else
+			shm_ns_id = odp_global_data.main_pid;
+
+		need_huge_page = 0;
+
+		/* Creates a file to /dev/shm/odp */
+		snprintf(shm_devname, SHM_DEVNAME_MAXLEN,
+			 SHM_DEVNAME_FORMAT, shm_ns_id, name);
+		fd = shm_open(shm_devname, oflag,
 			      S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 		if (fd == -1) {
-			ODP_DBG("%s: shm_open failed.\n", name);
+			ODP_DBG("%s: shm_open failed.\n", shm_devname);
 			return ODP_SHM_INVALID;
 		}
 	} else {

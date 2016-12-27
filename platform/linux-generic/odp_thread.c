@@ -4,20 +4,19 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include <sched.h>
+#include <odp_posix_extensions.h>
 
-#include <odp/thread.h>
-#include <odp/thrmask.h>
+#include <sched.h>
+#include <odp/api/thread.h>
+#include <odp/api/thrmask.h>
 #include <odp_internal.h>
-#include <odp/spinlock.h>
-#include <odp/config.h>
+#include <odp/api/spinlock.h>
+#include <odp_config_internal.h>
 #include <odp_debug_internal.h>
-#include <odp/shared_memory.h>
-#include <odp/align.h>
-#include <odp/cpu.h>
+#include <odp/api/shared_memory.h>
+#include <odp/api/align.h>
+#include <odp/api/cpu.h>
+#include <odp_schedule_if.h>
 
 #include <string.h>
 #include <stdio.h>
@@ -32,15 +31,13 @@ typedef struct {
 
 typedef struct {
 	thread_state_t thr[ODP_THREAD_COUNT_MAX];
-	union {
-		/* struct order must be kept in sync with schedule_types.h */
-		struct {
-			odp_thrmask_t  all;
-			odp_thrmask_t  worker;
-			odp_thrmask_t  control;
-		};
-		odp_thrmask_t sched_grp_mask[ODP_CONFIG_SCHED_GRPS];
+
+	struct {
+		odp_thrmask_t  all;
+		odp_thrmask_t  worker;
+		odp_thrmask_t  control;
 	};
+
 	uint32_t       num;
 	uint32_t       num_worker;
 	uint32_t       num_control;
@@ -59,7 +56,6 @@ static __thread thread_state_t *this_thread;
 int odp_thread_init_global(void)
 {
 	odp_shm_t shm;
-	int i;
 
 	shm = odp_shm_reserve("odp_thread_globals",
 			      sizeof(thread_globals_t),
@@ -73,16 +69,7 @@ int odp_thread_init_global(void)
 	memset(thread_globals, 0, sizeof(thread_globals_t));
 	odp_spinlock_init(&thread_globals->lock);
 
-	for (i = 0; i < ODP_CONFIG_SCHED_GRPS; i++)
-		odp_thrmask_zero(&thread_globals->sched_grp_mask[i]);
-
 	return 0;
-}
-
-odp_thrmask_t *thread_sched_grp_mask(int index);
-odp_thrmask_t *thread_sched_grp_mask(int index)
-{
-	return &thread_globals->sched_grp_mask[index];
 }
 
 int odp_thread_term_global(void)
@@ -174,6 +161,14 @@ int odp_thread_init_local(odp_thread_type_t type)
 	thread_globals->thr[id].type = type;
 
 	this_thread = &thread_globals->thr[id];
+
+	sched_fn->thr_add(ODP_SCHED_GROUP_ALL, id);
+
+	if (type == ODP_THREAD_WORKER)
+		sched_fn->thr_add(ODP_SCHED_GROUP_WORKER, id);
+	else if (type == ODP_THREAD_CONTROL)
+		sched_fn->thr_add(ODP_SCHED_GROUP_CONTROL, id);
+
 	return 0;
 }
 
@@ -181,6 +176,14 @@ int odp_thread_term_local(void)
 {
 	int num;
 	int id = this_thread->thr;
+	odp_thread_type_t type = this_thread->type;
+
+	sched_fn->thr_rem(ODP_SCHED_GROUP_ALL, id);
+
+	if (type == ODP_THREAD_WORKER)
+		sched_fn->thr_rem(ODP_SCHED_GROUP_WORKER, id);
+	else if (type == ODP_THREAD_CONTROL)
+		sched_fn->thr_rem(ODP_SCHED_GROUP_CONTROL, id);
 
 	odp_spinlock_lock(&thread_globals->lock);
 	num = free_id(id);

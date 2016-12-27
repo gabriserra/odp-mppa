@@ -7,7 +7,7 @@
 #ifndef _ODP_TEST_THREAD_H_
 #define _ODP_TEST_THREAD_H_
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp_cunit_common.h>
 
 /* test functions: */
@@ -28,6 +28,6 @@ extern odp_testinfo_t thread_suite[];
 extern odp_suiteinfo_t thread_suites[];
 
 /* main test program: */
-int thread_main(void);
+int thread_main(int argc, char *argv[]);
 
 #endif

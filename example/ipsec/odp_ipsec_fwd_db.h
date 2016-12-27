@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp/helper/eth.h>
 #include <odp_ipsec_misc.h>
 
@@ -23,7 +23,7 @@ extern "C" {
 typedef struct fwd_db_entry_s {
 	struct fwd_db_entry_s *next;          /**< Next entry on list */
 	char                   oif[OIF_LEN];  /**< Output interface name */
-	odp_queue_t            queue;         /**< Output transmit queue */
+	odp_pktout_queue_t     pktout;        /**< Output transmit queue */
 	uint8_t   src_mac[ODPH_ETHADDR_LEN];  /**< Output source MAC */
 	uint8_t   dst_mac[ODPH_ETHADDR_LEN];  /**< Output destination MAC */
 	ip_addr_range_t        subnet;        /**< Subnet for this router */
@@ -51,9 +51,13 @@ void init_fwd_db(void);
  *
  * @param input  Pointer to string describing route
  *
+ * @param if_names  Array of Name of the interfaces available
+ *
+ * @param if_count  number of interfaces in if_names array
+ *
  * @return 0 if successful else -1
  */
-int create_fwd_db_entry(char *input);
+int create_fwd_db_entry(char *input, char **if_names, int if_count);
 
 /**
  * Scan FWD DB entries and resolve output queue and source MAC address
@@ -62,7 +66,7 @@ int create_fwd_db_entry(char *input);
  * @param outq   Output queue for packet transmit
  * @param mac    MAC address of this interface
  */
-void resolve_fwd_db(char *intf, odp_queue_t outq, uint8_t *mac);
+void resolve_fwd_db(char *intf, odp_pktout_queue_t pktout, uint8_t *mac);
 
 /**
  * Display one fowarding database entry

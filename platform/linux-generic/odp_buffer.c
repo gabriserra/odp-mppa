@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#include <odp/buffer.h>
+#include <odp/api/buffer.h>
 #include <odp_pool_internal.h>
 #include <odp_buffer_internal.h>
 #include <odp_buffer_inlines.h>
@@ -12,7 +12,7 @@
 
 #include <string.h>
 #include <stdio.h>
-
+#include <inttypes.h>
 
 odp_buffer_t odp_buffer_from_event(odp_event_t ev)
 {

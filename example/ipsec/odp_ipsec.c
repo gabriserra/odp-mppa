@@ -10,16 +10,19 @@
  * @example odp_example_ipsec.c  ODP basic packet IO cross connect with IPsec test application
  */
 
-#define _DEFAULT_SOURCE
 /* enable strtok */
-#define _POSIX_C_SOURCE 200112L
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <example_debug.h>
 
-#include <odp.h>
+#include <odp_api.h>
 
 #include <odp/helper/linux.h>
 #include <odp/helper/eth.h>
@@ -148,7 +151,7 @@ typedef struct {
 	odp_buffer_t buffer;  /**< Buffer for context */
 	pkt_state_e  state;   /**< Next processing step */
 	ipsec_ctx_t  ipsec;   /**< IPsec specific context */
-	odp_queue_t  outq;    /**< transmit queue */
+	odp_pktout_queue_t pktout; /**< Packet output queue */
 } pkt_ctx_t;
 
 #define SHM_CTX_POOL_BUF_SIZE  (sizeof(pkt_ctx_t))
@@ -210,7 +213,7 @@ void free_pkt_ctx(pkt_ctx_t *ctx)
  * Example supports either polling queues or using odp_schedule
  */
 typedef odp_queue_t (*queue_create_func_t)
-		    (const char *, odp_queue_type_t, odp_queue_param_t *);
+		    (const char *, const odp_queue_param_t *);
 typedef odp_event_t (*schedule_func_t) (odp_queue_t *);
 
 static queue_create_func_t queue_create;
@@ -226,20 +229,26 @@ static int num_polled_queues;
  */
 static
 odp_queue_t polled_odp_queue_create(const char *name,
-				    odp_queue_type_t type,
-				    odp_queue_param_t *param EXAMPLE_UNUSED)
+				    const odp_queue_param_t *param)
 {
 	odp_queue_t my_queue;
-	odp_queue_type_t my_type = type;
+	odp_queue_param_t qp;
+	odp_queue_type_t type;
+
+	odp_queue_param_init(&qp);
+	if (param)
+		memcpy(&qp, param, sizeof(odp_queue_param_t));
+
+	type = qp.type;
 
 	if (ODP_QUEUE_TYPE_SCHED == type) {
-		printf("%s: change %s to POLL\n", __func__, name);
-		my_type = ODP_QUEUE_TYPE_POLL;
+		printf("%s: change %s to PLAIN\n", __func__, name);
+		qp.type = ODP_QUEUE_TYPE_PLAIN;
 	}
 
-	my_queue = odp_queue_create(name, my_type, NULL);
+	my_queue = odp_queue_create(name, &qp);
 
-	if ((ODP_QUEUE_TYPE_SCHED == type) || (ODP_QUEUE_TYPE_PKTIN == type)) {
+	if (ODP_QUEUE_TYPE_SCHED == type) {
 		poll_queues[num_polled_queues++] = my_queue;
 		printf("%s: adding %"PRIu64"\n", __func__,
 		       odp_queue_to_u64(my_queue));
@@ -297,25 +306,23 @@ void ipsec_init_pre(void)
 	 *  - sequence number queue (must be ATOMIC)
 	 */
 	odp_queue_param_init(&qparam);
+	qparam.type        = ODP_QUEUE_TYPE_SCHED;
 	qparam.sched.prio  = ODP_SCHED_PRIO_HIGHEST;
 	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
 	qparam.sched.group = ODP_SCHED_GROUP_ALL;
 
-	completionq = queue_create("completion",
-				   ODP_QUEUE_TYPE_SCHED,
-				   &qparam);
+	completionq = queue_create("completion", &qparam);
 	if (ODP_QUEUE_INVALID == completionq) {
 		EXAMPLE_ERR("Error: completion queue creation failed\n");
 		exit(EXIT_FAILURE);
 	}
 
+	qparam.type        = ODP_QUEUE_TYPE_SCHED;
 	qparam.sched.prio  = ODP_SCHED_PRIO_HIGHEST;
 	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
 	qparam.sched.group = ODP_SCHED_GROUP_ALL;
 
-	seqnumq = queue_create("seqnum",
-			       ODP_QUEUE_TYPE_SCHED,
-			       &qparam);
+	seqnumq = queue_create("seqnum", &qparam);
 	if (ODP_QUEUE_INVALID == seqnumq) {
 		EXAMPLE_ERR("Error: sequence number queue creation failed\n");
 		exit(EXIT_FAILURE);
@@ -403,6 +410,7 @@ void ipsec_init_post(crypto_api_mode_e api_mode)
  *
  * @param intf     Loopback interface name string
  */
+#if 0 /* Temporarely disable loopback mode. Needs packet output event queues */
 static
 void initialize_loop(char *intf)
 {
@@ -423,26 +431,24 @@ void initialize_loop(char *intf)
 
 	/* Create input queue */
 	odp_queue_param_init(&qparam);
+	qparam.type        = ODP_QUEUE_TYPE_SCHED;
 	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
 	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
 	qparam.sched.group = ODP_SCHED_GROUP_ALL;
 	snprintf(queue_name, sizeof(queue_name), "%i-loop_inq_def", idx);
 	queue_name[ODP_QUEUE_NAME_LEN - 1] = '\0';
 
-	inq_def = queue_create(queue_name, ODP_QUEUE_TYPE_SCHED, &qparam);
+	inq_def = queue_create(queue_name, &qparam);
 	if (ODP_QUEUE_INVALID == inq_def) {
 		EXAMPLE_ERR("Error: input queue creation failed for %s\n",
 			    intf);
 		exit(EXIT_FAILURE);
 	}
 	/* Create output queue */
-	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
-	qparam.sched.group = ODP_SCHED_GROUP_ALL;
 	snprintf(queue_name, sizeof(queue_name), "%i-loop_outq_def", idx);
 	queue_name[ODP_QUEUE_NAME_LEN - 1] = '\0';
 
-	outq_def = queue_create(queue_name, ODP_QUEUE_TYPE_POLL, &qparam);
+	outq_def = queue_create(queue_name, NULL);
 	if (ODP_QUEUE_INVALID == outq_def) {
 		EXAMPLE_ERR("Error: output queue creation failed for %s\n",
 			    intf);
@@ -464,7 +470,7 @@ void initialize_loop(char *intf)
 	/* Resolve any routes using this interface for output */
 	resolve_fwd_db(intf, outq_def, mac);
 }
-
+#endif
 /**
  * Initialize interface
  *
@@ -477,19 +483,18 @@ static
 void initialize_intf(char *intf)
 {
 	odp_pktio_t pktio;
-	odp_queue_t outq_def;
-	odp_queue_t inq_def;
-	char inq_name[ODP_QUEUE_NAME_LEN];
-	odp_queue_param_t qparam;
+	odp_pktout_queue_t pktout;
+	odp_queue_t inq;
 	int ret;
 	uint8_t src_mac[ODPH_ETHADDR_LEN];
 	char src_mac_str[MAX_STRING];
 	odp_pktio_param_t pktio_param;
+	odp_pktin_queue_param_t pktin_param;
 
 	odp_pktio_param_init(&pktio_param);
 
 	if (getenv("ODP_IPSEC_USE_POLL_QUEUES"))
-		pktio_param.in_mode = ODP_PKTIN_MODE_POLL;
+		pktio_param.in_mode = ODP_PKTIN_MODE_QUEUE;
 	else
 		pktio_param.in_mode = ODP_PKTIN_MODE_SCHED;
 
@@ -501,30 +506,27 @@ void initialize_intf(char *intf)
 		EXAMPLE_ERR("Error: pktio create failed for %s\n", intf);
 		exit(EXIT_FAILURE);
 	}
-	outq_def = odp_pktio_outq_getdef(pktio);
 
-	/*
-	 * Create and set the default INPUT queue associated with the 'pktio'
-	 * resource
-	 */
-	odp_queue_param_init(&qparam);
-	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
-	qparam.sched.group = ODP_SCHED_GROUP_ALL;
-	snprintf(inq_name, sizeof(inq_name), "%" PRIu64 "-pktio_inq_def",
-		 odp_pktio_to_u64(pktio));
-	inq_name[ODP_QUEUE_NAME_LEN - 1] = '\0';
+	odp_pktin_queue_param_init(&pktin_param);
+	pktin_param.queue_param.sched.sync = ODP_SCHED_SYNC_ATOMIC;
 
-	inq_def = queue_create(inq_name, ODP_QUEUE_TYPE_PKTIN, &qparam);
-	if (ODP_QUEUE_INVALID == inq_def) {
-		EXAMPLE_ERR("Error: pktio queue creation failed for %s\n",
-			    intf);
+	if (odp_pktin_queue_config(pktio, &pktin_param)) {
+		EXAMPLE_ERR("Error: pktin config failed for %s\n", intf);
 		exit(EXIT_FAILURE);
 	}
 
-	ret = odp_pktio_inq_setdef(pktio, inq_def);
-	if (ret) {
-		EXAMPLE_ERR("Error: default input-Q setup for %s\n", intf);
+	if (odp_pktout_queue_config(pktio, NULL)) {
+		EXAMPLE_ERR("Error: pktout config failed for %s\n", intf);
+		exit(EXIT_FAILURE);
+	}
+
+	if (odp_pktin_event_queue(pktio, &inq, 1) != 1) {
+		EXAMPLE_ERR("Error: failed to get input queue for %s\n", intf);
+		exit(EXIT_FAILURE);
+	}
+
+	if (odp_pktout_queue(pktio, &pktout, 1) != 1) {
+		EXAMPLE_ERR("Error: failed to get pktout queue for %s\n", intf);
 		exit(EXIT_FAILURE);
 	}
 
@@ -546,11 +548,11 @@ void initialize_intf(char *intf)
 	       "          default pktio%02" PRIu64 "-INPUT queue:%" PRIu64 "\n"
 	       "          source mac address %s\n",
 	       odp_pktio_to_u64(pktio), odp_pktio_to_u64(pktio),
-	       odp_queue_to_u64(inq_def),
+	       odp_queue_to_u64(inq),
 	       mac_addr_str(src_mac_str, src_mac));
 
 	/* Resolve any routes using this interface for output */
-	resolve_fwd_db(intf, outq_def, src_mac);
+	resolve_fwd_db(intf, pktout, src_mac);
 }
 
 /**
@@ -599,7 +601,7 @@ pkt_disposition_e do_route_fwd_db(odp_packet_t pkt, pkt_ctx_t *ctx)
 
 		memcpy(&eth->dst, entry->dst_mac, ODPH_ETHADDR_LEN);
 		memcpy(&eth->src, entry->src_mac, ODPH_ETHADDR_LEN);
-		ctx->outq = entry->queue;
+		ctx->pktout = entry->pktout;
 
 		return PKT_CONTINUE;
 	}
@@ -1036,12 +1038,12 @@ pkt_disposition_e do_ipsec_out_finish(odp_packet_t pkt,
  *  - Sequence number assignment queue
  *  - Per packet crypto API completion queue
  *
- * @param arg  Required by "odph_linux_pthread_create", unused
+ * @param arg  Required by "odph_odpthreads_create", unused
  *
  * @return NULL (should never return)
  */
 static
-void *pktio_thread(void *arg EXAMPLE_UNUSED)
+int pktio_thread(void *arg EXAMPLE_UNUSED)
 {
 	int thr;
 	odp_packet_t pkt;
@@ -1160,8 +1162,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
 
 			case PKT_STATE_TRANSMIT:
 
-				if (odp_queue_enq(ctx->outq, ev)) {
-					odp_event_free(ev);
+				if (odp_pktout_send(ctx->pktout, &pkt, 1) < 1) {
 					rc = PKT_DROP;
 				} else {
 					rc = PKT_DONE;
@@ -1193,7 +1194,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
 	}
 
 	/* unreachable */
-	return NULL;
+	return 0;
 }
 
 /**
@@ -1202,7 +1203,7 @@ void *pktio_thread(void *arg EXAMPLE_UNUSED)
 int
 main(int argc, char *argv[])
 {
-	odph_linux_pthread_t thread_tbl[MAX_WORKERS];
+	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	int num_workers;
 	int i;
 	int stream_count;
@@ -1210,6 +1211,8 @@ main(int argc, char *argv[])
 	odp_cpumask_t cpumask;
 	char cpumaskstr[ODP_CPUMASK_STR_SIZE];
 	odp_pool_param_t params;
+	odp_instance_t instance;
+	odph_odpthread_params_t thr_params;
 
 	/* create by default scheduled queues */
 	queue_create = odp_queue_create;
@@ -1222,13 +1225,13 @@ main(int argc, char *argv[])
 	}
 
 	/* Init ODP before calling anything else */
-	if (odp_init_global(NULL, NULL)) {
+	if (odp_init_global(&instance, NULL, NULL)) {
 		EXAMPLE_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Init this thread */
-	if (odp_init_local(ODP_THREAD_CONTROL)) {
+	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
 		EXAMPLE_ERR("Error: ODP local init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -1309,9 +1312,11 @@ main(int argc, char *argv[])
 
 	/* Initialize interfaces (which resolves FWD DB entries */
 	for (i = 0; i < args->appl.if_count; i++) {
+#if 0 /* Temporarely disable loopback mode. Needs packet output event queues */
 		if (!strncmp("loop", args->appl.if_names[i], strlen("loop")))
 			initialize_loop(args->appl.if_names[i]);
 		else
+#endif
 			initialize_intf(args->appl.if_names[i]);
 	}
 
@@ -1322,8 +1327,12 @@ main(int argc, char *argv[])
 	/*
 	 * Create and init worker threads
 	 */
-	odph_linux_pthread_create(thread_tbl, &cpumask,
-				  pktio_thread, NULL, ODP_THREAD_WORKER);
+	memset(&thr_params, 0, sizeof(thr_params));
+	thr_params.start    = pktio_thread;
+	thr_params.arg      = NULL;
+	thr_params.thr_type = ODP_THREAD_WORKER;
+	thr_params.instance = instance;
+	odph_odpthreads_create(thread_tbl, &cpumask, &thr_params);
 
 	/*
 	 * If there are streams attempt to verify them else
@@ -1337,7 +1346,7 @@ main(int argc, char *argv[])
 		} while (!done);
 		printf("All received\n");
 	} else {
-		odph_linux_pthread_join(thread_tbl, num_workers);
+		odph_odpthreads_join(thread_tbl);
 	}
 
 	free(args->appl.if_names);
@@ -1363,7 +1372,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	int rc = 0;
 	int i;
 
-	static struct option longopts[] = {
+	static const struct option longopts[] = {
 		{"count", required_argument, NULL, 'c'},
 		{"interface", required_argument, NULL, 'i'},	/* return 'i' */
 		{"mode", required_argument, NULL, 'm'},		/* return 'm' */
@@ -1377,13 +1386,19 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{NULL, 0, NULL, 0}
 	};
 
+	static const char *shortopts = "+c:i:m:h:r:p:a:e:t:s:";
+
+	/* let helper collect its own arguments (e.g. --odph_proc) */
+	odph_parse_options(argc, argv, shortopts, longopts);
+
 	printf("\nParsing command line options\n");
 
 	appl_args->mode = 0;  /* turn off async crypto API by default */
 
+	opterr = 0; /* do not issue errors on helper options */
+
 	while (!rc) {
-		opt = getopt_long(argc, argv, "+c:i:m:h:r:p:a:e:t:s:",
-				  longopts, &long_index);
+		opt = getopt_long(argc, argv, shortopts, longopts, &long_index);
 
 		if (-1 == opt)
 			break;	/* No more options */
@@ -1438,7 +1453,8 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 
 		case 'r':
-			rc = create_fwd_db_entry(optarg);
+			rc = create_fwd_db_entry(optarg, appl_args->if_names,
+						 appl_args->if_count);
 			break;
 
 		case 'p':
@@ -1501,7 +1517,7 @@ static void print_info(char *progname, appl_args_t *appl_args)
 	       "Cache line size: %i\n"
 	       "CPU count:       %i\n"
 	       "\n",
-	       odp_version_api_str(), odp_sys_cpu_model_str(), odp_sys_cpu_hz(),
+	       odp_version_api_str(), odp_cpu_model_str(), odp_cpu_hz_max(),
 	       odp_sys_cache_line_size(), odp_cpu_count());
 
 	printf("Running ODP appl: \"%s\"\n"
@@ -1561,11 +1577,7 @@ static void usage(char *progname)
 	       "Optional OPTIONS\n"
 	       "  -c, --count <number> CPU count.\n"
 	       "  -h, --help           Display help and exit.\n"
-	       " environment variables: ODP_PKTIO_DISABLE_NETMAP\n"
-	       "                        ODP_PKTIO_DISABLE_SOCKET_MMAP\n"
-	       "                        ODP_PKTIO_DISABLE_SOCKET_MMSG\n"
-	       " can be used to advanced pkt I/O selection for linux-generic\n"
-	       "                        ODP_IPSEC_USE_POLL_QUEUES\n"
+	       " environment variables: ODP_IPSEC_USE_POLL_QUEUES\n"
 	       " to enable use of poll queues instead of scheduled (default)\n"
 	       "                        ODP_IPSEC_STREAM_VERIFY_MDEQ\n"
 	       " to enable use of multiple dequeue for queue draining during\n"

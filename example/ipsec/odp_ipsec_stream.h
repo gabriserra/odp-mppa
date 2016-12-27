@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp_ipsec_misc.h>
 #include <odp_ipsec_cache.h>
 
@@ -92,10 +92,6 @@ odp_packet_t create_ipv4_packet(stream_db_entry_t *stream,
 
 /**
  * Verify an IPv4 packet received on a loop output queue
- *
- * @todo Better error checking, add counters, add tracing,
- *       remove magic numbers, add order verification
- *       (see https://bugs.linaro.org/show_bug.cgi?id=620)
  *
  * @param stream  Stream to verify the packet against
  * @param pkt     Packet to verify

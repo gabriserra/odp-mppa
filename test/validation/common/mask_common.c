@@ -4,10 +4,12 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#include <odp.h>
+#include <odp_api.h>
 
 #include "odp_cunit_common.h"
 #include "mask_common.h"
+
+#include <stdlib.h>
 
 /*
  * The following strings are used to build masks with odp_*mask_from_str().

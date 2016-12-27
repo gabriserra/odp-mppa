@@ -1,22 +1,24 @@
 include $(top_srcdir)/test/Makefile.inc
 
-ODP_MODULES = buffer \
+ODP_MODULES = atomic \
+	      barrier \
+	      buffer \
 	      classification \
-	      config \
 	      cpumask \
 	      errno \
 	      hash \
 	      init \
+	      lock \
 	      queue \
 	      packet \
 	      pktio \
 	      pool \
 	      scheduler \
 	      std_clib \
-	      synchronizers \
 	      thread \
 	      time \
 	      timer \
+	      traffic_mngr \
 	      shmem \
 	      system
 
@@ -27,3 +29,5 @@ endif
 
 SUBDIRS = common $(ODP_MODULES)
 
+#The tests will need to retain the deprecated test implementation
+AM_CFLAGS += -Wno-deprecated-declarations

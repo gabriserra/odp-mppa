@@ -8,9 +8,10 @@
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <example_debug.h>
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp/helper/linux.h>
 #include <odp/helper/eth.h>
 #include <odp/helper/ip.h>
@@ -56,7 +57,7 @@ typedef struct {
 	odp_atomic_u64_t pool_pkt_count; /**< count of received packets */
 	char cos_name[ODP_COS_NAME_LEN];	/**< cos name */
 	struct {
-		odp_pmr_term_e term;	/**< odp pmr term value */
+		odp_cls_pmr_term_t term;	/**< odp pmr term value */
 		uint64_t val;	/**< pmr term value */
 		uint64_t mask;	/**< pmr term mask */
 		uint32_t val_sz;	/**< size of the pmr term */
@@ -81,15 +82,17 @@ enum packet_mode {
 	APPL_MODE_REPLY		/**< Packet is sent back */
 };
 
+static int shutdown; /**< Shutdown threads if !0 */
+
 /* helper funcs */
 static int drop_err_pkts(odp_packet_t pkt_tbl[], unsigned len);
 static void swap_pkt_addrs(odp_packet_t pkt_tbl[], unsigned len);
 static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
-static void configure_cos(odp_pktio_t pktio, appl_args_t *args);
-static void configure_default_cos(odp_pktio_t pktio, appl_args_t *args);
-static int convert_str_to_pmr_enum(char *token, odp_pmr_term_e *term,
+static void configure_cos(odp_cos_t default_cos, appl_args_t *args);
+static odp_cos_t configure_default_cos(odp_pktio_t pktio, appl_args_t *args);
+static int convert_str_to_pmr_enum(char *token, odp_cls_pmr_term_t *term,
 				   uint32_t *offset);
 static int parse_pmr_policy(appl_args_t *appl_args, char *argv[], char *optarg);
 
@@ -162,26 +165,6 @@ void print_cls_statistics(appl_args_t *args)
 }
 
 static inline
-int parse_ipv4_addr(const char *ipaddress, uint64_t *addr)
-{
-	uint32_t b[4];
-	int converted;
-
-	converted = sscanf(ipaddress,
-			   "%" SCNu32 ".%" SCNu32 ".%" SCNu32 ".%" SCNu32 "",
-			   &b[3], &b[2], &b[1], &b[0]);
-	if (4 != converted)
-		return -1;
-
-	if ((b[0] > 255) || (b[1] > 255) || (b[2] > 255) || (b[3] > 255))
-		return -1;
-
-	*addr = b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24;
-
-	return 0;
-}
-
-static inline
 int parse_mask(const char *str, uint64_t *mask)
 {
 	uint64_t b;
@@ -230,11 +213,8 @@ int parse_value(const char *str, uint64_t *val, uint32_t *val_sz)
 static odp_pktio_t create_pktio(const char *dev, odp_pool_t pool)
 {
 	odp_pktio_t pktio;
-	odp_queue_t inq_def;
-	odp_queue_param_t qparam;
-	char inq_name[ODP_QUEUE_NAME_LEN];
-	int ret;
 	odp_pktio_param_t pktio_param;
+	odp_pktin_queue_param_t pktin_param;
 
 	odp_pktio_param_init(&pktio_param);
 	pktio_param.in_mode = ODP_PKTIN_MODE_SCHED;
@@ -249,32 +229,24 @@ static odp_pktio_t create_pktio(const char *dev, odp_pool_t pool)
 		exit(EXIT_FAILURE);
 	}
 
-	odp_queue_param_init(&qparam);
-	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
-	qparam.sched.group = ODP_SCHED_GROUP_ALL;
-	snprintf(inq_name, sizeof(inq_name), "%" PRIu64 "-pktio_inq_def",
-		 odp_pktio_to_u64(pktio));
-	inq_name[ODP_QUEUE_NAME_LEN - 1] = '\0';
+	odp_pktin_queue_param_init(&pktin_param);
+	pktin_param.queue_param.sched.sync = ODP_SCHED_SYNC_ATOMIC;
 
-	inq_def = odp_queue_create(inq_name, ODP_QUEUE_TYPE_PKTIN, &qparam);
-	if (inq_def == ODP_QUEUE_INVALID) {
-		EXAMPLE_ERR("pktio inq create failed for %s\n", dev);
+	if (odp_pktin_queue_config(pktio, &pktin_param)) {
+		EXAMPLE_ERR("pktin queue config failed for %s\n", dev);
 		exit(EXIT_FAILURE);
 	}
 
-	ret = odp_pktio_inq_setdef(pktio, inq_def);
-	if (ret != 0) {
-		EXAMPLE_ERR("default input-Q setup for %s\n", dev);
+	if (odp_pktout_queue_config(pktio, NULL)) {
+		EXAMPLE_ERR("pktout queue config failed for %s\n", dev);
 		exit(EXIT_FAILURE);
 	}
 
 	printf("  created pktio:%02" PRIu64
 			", dev:%s, queue mode (ATOMIC queues)\n"
-			"  \tdefault pktio%02" PRIu64
-			"-INPUT queue:%" PRIu64 "\n",
+			"  \tdefault pktio%02" PRIu64 "\n",
 			odp_pktio_to_u64(pktio), dev,
-			odp_pktio_to_u64(pktio), odp_queue_to_u64(inq_def));
+			odp_pktio_to_u64(pktio));
 
 	return pktio;
 }
@@ -283,10 +255,10 @@ static odp_pktio_t create_pktio(const char *dev, odp_pool_t pool)
  * Worker threads to receive the packet
  *
  */
-static void *pktio_receive_thread(void *arg)
+static int pktio_receive_thread(void *arg)
 {
 	int thr;
-	odp_queue_t outq_def;
+	odp_pktout_queue_t pktout;
 	odp_packet_t pkt;
 	odp_pool_t pool;
 	odp_event_t ev;
@@ -301,8 +273,12 @@ static void *pktio_receive_thread(void *arg)
 	for (;;) {
 		odp_pktio_t pktio_tmp;
 
+		if (shutdown)
+			break;
+
 		/* Use schedule to get buf from any input queue */
-		ev = odp_schedule(&queue, ODP_SCHED_WAIT);
+		ev = odp_schedule(&queue,
+				  odp_schedule_wait_time(ODP_TIME_SEC_IN_NS));
 
 		/* Loop back to receive packets incase of invalid event */
 		if (odp_unlikely(ev == ODP_EVENT_INVALID))
@@ -320,12 +296,10 @@ static void *pktio_receive_thread(void *arg)
 		}
 
 		pktio_tmp = odp_packet_input(pkt);
-		outq_def = odp_pktio_outq_getdef(pktio_tmp);
 
-		if (outq_def == ODP_QUEUE_INVALID) {
-			EXAMPLE_ERR("  [%02i] Error: def output-Q query\n",
-				    thr);
-			return NULL;
+		if (odp_pktout_queue(pktio_tmp, &pktout, 1) != 1) {
+			EXAMPLE_ERR("  [%02i] Error: no output queue\n", thr);
+			return -1;
 		}
 
 		pool = odp_packet_pool(pkt);
@@ -340,21 +314,21 @@ static void *pktio_receive_thread(void *arg)
 				odp_atomic_inc_u64(&stats->pool_pkt_count);
 		}
 
-		if (appl->appl_mode == APPL_MODE_DROP)
+		if (appl->appl_mode == APPL_MODE_DROP) {
 			odp_packet_free(pkt);
-		else
-			if (odp_queue_enq(outq_def, ev)) {
-				EXAMPLE_ERR("  [%i] Queue enqueue failed.\n",
-					    thr);
-				odp_packet_free(pkt);
-				continue;
-			}
+			continue;
+		}
+
+		if (odp_pktout_send(pktout, &pkt, 1) < 1) {
+			EXAMPLE_ERR("  [%i] Packet send failed.\n", thr);
+			odp_packet_free(pkt);
+		}
 	}
 
-	return NULL;
+	return 0;
 }
 
-static void configure_default_cos(odp_pktio_t pktio, appl_args_t *args)
+static odp_cos_t configure_default_cos(odp_pktio_t pktio, appl_args_t *args)
 {
 	odp_queue_param_t qparam;
 	const char *queue_name = "DefaultQueue";
@@ -369,11 +343,11 @@ static void configure_default_cos(odp_pktio_t pktio, appl_args_t *args)
 
 
 	odp_queue_param_init(&qparam);
+	qparam.type       = ODP_QUEUE_TYPE_SCHED;
 	qparam.sched.prio = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync = ODP_SCHED_SYNC_NONE;
+	qparam.sched.sync = ODP_SCHED_SYNC_PARALLEL;
 	qparam.sched.group = ODP_SCHED_GROUP_ALL;
-	queue_default = odp_queue_create(queue_name,
-					 ODP_QUEUE_TYPE_SCHED, &qparam);
+	queue_default = odp_queue_create(queue_name, &qparam);
 	if (queue_default == ODP_QUEUE_INVALID) {
 		EXAMPLE_ERR("Error: default queue create failed.\n");
 		exit(EXIT_FAILURE);
@@ -416,41 +390,33 @@ static void configure_default_cos(odp_pktio_t pktio, appl_args_t *args)
 	odp_atomic_init_u64(&stats[args->policy_count].queue_pkt_count, 0);
 	odp_atomic_init_u64(&stats[args->policy_count].pool_pkt_count, 0);
 	args->policy_count++;
+	return cos_default;
 }
 
-static void configure_cos(odp_pktio_t pktio, appl_args_t *args)
+static void configure_cos(odp_cos_t default_cos, appl_args_t *args)
 {
 	char cos_name[ODP_COS_NAME_LEN];
 	char queue_name[ODP_QUEUE_NAME_LEN];
 	char pool_name[ODP_POOL_NAME_LEN];
 	odp_pool_param_t pool_params;
 	odp_cls_cos_param_t cls_param;
+	odp_pmr_param_t pmr_param;
 	int i;
 	global_statistics *stats;
 	odp_queue_param_t qparam;
 
-	for (i = 0; i < args->policy_count; i++) {
+	for (i = 0; i < args->policy_count - 1; i++) {
 		stats = &args->stats[i];
 
-		const odp_pmr_match_t match = {
-			.term = stats->rule.term,
-			.val = &stats->rule.val,
-			.mask = &stats->rule.mask,
-			.val_sz = stats->rule.val_sz,
-			.offset = stats->rule.offset
-		};
-
-		stats->pmr = odp_pmr_create(&match);
 		odp_queue_param_init(&qparam);
+		qparam.type       = ODP_QUEUE_TYPE_SCHED;
 		qparam.sched.prio = i % odp_schedule_num_prio();
-		qparam.sched.sync = ODP_SCHED_SYNC_NONE;
+		qparam.sched.sync = ODP_SCHED_SYNC_PARALLEL;
 		qparam.sched.group = ODP_SCHED_GROUP_ALL;
 
 		snprintf(queue_name, sizeof(queue_name), "%sQueue%d",
 			 args->stats[i].cos_name, i);
-		stats->queue = odp_queue_create(queue_name,
-						 ODP_QUEUE_TYPE_SCHED,
-						 &qparam);
+		stats->queue = odp_queue_create(queue_name, &qparam);
 		if (ODP_QUEUE_INVALID == stats->queue) {
 			EXAMPLE_ERR("odp_queue_create failed");
 			exit(EXIT_FAILURE);
@@ -480,7 +446,16 @@ static void configure_cos(odp_pktio_t pktio, appl_args_t *args)
 		cls_param.drop_policy = ODP_COS_DROP_POOL;
 		stats->cos = odp_cls_cos_create(cos_name, &cls_param);
 
-		if (0 > odp_pktio_pmr_cos(stats->pmr, pktio, stats->cos)) {
+		odp_cls_pmr_param_init(&pmr_param);
+		pmr_param.term = stats->rule.term;
+		pmr_param.match.value = &stats->rule.val;
+		pmr_param.match.mask = &stats->rule.mask;
+		pmr_param.val_sz = stats->rule.val_sz;
+		pmr_param.offset = stats->rule.offset;
+
+		stats->pmr = odp_cls_pmr_create(&pmr_param, 1, default_cos,
+						stats->cos);
+		if (stats->pmr == ODP_PMR_INVAL) {
 			EXAMPLE_ERR("odp_pktio_pmr_cos failed");
 			exit(EXIT_FAILURE);
 		}
@@ -495,27 +470,29 @@ static void configure_cos(odp_pktio_t pktio, appl_args_t *args)
  */
 int main(int argc, char *argv[])
 {
-	odph_linux_pthread_t thread_tbl[MAX_WORKERS];
+	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	odp_pool_t pool;
 	int num_workers;
 	int i;
-	int cpu;
 	odp_cpumask_t cpumask;
 	char cpumaskstr[ODP_CPUMASK_STR_SIZE];
 	odp_pool_param_t params;
 	odp_pktio_t pktio;
 	appl_args_t *args;
-	odp_queue_t inq;
+	odp_cos_t default_cos;
 	odp_shm_t shm;
+	int ret;
+	odp_instance_t instance;
+	odph_odpthread_params_t thr_params;
 
 	/* Init ODP before calling anything else */
-	if (odp_init_global(NULL, NULL)) {
+	if (odp_init_global(&instance, NULL, NULL)) {
 		EXAMPLE_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Init this thread */
-	if (odp_init_local(ODP_THREAD_CONTROL)) {
+	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
 		EXAMPLE_ERR("Error: ODP local init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -576,10 +553,10 @@ int main(int argc, char *argv[])
 	/* create pktio per interface */
 	pktio = create_pktio(args->if_name, pool);
 
-	configure_cos(pktio, args);
-
 	/* configure default Cos */
-	configure_default_cos(pktio, args);
+	default_cos = configure_default_cos(pktio, args);
+
+	configure_cos(default_cos, args);
 
 	if (odp_pktio_start(pktio)) {
 		EXAMPLE_ERR("Error: unable to start pktio.\n");
@@ -589,39 +566,46 @@ int main(int argc, char *argv[])
 	/* Create and init worker threads */
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
-	cpu = odp_cpumask_first(&cpumask);
-	for (i = 0; i < num_workers; ++i) {
-		odp_cpumask_t thd_mask;
-		/*
-		 * Calls odp_thread_create(cpu) for each thread
-		 */
-		odp_cpumask_zero(&thd_mask);
-		odp_cpumask_set(&thd_mask, cpu);
-		odph_linux_pthread_create(&thread_tbl[i], &thd_mask,
-					  pktio_receive_thread,
-					  args, ODP_THREAD_WORKER);
-		cpu = odp_cpumask_next(&cpumask, cpu);
-	}
+	memset(&thr_params, 0, sizeof(thr_params));
+	thr_params.start    = pktio_receive_thread;
+	thr_params.arg      = args;
+	thr_params.thr_type = ODP_THREAD_WORKER;
+	thr_params.instance = instance;
+	odph_odpthreads_create(thread_tbl, &cpumask, &thr_params);
 
 	print_cls_statistics(args);
 
+	odp_pktio_stop(pktio);
+	shutdown = 1;
+	odph_odpthreads_join(thread_tbl);
+
 	for (i = 0; i < args->policy_count; i++) {
-		odp_cos_destroy(args->stats[i].cos);
-		odp_pool_destroy(args->stats[i].pool);
-		odp_queue_destroy(args->stats[i].queue);
-		odp_pool_destroy(args->stats[i].pool);
+		if ((i !=  args->policy_count - 1) &&
+		    odp_cls_pmr_destroy(args->stats[i].pmr))
+			EXAMPLE_ERR("err: odp_cls_pmr_destroy for %d\n", i);
+		if (odp_cos_destroy(args->stats[i].cos))
+			EXAMPLE_ERR("err: odp_cos_destroy for %d\n", i);
+		if (odp_queue_destroy(args->stats[i].queue))
+			EXAMPLE_ERR("err: odp_queue_destroy for %d\n", i);
+		if (odp_pool_destroy(args->stats[i].pool))
+			EXAMPLE_ERR("err: odp_pool_destroy for %d\n", i);
 	}
 
 	free(args->if_name);
 	odp_shm_free(shm);
-	odp_pool_destroy(pool);
-	inq = odp_pktio_inq_getdef(pktio);
-	odp_pktio_inq_remdef(pktio);
-	odp_queue_destroy(inq);
-	odp_pktio_close(pktio);
-	printf("Exit\n\n");
+	if (odp_pktio_close(pktio))
+		EXAMPLE_ERR("err: close pktio error\n");
+	if (odp_pool_destroy(pool))
+		EXAMPLE_ERR("err: odp_pool_destroy error\n");
 
-	return 0;
+	ret = odp_term_local();
+	if (ret)
+		EXAMPLE_ERR("odp_term_local error %d\n", ret);
+	ret = odp_term_global(instance);
+	if (ret)
+		EXAMPLE_ERR("odp_term_global error %d\n", ret);
+	printf("Exit\n\n");
+	return ret;
 }
 
 /**
@@ -667,7 +651,7 @@ static void swap_pkt_addrs(odp_packet_t pkt_tbl[], unsigned len)
 	odph_ethhdr_t *eth;
 	odph_ethaddr_t tmp_addr;
 	odph_ipv4hdr_t *ip;
-	uint32be_t ip_tmp_addr; /* tmp ip addr */
+	odp_u32be_t ip_tmp_addr; /* tmp ip addr */
 	unsigned i;
 
 	for (i = 0; i < len; ++i) {
@@ -692,7 +676,7 @@ static void swap_pkt_addrs(odp_packet_t pkt_tbl[], unsigned len)
 	}
 }
 
-static int convert_str_to_pmr_enum(char *token, odp_pmr_term_e *term,
+static int convert_str_to_pmr_enum(char *token, odp_cls_pmr_term_t *term,
 				   uint32_t *offset)
 {
 	if (NULL == token)
@@ -718,10 +702,11 @@ static int parse_pmr_policy(appl_args_t *appl_args, char *argv[], char *optarg)
 	int policy_count;
 	char *token;
 	size_t len;
-	odp_pmr_term_e term;
+	odp_cls_pmr_term_t term;
 	global_statistics *stats;
 	char *pmr_str;
 	uint32_t offset;
+	uint32_t ip_addr;
 
 	policy_count = appl_args->policy_count;
 	stats = appl_args->stats;
@@ -751,7 +736,14 @@ static int parse_pmr_policy(appl_args_t *appl_args, char *argv[], char *optarg)
 		token = strtok(NULL, ":");
 		strncpy(stats[policy_count].value, token,
 			DISPLAY_STRING_LEN - 1);
-		parse_ipv4_addr(token, &stats[policy_count].rule.val);
+
+		if (odph_ipv4_addr_parse(&ip_addr, token)) {
+			EXAMPLE_ERR("Bad IP address\n");
+			exit(EXIT_FAILURE);
+		}
+
+		stats[policy_count].rule.val = ip_addr;
+
 		token = strtok(NULL, ":");
 		strncpy(stats[policy_count].mask, token,
 			DISPLAY_STRING_LEN - 1);
@@ -801,7 +793,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	int interface = 0;
 	int policy = 0;
 
-	static struct option longopts[] = {
+	static const struct option longopts[] = {
 		{"count", required_argument, NULL, 'c'},
 		{"interface", required_argument, NULL, 'i'},	/* return 'i' */
 		{"policy", required_argument, NULL, 'p'},	/* return 'p' */
@@ -811,10 +803,16 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{NULL, 0, NULL, 0}
 	};
 
+	static const char *shortopts = "+c:t:i:p:m:t:h";
+
+	/* let helper collect its own arguments (e.g. --odph_proc) */
+	odph_parse_options(argc, argv, shortopts, longopts);
+
+	opterr = 0; /* do not issue errors on helper options */
 
 	while (1) {
-		opt = getopt_long(argc, argv, "+c:t:i:p:m:t:h",
-				longopts, &long_index);
+		opt = getopt_long(argc, argv, shortopts,
+				  longopts, &long_index);
 
 		if (opt == -1)
 			break;	/* No more options */
@@ -892,8 +890,8 @@ static void print_info(char *progname, appl_args_t *appl_args)
 			"Cache line size: %i\n"
 			"CPU count:       %i\n"
 			"\n",
-			odp_version_api_str(), odp_sys_cpu_model_str(),
-			odp_sys_cpu_hz(), odp_sys_cache_line_size(),
+			odp_version_api_str(), odp_cpu_model_str(),
+			odp_cpu_hz_max(), odp_sys_cache_line_size(),
 			odp_cpu_count());
 
 	printf("Running ODP appl: \"%s\"\n"
@@ -923,9 +921,9 @@ static void usage(char *progname)
 			"\n"
 			"Mandatory OPTIONS:\n"
 			"  -i, --interface Eth interface\n"
-			"  -p, --policy [<odp_pmr_term_e>|<offset>]:<value>:<mask bits>:<queue name>\n"
+			"  -p, --policy [<odp_cls_pmr_term_t>|<offset>]:<value>:<mask bits>:<queue name>\n"
 			"\n"
-			"<odp_pmr_term_e>	Packet Matching Rule defined with odp_pmr_term_e "
+			"<odp_cls_pmr_term_t>	Packet Matching Rule defined with odp_cls_pmr_term_t "
 			"for the policy\n"
 			"<offset>		Absolute offset in bytes from frame start to define a "
 			"ODP_PMR_CUSTOM_FRAME Packet Matching Rule for the policy\n"

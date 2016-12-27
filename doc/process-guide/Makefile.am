@@ -1,14 +1,47 @@
-TARGET = $(top_builddir)/doc/output/release-guide.html
+include ../Makefile.inc
 
-EXTRA_DIST = release-guide.adoc
-COMMON_DOC_FLAGS = -a "imagesdir=$(abs_top_builddir)/doc/images" -a data-uri -a icons -a toc2  -a max-width=55em
+IMAGES =   $(top_srcdir)/doc/images/aboutODP1.svg \
+	   $(top_srcdir)/doc/images/aboutODP2.svg \
+	   $(top_srcdir)/doc/images/aboutODP3.svg \
+	   $(top_srcdir)/doc/images/packet_flow.svg \
+	   $(top_srcdir)/doc/images/aboutODP5.svg \
+	   $(top_srcdir)/doc/images/overview.svg
 
-all-local: $(TARGET)
+EXTRA_DIST = $(top_srcdir)/doc/process-guide/bylaws-guide.adoc \
+	     $(top_srcdir)/doc/process-guide/release-guide.adoc \
+	     $(top_srcdir)/doc/process-guide/faq.adoc \
+	     $(top_srcdir)/CONTRIBUTING \
+	     $(IMAGES)
 
-$(TARGET): release-guide.adoc
-	@mkdir -p $(top_srcdir)/doc/output
-	asciidoc -$(COMMON_DOC_FLAGS) -b html5 --out-file=$@ $< || \
-	asciidoc -$(COMMON_DOC_FLAGS) -b html4 --out-file=$@ $<
+all-local: bylaws-guide.html \
+	   release-guide.html \
+	   faq.html \
+	   CONTRIBUTING.html \
+	   CHANGELOG.html
 
 clean-local:
-	rm -f $(TARGET)
+	rm -f $(builddir)/bylaws-guide.html
+	rm -f $(builddir)/release-guide.html
+	rm -f $(builddir)/faq.html
+	rm -f $(builddir)/CONTRIBUTING.html
+	rm -f $(builddir)/CHANGELOG.html
+
+release-guide.html: $(top_srcdir)/doc/process-guide/release-guide.adoc \
+		    $(top_srcdir)/doc/images/simple_release_git.svg \
+		    $(top_srcdir)/doc/images/release_git.svg
+
+bylaws-guide.html:  $(top_srcdir)/doc/process-guide/bylaws-guide.adoc
+
+faq.html:  $(top_srcdir)/doc/process-guide/faq.adoc \
+	   $(IMAGES)
+
+#special case is not postfixed .adoc
+CONTRIBUTING.html:  $(top_srcdir)/CONTRIBUTING
+	asciidoctor $(ASCIIDOC_FLAGS) --out-file=$@ $<
+
+CHANGELOG.html:  $(top_srcdir)/CHANGELOG
+	asciidoctor $(ASCIIDOC_FLAGS) --out-file=$@ $<
+
+#add deps on images
+
+doc_DATA = bylaws-guide.html release-guide.html CONTRIBUTING.html faq.html CHANGELOG.html

@@ -1,14 +1,53 @@
-TARGET = $(top_builddir)/doc/output/users-guide.html
+include ../Makefile.inc
 
-EXTRA_DIST = users-guide.adoc
-COMMON_DOC_FLAGS = -a "imagesdir=$(abs_top_builddir)/doc/images" -a data-uri -a icons -a toc2  -a max-width=55em
+SRC    = $(top_srcdir)/doc/users-guide/users-guide.adoc \
+	 $(top_srcdir)/doc/users-guide/users-guide-cls.adoc \
+	 $(top_srcdir)/doc/users-guide/users-guide-packet.adoc \
+	 $(top_srcdir)/doc/users-guide/users-guide-pktio.adoc \
+	 $(top_srcdir)/doc/users-guide/users-guide-timer.adoc \
+	 $(top_srcdir)/doc/users-guide/users-guide-tm.adoc
+TARGET = users-guide.html
+IMAGES = $(top_srcdir)/doc/images/overview.svg \
+	 $(top_srcdir)/doc/images/atomic_queue.svg \
+	 $(top_srcdir)/doc/images/odp_components.svg \
+	 $(top_srcdir)/doc/images/ODP-Logo-HQ.svg \
+	 $(top_srcdir)/doc/images/odp_rx_processing.svg \
+	 $(top_srcdir)/doc/images/odp_scheduling.svg \
+	 $(top_srcdir)/doc/images/odp_traffic_manager.svg \
+	 $(top_srcdir)/doc/images/ordered_queue.svg \
+	 $(top_srcdir)/doc/images/packet_flow.svg \
+	 $(top_srcdir)/doc/images/packet-adddata.svg \
+	 $(top_srcdir)/doc/images/packet-align.svg \
+	 $(top_srcdir)/doc/images/packet-copyops.svg \
+	 $(top_srcdir)/doc/images/packet-remdata.svg \
+	 $(top_srcdir)/doc/images/packet-split.svg \
+	 $(top_srcdir)/doc/images/packet.svg \
+	 $(top_srcdir)/doc/images/parallel_queue.svg \
+	 $(top_srcdir)/doc/images/pktin_direct_recv.svg \
+	 $(top_srcdir)/doc/images/pktin_queue_recv.svg \
+	 $(top_srcdir)/doc/images/pktin_sched_recv.svg \
+	 $(top_srcdir)/doc/images/pktio_fsm.svg \
+	 $(top_srcdir)/doc/images/pktout_direct_send.svg \
+	 $(top_srcdir)/doc/images/pktout_queue_send.svg \
+	 $(top_srcdir)/doc/images/release_git.svg \
+	 $(top_srcdir)/doc/images/segment.svg \
+	 $(top_srcdir)/doc/images/simple_release_git.svg \
+	 $(top_srcdir)/doc/images/timeout_fsm.svg \
+	 $(top_srcdir)/doc/images/timer_fsm.svg \
+	 $(top_srcdir)/doc/images/tm_hierarchy.svg \
+	 $(top_srcdir)/doc/images/tm_node.svg \
+	 $(top_srcdir)/doc/images/pktin_sched_cls.svg
 
-all-local: $(TARGET)
+if HAVE_MSCGEN
+IMAGES += $(top_srcdir)/doc/images/resource_management.svg
+endif
 
-$(TARGET): users-guide.adoc
-	@mkdir -p $(top_builddir)/doc/output
-	asciidoc -$(COMMON_DOC_FLAGS) -b html5 --out-file=$@ $< || \
-	asciidoc -$(COMMON_DOC_FLAGS) -b html4 --out-file=$@ $<
+EXTRA_DIST = $(SRC) $(IMAGES)
+
+doc_DATA = $(TARGET)
+$(TARGET): $(SRC) $(IMAGES)
 
 clean-local:
-	rm -f $(TARGET)
+	rm -f $(builddir)/$(TARGET)
+
+$(SRC): $(IMAGES)

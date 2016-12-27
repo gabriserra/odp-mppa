@@ -11,9 +11,7 @@
  *
  */
 
-/* Check if compiler supports 16-byte atomics. GCC needs -mcx16 flag on x86 */
-/* Using spin lock actually seems faster on Core2 */
-#ifdef ODP_ATOMIC_U128
+#if __SIZEOF_POINTER__ != 8
 /* TB_NEEDS_PAD defined if sizeof(odp_buffer_t) != 8 */
 #define TB_NEEDS_PAD
 #define TB_SET_PAD(x) ((x).pad = 0)
@@ -21,33 +19,38 @@
 #define TB_SET_PAD(x) (void)(x)
 #endif
 
-/* For snprint, POSIX timers and sigevent */
-#define _POSIX_C_SOURCE 200112L
+#include <odp_posix_extensions.h>
+
 #include <errno.h>
 #include <stdlib.h>
 #include <time.h>
 #include <signal.h>
-#include <odp/align.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <inttypes.h>
+
+#include <odp/api/align.h>
 #include <odp_align_internal.h>
-#include <odp/atomic.h>
+#include <odp/api/atomic.h>
 #include <odp_atomic_internal.h>
-#include <odp/buffer.h>
+#include <odp/api/buffer.h>
 #include <odp_buffer_inlines.h>
-#include <odp/pool.h>
+#include <odp/api/cpu.h>
+#include <odp/api/pool.h>
 #include <odp_pool_internal.h>
-#include <odp/debug.h>
+#include <odp/api/debug.h>
 #include <odp_debug_internal.h>
-#include <odp/event.h>
-#include <odp/hints.h>
+#include <odp/api/event.h>
+#include <odp/api/hints.h>
 #include <odp_internal.h>
-#include <odp/queue.h>
-#include <odp/shared_memory.h>
-#include <odp_spin_internal.h>
-#include <odp/spinlock.h>
-#include <odp/std_types.h>
-#include <odp/sync.h>
-#include <odp/time.h>
-#include <odp/timer.h>
+#include <odp/api/queue.h>
+#include <odp/api/shared_memory.h>
+#include <odp/api/spinlock.h>
+#include <odp/api/std_types.h>
+#include <odp/api/sync.h>
+#include <odp/api/time.h>
+#include <odp/api/timer.h>
 #include <odp_timer_internal.h>
 
 #define TMO_UNUSED   ((uint64_t)0xFFFFFFFFFFFFFFFF)
@@ -55,12 +58,6 @@
  * The original expiration tick (63 bits) is still available so it can be used
  * for checking the freshness of received timeouts */
 #define TMO_INACTIVE ((uint64_t)0x8000000000000000)
-
-#ifdef __ARM_ARCH
-#define PREFETCH(ptr) __builtin_prefetch((ptr), 0, 0)
-#else
-#define PREFETCH(ptr) (void)(ptr)
-#endif
 
 /******************************************************************************
  * Mutual exclusion in the absence of CAS16
@@ -92,7 +89,15 @@ static odp_timeout_hdr_t *timeout_hdr(odp_timeout_t tmo)
  *****************************************************************************/
 
 typedef struct tick_buf_s {
+#if __GCC_ATOMIC_LLONG_LOCK_FREE < 2
+	/* No atomics support for 64-bit variables, will use separate lock */
+	/* Use the same layout as odp_atomic_u64_t but without lock variable */
+	struct {
+		uint64_t v;
+	} exp_tck;/* Expiration tick or TMO_xxx */
+#else
 	odp_atomic_u64_t exp_tck;/* Expiration tick or TMO_xxx */
+#endif
 	odp_buffer_t tmo_buf;/* ODP_BUFFER_INVALID if timer not active */
 #ifdef TB_NEEDS_PAD
 	uint32_t pad;/* Need to be able to access padding for successful CAS */
@@ -103,7 +108,10 @@ ODP_ALIGNED(16) /* 16-byte atomic operations need properly aligned addresses */
 #endif
 ;
 
-_ODP_STATIC_ASSERT(sizeof(tick_buf_t) == 16, "sizeof(tick_buf_t) == 16");
+#if __GCC_ATOMIC_LLONG_LOCK_FREE >= 2
+/* Only assert this when we perform atomic operations on tick_buf_t */
+ODP_STATIC_ASSERT(sizeof(tick_buf_t) == 16, "sizeof(tick_buf_t) == 16");
+#endif
 
 typedef struct odp_timer_s {
 	void *user_ptr;
@@ -121,7 +129,11 @@ static void timer_init(odp_timer *tim,
 	/* All pad fields need a defined and constant value */
 	TB_SET_PAD(*tb);
 	/* Release the timer by setting timer state to inactive */
+#if __GCC_ATOMIC_LLONG_LOCK_FREE < 2
+	tb->exp_tck.v = TMO_INACTIVE;
+#else
 	_odp_atomic_u64_store_mm(&tb->exp_tck, TMO_INACTIVE, _ODP_MEMMODEL_RLS);
+#endif
 }
 
 /* Teardown when timer is freed */
@@ -159,7 +171,6 @@ typedef struct odp_timer_pool_s {
 	tick_buf_t *tick_buf; /* Expiration tick and timeout buffer */
 	odp_timer *timers; /* User pointer and queue handle (and lock) */
 	odp_atomic_u32_t high_wm;/* High watermark of allocated timers */
-	odp_spinlock_t itimer_running;
 	odp_spinlock_t lock;
 	uint32_t num_alloc;/* Current number of allocated timers */
 	uint32_t first_free;/* 0..max_timers-1 => free timer */
@@ -168,6 +179,10 @@ typedef struct odp_timer_pool_s {
 	char name[ODP_TIMER_POOL_NAME_LEN];
 	odp_shm_t shm;
 	timer_t timerid;
+	int notify_overrun;
+	pthread_t timer_thread; /* pthread_t of timer thread */
+	pid_t timer_thread_id; /* gettid() for timer thread */
+	int timer_thread_exit; /* request to exit for timer thread */
 } odp_timer_pool;
 
 #define MAX_TIMER_POOLS 255 /* Leave one for ODP_TIMER_INVALID */
@@ -177,7 +192,7 @@ static odp_timer_pool *timer_pool[MAX_TIMER_POOLS];
 
 static inline odp_timer_pool *handle_to_tp(odp_timer_t hdl)
 {
-	uint32_t tp_idx = hdl >> INDEX_BITS;
+	uint32_t tp_idx = _odp_typeval(hdl) >> INDEX_BITS;
 	if (odp_likely(tp_idx < MAX_TIMER_POOLS)) {
 		odp_timer_pool *tp = timer_pool[tp_idx];
 		if (odp_likely(tp != NULL))
@@ -189,8 +204,8 @@ static inline odp_timer_pool *handle_to_tp(odp_timer_t hdl)
 static inline uint32_t handle_to_idx(odp_timer_t hdl,
 		struct odp_timer_pool_s *tp)
 {
-	uint32_t idx = hdl & ((1U << INDEX_BITS) - 1U);
-	PREFETCH(&tp->tick_buf[idx]);
+	uint32_t idx = _odp_typeval(hdl) & ((1U << INDEX_BITS) - 1U);
+	__builtin_prefetch(&tp->tick_buf[idx], 0, 0);
 	if (odp_likely(idx < odp_atomic_load_u32(&tp->high_wm)))
 		return idx;
 	ODP_ABORT("Invalid timer handle %#x\n", hdl);
@@ -200,23 +215,22 @@ static inline odp_timer_t tp_idx_to_handle(struct odp_timer_pool_s *tp,
 		uint32_t idx)
 {
 	ODP_ASSERT(idx < (1U << INDEX_BITS));
-	return (tp->tp_idx << INDEX_BITS) | idx;
+	return _odp_cast_scalar(odp_timer_t, (tp->tp_idx << INDEX_BITS) | idx);
 }
 
 /* Forward declarations */
 static void itimer_init(odp_timer_pool *tp);
 static void itimer_fini(odp_timer_pool *tp);
 
-static odp_timer_pool *odp_timer_pool_new(
-	const char *_name,
-	const odp_timer_pool_param_t *param)
+static odp_timer_pool_t odp_timer_pool_new(const char *_name,
+					   const odp_timer_pool_param_t *param)
 {
 	uint32_t tp_idx = odp_atomic_fetch_add_u32(&num_timer_pools, 1);
 	if (odp_unlikely(tp_idx >= MAX_TIMER_POOLS)) {
 		/* Restore the previous value */
 		odp_atomic_sub_u32(&num_timer_pools, 1);
 		__odp_errno = ENFILE; /* Table overflow */
-		return NULL;
+		return ODP_TIMER_POOL_INVALID;
 	}
 	size_t sz0 = ODP_ALIGN_ROUNDUP(sizeof(odp_timer_pool),
 			ODP_CACHE_LINE_SIZE);
@@ -239,6 +253,7 @@ static odp_timer_pool *odp_timer_pool_new(
 	tp->num_alloc = 0;
 	odp_atomic_init_u32(&tp->high_wm, 0);
 	tp->first_free = 0;
+	tp->notify_overrun = 1;
 	tp->tick_buf = (void *)((char *)odp_shm_addr(shm) + sz0);
 	tp->timers = (void *)((char *)odp_shm_addr(shm) + sz0 + sz1);
 	/* Initialize all odp_timer entries */
@@ -247,31 +262,57 @@ static odp_timer_pool *odp_timer_pool_new(
 		tp->timers[i].queue = ODP_QUEUE_INVALID;
 		set_next_free(&tp->timers[i], i + 1);
 		tp->timers[i].user_ptr = NULL;
+#if __GCC_ATOMIC_LLONG_LOCK_FREE < 2
+		tp->tick_buf[i].exp_tck.v = TMO_UNUSED;
+#else
 		odp_atomic_init_u64(&tp->tick_buf[i].exp_tck, TMO_UNUSED);
+#endif
 		tp->tick_buf[i].tmo_buf = ODP_BUFFER_INVALID;
 	}
 	tp->tp_idx = tp_idx;
 	odp_spinlock_init(&tp->lock);
-	odp_spinlock_init(&tp->itimer_running);
 	timer_pool[tp_idx] = tp;
 	if (tp->param.clk_src == ODP_CLOCK_CPU)
 		itimer_init(tp);
 	return tp;
 }
 
+static void block_sigalarm(void)
+{
+	sigset_t sigset;
+
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGALRM);
+	sigprocmask(SIG_BLOCK, &sigset, NULL);
+}
+
+static void stop_timer_thread(odp_timer_pool *tp)
+{
+	int ret;
+
+	ODP_DBG("stop\n");
+	tp->timer_thread_exit = 1;
+	ret = pthread_join(tp->timer_thread, NULL);
+	if (ret != 0)
+		ODP_ABORT("unable to join thread, err %d\n", ret);
+}
+
 static void odp_timer_pool_del(odp_timer_pool *tp)
 {
 	odp_spinlock_lock(&tp->lock);
 	timer_pool[tp->tp_idx] = NULL;
-	/* Wait for itimer thread to stop running */
-	odp_spinlock_lock(&tp->itimer_running);
+
+	/* Stop timer triggering */
+	if (tp->param.clk_src == ODP_CLOCK_CPU)
+		itimer_fini(tp);
+
+	stop_timer_thread(tp);
+
 	if (tp->num_alloc != 0) {
 		/* It's a programming error to attempt to destroy a */
 		/* timer pool which is still in use */
 		ODP_ABORT("%s: timers in use\n", tp->name);
 	}
-	if (tp->param.clk_src == ODP_CLOCK_CPU)
-		itimer_fini(tp);
 	int rc = odp_shm_free(tp->shm);
 	if (rc != 0)
 		ODP_ABORT("Failed to free shared memory (%d)\n", rc);
@@ -348,7 +389,7 @@ static bool timer_reset(uint32_t idx,
 	tick_buf_t *tb = &tp->tick_buf[idx];
 
 	if (tmo_buf == NULL || *tmo_buf == ODP_BUFFER_INVALID) {
-#ifdef ODP_ATOMIC_U128
+#ifdef ODP_ATOMIC_U128 /* Target supports 128-bit atomic operations */
 		tick_buf_t new, old;
 		do {
 			/* Relaxed and non-atomic read of current values */
@@ -375,9 +416,10 @@ static bool timer_reset(uint32_t idx,
 					(_uint128_t *)&new,
 					_ODP_MEMMODEL_RLS,
 					_ODP_MEMMODEL_RLX));
-#else
-#ifdef __ARM_ARCH
-		/* Since barriers are not good for C-A15, we take an
+#elif __GCC_ATOMIC_LLONG_LOCK_FREE >= 2 && \
+	defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_8
+	/* Target supports lock-free 64-bit CAS (and probably exchange) */
+		/* Since locks/barriers are not good for C-A15, we take an
 		 * alternative approach using relaxed memory model */
 		uint64_t old;
 		/* Swap in new expiration tick, get back old tick which
@@ -403,12 +445,12 @@ static bool timer_reset(uint32_t idx,
 					_ODP_MEMMODEL_RLX);
 			success = false;
 		}
-#else
+#else /* Target supports neither 128-bit nor 64-bit CAS => use lock */
 		/* Take a related lock */
 		while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 			/* While lock is taken, spin using relaxed loads */
 			while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-				odp_spin();
+				odp_cpu_pause();
 
 		/* Only if there is a timeout buffer can be reset the timer */
 		if (odp_likely(tb->tmo_buf != ODP_BUFFER_INVALID)) {
@@ -422,7 +464,6 @@ static bool timer_reset(uint32_t idx,
 
 		/* Release the lock */
 		_odp_atomic_flag_clear(IDX2LOCK(idx));
-#endif
 #endif
 	} else {
 		/* We have a new timeout buffer which replaces any old one */
@@ -455,7 +496,7 @@ static bool timer_reset(uint32_t idx,
 		while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 			/* While lock is taken, spin using relaxed loads */
 			while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-				odp_spin();
+				odp_cpu_pause();
 
 		/* Swap in new buffer, save any old buffer */
 		old_buf = tb->tmo_buf;
@@ -496,7 +537,7 @@ static odp_buffer_t timer_cancel(odp_timer_pool *tp,
 	while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 		/* While lock is taken, spin using relaxed loads */
 		while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-			odp_spin();
+			odp_cpu_pause();
 
 	/* Update the timer state (e.g. cancel the current timeout) */
 	tb->exp_tck.v = new_state;
@@ -550,7 +591,7 @@ static unsigned timer_expire(odp_timer_pool *tp, uint32_t idx, uint64_t tick)
 	while (_odp_atomic_flag_tas(IDX2LOCK(idx)))
 		/* While lock is taken, spin using relaxed loads */
 		while (_odp_atomic_flag_load(IDX2LOCK(idx)))
-			odp_spin();
+			odp_cpu_pause();
 	/* Proper check for timer expired */
 	exp_tck = tb->exp_tck.v;
 	if (odp_likely(exp_tck <= tick)) {
@@ -608,13 +649,11 @@ static unsigned odp_timer_pool_expire(odp_timer_pool_t tpid, uint64_t tick)
 
 	ODP_ASSERT(high_wm <= tpid->param.num_timers);
 	for (i = 0; i < high_wm;) {
-#ifdef __ARM_ARCH
 		/* As a rare occurrence, we can outsmart the HW prefetcher
 		 * and the compiler (GCC -fprefetch-loop-arrays) with some
 		 * tuned manual prefetching (32x16=512B ahead), seems to
 		 * give 30% better performance on ARM C-A15 */
-		PREFETCH(&array[i + 32]);
-#endif
+		__builtin_prefetch(&array[i + 32], 0, 0);
 		/* Non-atomic read for speed */
 		uint64_t exp_tck = array[i++].exp_tck.v;
 		if (odp_unlikely(exp_tck <= tick)) {
@@ -630,32 +669,64 @@ static unsigned odp_timer_pool_expire(odp_timer_pool_t tpid, uint64_t tick)
  * Functions that use Linux/POSIX per-process timers and related facilities
  *****************************************************************************/
 
-static void timer_notify(sigval_t sigval)
+static void timer_notify(odp_timer_pool *tp)
 {
 	int overrun;
-	odp_timer_pool *tp = (odp_timer_pool *)sigval.sival_ptr;
+	int64_t prev_tick;
 
-	overrun = timer_getoverrun(tp->timerid);
-	if (overrun)
-		ODP_ERR("\n\t%d ticks overrun on timer pool \"%s\", timer resolution too high\n",
-			overrun, tp->name);
+	if (tp->notify_overrun) {
+		overrun = timer_getoverrun(tp->timerid);
+		if (overrun) {
+			ODP_ERR("\n\t%d ticks overrun on timer pool \"%s\", timer resolution too high\n",
+				overrun, tp->name);
+			tp->notify_overrun = 0;
+		}
+	}
 
-#ifdef __ARM_ARCH
 	odp_timer *array = &tp->timers[0];
 	uint32_t i;
 	/* Prefetch initial cache lines (match 32 above) */
 	for (i = 0; i < 32; i += ODP_CACHE_LINE_SIZE / sizeof(array[0]))
-		PREFETCH(&array[i]);
-#endif
-	uint64_t prev_tick = odp_atomic_fetch_inc_u64(&tp->cur_tick);
-	/* Attempt to acquire the lock, check if the old value was clear */
-	if (odp_spinlock_trylock(&tp->itimer_running)) {
-		/* Scan timer array, looking for timers to expire */
-		(void)odp_timer_pool_expire(tp, prev_tick);
-		odp_spinlock_unlock(&tp->itimer_running);
-	}
+		__builtin_prefetch(&array[i], 0, 0);
+	prev_tick = odp_atomic_fetch_inc_u64(&tp->cur_tick);
+
+	/* Scan timer array, looking for timers to expire */
+	(void)odp_timer_pool_expire(tp, prev_tick);
+
 	/* Else skip scan of timers. cur_tick was updated and next itimer
 	 * invocation will process older expiration ticks as well */
+}
+
+static void *timer_thread(void *arg)
+{
+	odp_timer_pool *tp = (odp_timer_pool *)arg;
+	sigset_t sigset;
+	int ret;
+	struct timespec tmo;
+	siginfo_t si;
+
+	tp->timer_thread_id = (pid_t)syscall(SYS_gettid);
+
+	tmo.tv_sec = 0;
+	tmo.tv_nsec = ODP_TIME_MSEC_IN_NS * 100;
+
+	sigemptyset(&sigset);
+	/* unblock sigalarm in this thread */
+	sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+	sigaddset(&sigset, SIGALRM);
+
+	while (1) {
+		ret = sigtimedwait(&sigset, &si, &tmo);
+		if (tp->timer_thread_exit) {
+			tp->timer_thread_id = 0;
+			return NULL;
+		}
+		if (ret > 0)
+			timer_notify(tp);
+	}
+
+	return NULL;
 }
 
 static void itimer_init(odp_timer_pool *tp)
@@ -663,16 +734,26 @@ static void itimer_init(odp_timer_pool *tp)
 	struct sigevent   sigev;
 	struct itimerspec ispec;
 	uint64_t res, sec, nsec;
+	int ret;
 
 	ODP_DBG("Creating POSIX timer for timer pool %s, period %"
 		PRIu64" ns\n", tp->name, tp->param.res_ns);
 
-	memset(&sigev, 0, sizeof(sigev));
-	memset(&ispec, 0, sizeof(ispec));
+	tp->timer_thread_id = 0;
+	ret = pthread_create(&tp->timer_thread, NULL, timer_thread, tp);
+	if (ret)
+		ODP_ABORT("unable to create timer thread\n");
 
-	sigev.sigev_notify          = SIGEV_THREAD;
-	sigev.sigev_notify_function = timer_notify;
+	/* wait thread set tp->timer_thread_id */
+	do {
+		sched_yield();
+	} while (tp->timer_thread_id == 0);
+
+	memset(&sigev, 0, sizeof(sigev));
+	sigev.sigev_notify          = SIGEV_THREAD_ID;
 	sigev.sigev_value.sival_ptr = tp;
+	sigev._sigev_un._tid = tp->timer_thread_id;
+	sigev.sigev_signo = SIGALRM;
 
 	if (timer_create(CLOCK_MONOTONIC, &sigev, &tp->timerid))
 		ODP_ABORT("timer_create() returned error %s\n",
@@ -682,6 +763,7 @@ static void itimer_init(odp_timer_pool *tp)
 	sec  = res / ODP_TIME_SEC_IN_NS;
 	nsec = res - sec * ODP_TIME_SEC_IN_NS;
 
+	memset(&ispec, 0, sizeof(ispec));
 	ispec.it_interval.tv_sec  = (time_t)sec;
 	ispec.it_interval.tv_nsec = (long)nsec;
 	ispec.it_value.tv_sec     = (time_t)sec;
@@ -712,10 +794,9 @@ odp_timer_pool_create(const char *name,
 	/* Verify that we have a valid (non-zero) timer resolution */
 	if (param->res_ns == 0) {
 		__odp_errno = EINVAL;
-		return NULL;
+		return ODP_TIMER_POOL_INVALID;
 	}
-	odp_timer_pool_t tp = odp_timer_pool_new(name, param);
-	return tp;
+	return odp_timer_pool_new(name, param);
 }
 
 void odp_timer_pool_start(void)
@@ -754,21 +835,27 @@ int odp_timer_pool_info(odp_timer_pool_t tpid,
 	return 0;
 }
 
+uint64_t odp_timer_pool_to_u64(odp_timer_pool_t tpid)
+{
+	return _odp_pri(tpid);
+}
+
 odp_timer_t odp_timer_alloc(odp_timer_pool_t tpid,
 			    odp_queue_t queue,
 			    void *user_ptr)
 {
-	if (odp_unlikely(queue == ODP_QUEUE_INVALID))
-		ODP_ABORT("%s: Invalid queue handle\n", tpid->name);
+	if (odp_unlikely(tpid == ODP_TIMER_POOL_INVALID)) {
+		ODP_ERR("Invalid timer pool.\n");
+		return ODP_TIMER_INVALID;
+	}
+
+	if (odp_unlikely(queue == ODP_QUEUE_INVALID)) {
+		ODP_ERR("%s: Invalid queue handle\n", tpid->name);
+		return ODP_TIMER_INVALID;
+	}
 	/* We don't care about the validity of user_ptr because we will not
 	 * attempt to dereference it */
-	odp_timer_t hdl = timer_alloc(tpid, queue, user_ptr);
-	if (odp_likely(hdl != ODP_TIMER_INVALID)) {
-		/* Success */
-		return hdl;
-	}
-	/* errno set by timer_alloc() */
-	return ODP_TIMER_INVALID;
+	return timer_alloc(tpid, queue, user_ptr);
 }
 
 odp_event_t odp_timer_free(odp_timer_t hdl)
@@ -827,6 +914,11 @@ int odp_timer_cancel(odp_timer_t hdl, odp_event_t *tmo_ev)
 	}
 }
 
+uint64_t odp_timer_to_u64(odp_timer_t hdl)
+{
+	return _odp_pri(hdl);
+}
+
 odp_timeout_t odp_timeout_from_event(odp_event_t ev)
 {
 	/* This check not mandated by the API specification */
@@ -840,6 +932,11 @@ odp_event_t odp_timeout_to_event(odp_timeout_t tmo)
 	return (odp_event_t)tmo;
 }
 
+uint64_t odp_timeout_to_u64(odp_timeout_t tmo)
+{
+	return _odp_pri(tmo);
+}
+
 int odp_timeout_fresh(odp_timeout_t tmo)
 {
 	const odp_timeout_hdr_t *hdr = timeout_hdr(tmo);
@@ -847,7 +944,11 @@ int odp_timeout_fresh(odp_timeout_t tmo)
 	odp_timer_pool *tp = handle_to_tp(hdl);
 	uint32_t idx = handle_to_idx(hdl, tp);
 	tick_buf_t *tb = &tp->tick_buf[idx];
+#if __GCC_ATOMIC_LLONG_LOCK_FREE < 2
+	uint64_t exp_tck = tb->exp_tck.v;
+#else
 	uint64_t exp_tck = odp_atomic_load_u64(&tb->exp_tck);
+#endif
 	/* Return true if the timer still has the same expiration tick
 	 * (ignoring the inactive/expired bit) as the timeout */
 	return hdr->expiration == (exp_tck & ~TMO_INACTIVE);
@@ -892,5 +993,13 @@ int odp_timer_init_global(void)
 	ODP_DBG("Using lock-less timer implementation\n");
 #endif
 	odp_atomic_init_u32(&num_timer_pools, 0);
+
+	block_sigalarm();
+
+	return 0;
+}
+
+int odp_timer_term_global(void)
+{
 	return 0;
 }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp_cunit_common.h>
 #include "shmem.h"
 
@@ -13,13 +13,16 @@
 #define TEST_SHARE_FOO (0xf0f0f0f0)
 #define TEST_SHARE_BAR (0xf0f0f0f)
 
-static void *run_shm_thread(void *arg)
+static odp_barrier_t test_barrier;
+
+static int run_shm_thread(void *arg ODP_UNUSED)
 {
 	odp_shm_info_t  info;
 	odp_shm_t shm;
 	test_shared_data_t *test_shared_data;
 	int thr;
 
+	odp_barrier_wait(&test_barrier);
 	thr = odp_thread_id();
 	printf("Thread %i starts\n", thr);
 
@@ -41,7 +44,7 @@ static void *run_shm_thread(void *arg)
 	odp_shm_print_all();
 
 	fflush(stdout);
-	return arg;
+	return CU_get_number_of_failures();
 }
 
 void shmem_test_odp_shm_sunnyday(void)
@@ -49,6 +52,7 @@ void shmem_test_odp_shm_sunnyday(void)
 	pthrd_arg thrdarg;
 	odp_shm_t shm;
 	test_shared_data_t *test_shared_data;
+	odp_cpumask_t unused;
 
 	shm = odp_shm_reserve(TESTNAME,
 			      sizeof(test_shared_data_t), ALIGE_SIZE, 0);
@@ -67,13 +71,14 @@ void shmem_test_odp_shm_sunnyday(void)
 	test_shared_data->foo = TEST_SHARE_FOO;
 	test_shared_data->bar = TEST_SHARE_BAR;
 
-	thrdarg.numthrds = odp_cpu_count();
+	thrdarg.numthrds = odp_cpumask_default_worker(&unused, 0);
 
 	if (thrdarg.numthrds > MAX_WORKERS)
 		thrdarg.numthrds = MAX_WORKERS;
 
+	odp_barrier_init(&test_barrier, thrdarg.numthrds);
 	odp_cunit_thread_create(run_shm_thread, &thrdarg);
-	odp_cunit_thread_exit(&thrdarg);
+	CU_ASSERT(odp_cunit_thread_exit(&thrdarg) >= 0);
 }
 
 odp_testinfo_t shmem_suite[] = {
@@ -86,9 +91,15 @@ odp_suiteinfo_t shmem_suites[] = {
 	ODP_SUITE_INFO_NULL,
 };
 
-int shmem_main(void)
+int shmem_main(int argc, char *argv[])
 {
-	int ret = odp_cunit_register(shmem_suites);
+	int ret;
+
+	/* parse common options: */
+	if (odp_cunit_parse_options(argc, argv))
+		return -1;
+
+	ret = odp_cunit_register(shmem_suites);
 
 	if (ret == 0)
 		ret = odp_cunit_run();

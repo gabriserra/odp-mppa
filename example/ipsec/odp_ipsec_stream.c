@@ -5,7 +5,9 @@
  */
 
 /* enable strtok */
-#define _POSIX_C_SOURCE 200112L
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +19,7 @@
 
 #include <example_debug.h>
 
-#include <odp.h>
+#include <odp_api.h>
 
 #include <odp/helper/eth.h>
 #include <odp/helper/ip.h>
@@ -34,7 +36,7 @@
  * Stream packet header
  */
 typedef struct ODP_PACKED stream_pkt_hdr_s {
-	uint64be_t magic;    /**< Stream magic value for verification */
+	odp_u64be_t magic;   /**< Stream magic value for verification */
 	uint8_t    data[0];  /**< Incrementing data stream */
 } stream_pkt_hdr_t;
 
@@ -269,7 +271,7 @@ odp_packet_t create_ipv4_packet(stream_db_entry_t *stream,
 		inner_ip->frag_offset = 0;
 		inner_ip->src_addr = odp_cpu_to_be_32(stream->src_ip);
 		inner_ip->dst_addr = odp_cpu_to_be_32(stream->dst_ip);
-		inner_ip->chksum = odp_chksum(inner_ip, sizeof(*inner_ip));
+		inner_ip->chksum = odph_chksum(inner_ip, sizeof(*inner_ip));
 		data += sizeof(*inner_ip);
 	}
 
@@ -290,7 +292,7 @@ odp_packet_t create_ipv4_packet(stream_db_entry_t *stream,
 
 	/* Close ICMP */
 	icmp->chksum = 0;
-	icmp->chksum = odp_chksum(icmp, data - (uint8_t *)icmp);
+	icmp->chksum = odph_chksum(icmp, data - (uint8_t *)icmp);
 
 	/* Close ESP if specified */
 	if (esp) {

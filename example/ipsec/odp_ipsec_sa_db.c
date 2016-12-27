@@ -5,14 +5,16 @@
  */
 
 /* enable strtok */
-#define _POSIX_C_SOURCE 200112L
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include <stdlib.h>
 #include <string.h>
 
 #include <example_debug.h>
 
-#include <odp.h>
+#include <odp_api.h>
 
 #include <odp_ipsec_sa_db.h>
 

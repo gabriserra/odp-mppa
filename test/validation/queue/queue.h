@@ -10,7 +10,9 @@
 #include <odp_cunit_common.h>
 
 /* test functions: */
-void queue_test_sunnydays(void);
+void queue_test_capa(void);
+void queue_test_mode(void);
+void queue_test_param(void);
 void queue_test_info(void);
 
 /* test arrays: */
@@ -24,6 +26,6 @@ int queue_suite_term(void);
 extern odp_suiteinfo_t queue_suites[];
 
 /* main test program: */
-int queue_main(void);
+int queue_main(int argc, char *argv[]);
 
 #endif

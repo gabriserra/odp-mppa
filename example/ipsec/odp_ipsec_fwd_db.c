@@ -5,14 +5,16 @@
  */
 
 /* enable strtok */
-#define _POSIX_C_SOURCE 200112L
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include <stdlib.h>
 #include <string.h>
 
 #include <example_debug.h>
 
-#include <odp.h>
+#include <odp_api.h>
 
 #include <odp_ipsec_fwd_db.h>
 
@@ -37,9 +39,9 @@ void init_fwd_db(void)
 	memset(fwd_db, 0, sizeof(*fwd_db));
 }
 
-int create_fwd_db_entry(char *input)
+int create_fwd_db_entry(char *input, char **if_names, int if_count)
 {
-	int pos = 0;
+	int pos = 0, i, match = 0;
 	char *local;
 	char *str;
 	char *save;
@@ -74,6 +76,17 @@ int create_fwd_db_entry(char *input)
 		case 1:
 			strncpy(entry->oif, token, OIF_LEN - 1);
 			entry->oif[OIF_LEN - 1] = 0;
+			for (i = 0; i < if_count; i++) {
+				if (!strcmp(if_names[i], entry->oif)) {
+					match = 1;
+					break;
+				}
+			}
+			if (!match) {
+				printf("ERROR: interface name not correct for route\n");
+				free(local);
+				return -1;
+			}
 			break;
 		case 2:
 			parse_mac_string(token, entry->dst_mac);
@@ -97,9 +110,6 @@ int create_fwd_db_entry(char *input)
 		return -1;
 	}
 
-	/* Reset queue to invalid */
-	entry->queue = ODP_QUEUE_INVALID;
-
 	/* Add route to the list */
 	fwd_db->index++;
 	entry->next = fwd_db->list;
@@ -109,7 +119,7 @@ int create_fwd_db_entry(char *input)
 	return 0;
 }
 
-void resolve_fwd_db(char *intf, odp_queue_t outq, uint8_t *mac)
+void resolve_fwd_db(char *intf, odp_pktout_queue_t pktout, uint8_t *mac)
 {
 	fwd_db_entry_t *entry;
 
@@ -118,7 +128,7 @@ void resolve_fwd_db(char *intf, odp_queue_t outq, uint8_t *mac)
 		if (strcmp(intf, entry->oif))
 			continue;
 
-		entry->queue = outq;
+		entry->pktout = pktout;
 		memcpy(entry->src_mac, mac, ODPH_ETHADDR_LEN);
 	}
 }

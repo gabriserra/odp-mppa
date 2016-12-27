@@ -1,5 +1,5 @@
-SUBDIRS = api_test performance miscellaneous
+SUBDIRS = performance miscellaneous
 
 if cunit_support
-    SUBDIRS += validation
+    SUBDIRS += validation @platform_with_platform@
 endif

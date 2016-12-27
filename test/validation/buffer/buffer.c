@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:	BSD-3-Clause
  */
 
-#include <odp.h>
+#include <odp_api.h>
 #include "odp_cunit_common.h"
 #include "buffer.h"
 
@@ -257,9 +257,15 @@ odp_suiteinfo_t buffer_suites[] = {
 	ODP_SUITE_INFO_NULL,
 };
 
-int buffer_main(void)
+int buffer_main(int argc, char *argv[])
 {
-	int ret = odp_cunit_register(buffer_suites);
+	int ret;
+
+	/* parse common options: */
+	if (odp_cunit_parse_options(argc, argv))
+		return -1;
+
+	ret = odp_cunit_register(buffer_suites);
 
 	if (ret == 0)
 		odp_cunit_run();

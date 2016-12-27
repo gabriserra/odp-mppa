@@ -7,7 +7,7 @@ LIB   = $(top_builddir)/lib
 #in the following line, the libs using the symbols should come before
 #the libs containing them! The includer is given a chance to add things
 #before libodp by setting PRE_LDADD before the inclusion.
-LDADD = $(PRE_LDADD) $(LIB)/libodphelper.la $(LIB)/libodp.la
+LDADD = $(PRE_LDADD) $(LIB)/libodphelper-linux.la $(LIB)/libodp-linux.la
 
 INCFLAGS = -I$(top_srcdir)/test \
 	-I$(top_srcdir)/platform/@with_platform@/include \
@@ -19,7 +19,7 @@ AM_CXXFLAGS = $(INCFLAGS)
 AM_LDFLAGS += -L$(LIB)
 
 @VALGRIND_CHECK_RULES@
-valgrind_tools = memcheck drd sgcheck
+valgrind_tools = memcheck
 
 TESTS_ENVIRONMENT+= ODP_PLATFORM=${with_platform} EXEEXT=${EXEEXT} ODP_TOOLCHAIN_DIR=${top_srcdir}/install/local/k1tools
 bindir      = $(datarootdir)/$(subst $(top_srcdir)/,,$(srcdir))

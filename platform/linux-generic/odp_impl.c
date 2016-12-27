@@ -18,11 +18,11 @@
 extern "C" {
 #endif
 
-#include <odp/version.h>
+#include <odp/api/version.h>
 
 #define ODP_VERSION_IMPL 0
 #define ODP_VERSION_IMPL_STR \
-	ODP_VERSION_TO_STR(PLATFORM) " " \
+	ODP_VERSION_TO_STR(IMPLEMENTATION_NAME) " " \
 	ODP_VERSION_TO_STR(ODP_VERSION_API_GENERATION) "." \
 	ODP_VERSION_TO_STR(ODP_VERSION_API_MAJOR) "." \
 	ODP_VERSION_TO_STR(ODP_VERSION_API_MINOR) "-" \
@@ -30,12 +30,19 @@ extern "C" {
 	ODP_VERSION_TO_STR(ODP_VERSION_API_GENERATION) "." \
 	ODP_VERSION_TO_STR(ODP_VERSION_API_MAJOR) "." \
 	ODP_VERSION_TO_STR(ODP_VERSION_API_MINOR) ") " \
-	__DATE__ " " __TIME__ " " \
 	ODP_VERSION_TO_STR(GIT_HASH)
+
+#define ODP_VERSION_IMPL_NAME \
+	ODP_VERSION_TO_STR(IMPLEMENTATION_NAME)
 
 const char *odp_version_impl_str(void)
 {
 	return ODP_VERSION_IMPL_STR;
+}
+
+const char *odp_version_impl_name(void)
+{
+	return ODP_VERSION_IMPL_NAME;
 }
 
 #ifdef __cplusplus

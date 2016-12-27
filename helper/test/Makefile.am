@@ -5,14 +5,16 @@ AM_LDFLAGS += -static
 
 TESTS_ENVIRONMENT += TEST_DIR=${builddir}
 
-EXECUTABLES = odp_chksum$(EXEEXT) \
-              odp_thread$(EXEEXT) \
-              odph_pause$(EXEEXT)\
-              odp_table$(EXEEXT)
+EXECUTABLES = chksum$(EXEEXT) \
+              thread$(EXEEXT) \
+              parse$(EXEEXT)\
+              process$(EXEEXT)\
+              table$(EXEEXT)
 
-COMPILE_ONLY =
+COMPILE_ONLY = odpthreads
 
-TESTSCRIPTS =
+TESTSCRIPTS = odpthreads_as_processes \
+	      odpthreads_as_pthreads
 
 if test_helper
 TESTS = $(EXECUTABLES) $(TESTSCRIPTS)
@@ -20,13 +22,16 @@ endif
 
 dist_bin_SCRIPTS =
 
-bin_PROGRAMS = $(EXECUTABLES) $(COMPILE_ONLY)
+test_PROGRAMS = $(EXECUTABLES) $(COMPILE_ONLY)
 
+EXTRA_DIST = odpthreads_as_processes odpthreads_as_pthreads
 
-dist_odp_chksum_SOURCES = odp_chksum.c
-dist_odp_thread_SOURCES = odp_thread.c
-odp_thread_LDADD = $(LIB)/libodphelper.la $(LIB)/libodp.la
-dist_odp_process_SOURCES = odp_process.c
-odp_process_LDADD = $(LIB)/libodphelper.la $(LIB)/libodp.la
-odph_pause_SOURCES = odph_pause.c
-dist_odp_table_SOURCES = odp_table.c
+dist_chksum_SOURCES = chksum.c
+dist_odpthreads_SOURCES = odpthreads.c
+odpthreads_LDADD = $(LIB)/libodphelper-linux.la $(LIB)/libodp-linux.la
+dist_thread_SOURCES = thread.c
+thread_LDADD = $(LIB)/libodphelper-linux.la $(LIB)/libodp-linux.la
+dist_process_SOURCES = process.c
+dist_parse_SOURCES = parse.c
+process_LDADD = $(LIB)/libodphelper-linux.la $(LIB)/libodp-linux.la
+dist_table_SOURCES = table.c

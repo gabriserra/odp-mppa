@@ -9,9 +9,13 @@
  */
 
 /* For rand_r and nanosleep */
-#define _POSIX_C_SOURCE 200112L
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <time.h>
 #include <odp.h>
+#include <odp/helper/linux.h>
 #ifdef __K1__
 #include <HAL/hal/cluster/dsu.h>
 #endif
@@ -42,11 +46,9 @@ static odp_timer_pool_t tp;
 /** @private Count of timeouts delivered too late */
 static odp_atomic_u32_t ndelivtoolate;
 
-/** @private min() function */
-static int min(int a, int b)
-{
-	return a < b ? a : b;
-}
+/** @private Sum of all allocated timers from all threads. Thread-local
+ * caches may make this number lower than the capacity of the pool  */
+static odp_atomic_u32_t timers_allocated;
 
 /* @private Timer helper structure */
 struct test_timer {
@@ -84,14 +86,15 @@ void timer_test_timeout_pool_alloc(void)
 	odp_event_t ev;
 	int index;
 	char wrong_type = 0;
-	odp_pool_param_t params = {
-			.tmo = {
-				.num   = num,
-			},
-			.type  = ODP_POOL_TIMEOUT,
-	};
+	odp_pool_param_t params;
+
+	odp_pool_param_init(&params);
+	params.type    = ODP_POOL_TIMEOUT;
+	params.tmo.num = num;
 
 	pool = odp_pool_create("timeout_pool_alloc", &params);
+	CU_ASSERT_FATAL(pool != ODP_POOL_INVALID);
+
 	odp_pool_print(pool);
 
 	/* Try to allocate num items from the pool */
@@ -124,14 +127,14 @@ void timer_test_timeout_pool_free(void)
 {
 	odp_pool_t pool;
 	odp_timeout_t tmo;
-	odp_pool_param_t params = {
-			.tmo = {
-				.num   = 1,
-			},
-			.type  = ODP_POOL_TIMEOUT,
-	};
+	odp_pool_param_t params;
+
+	odp_pool_param_init(&params);
+	params.type    = ODP_POOL_TIMEOUT;
+	params.tmo.num = 1;
 
 	pool = odp_pool_create("timeout_pool_free", &params);
+	CU_ASSERT_FATAL(pool != ODP_POOL_INVALID);
 	odp_pool_print(pool);
 
 	/* Allocate the only timeout from the pool */
@@ -164,8 +167,10 @@ void timer_test_odp_timer_cancel(void)
 	odp_timer_set_t rc;
 	uint64_t tick;
 
-	params.tmo.num = 1;
+	odp_pool_param_init(&params);
 	params.type    = ODP_POOL_TIMEOUT;
+	params.tmo.num = 1;
+
 	pool = odp_pool_create("tmo_pool_for_cancel", &params);
 
 	if (pool == ODP_POOL_INVALID)
@@ -184,7 +189,7 @@ void timer_test_odp_timer_cancel(void)
 	/* Start all created timer pools */
 	odp_timer_pool_start();
 
-	queue = odp_queue_create("timer_queue", ODP_QUEUE_TYPE_POLL, NULL);
+	queue = odp_queue_create("timer_queue", NULL);
 	if (queue == ODP_QUEUE_INVALID)
 		CU_FAIL_FATAL("Queue create failed");
 
@@ -192,6 +197,7 @@ void timer_test_odp_timer_cancel(void)
 	tim = odp_timer_alloc(tp, queue, USER_PTR);
 	if (tim == ODP_TIMER_INVALID)
 		CU_FAIL_FATAL("Failed to allocate timer");
+	LOG_DBG("Timer handle: %" PRIu64 "\n", odp_timer_to_u64(tim));
 
 	ev = odp_timeout_to_event(odp_timeout_alloc(pool));
 	if (ev == ODP_EVENT_INVALID)
@@ -213,6 +219,7 @@ void timer_test_odp_timer_cancel(void)
 	tmo = odp_timeout_from_event(ev);
 	if (tmo == ODP_TIMEOUT_INVALID)
 		CU_FAIL_FATAL("Cancel did not return timeout");
+	LOG_DBG("Timeout handle: %" PRIu64 "\n", odp_timeout_to_u64(tmo));
 
 	if (odp_timeout_timer(tmo) != tim)
 		CU_FAIL("Cancel invalid tmo.timer");
@@ -294,16 +301,14 @@ static void handle_tmo(odp_event_t ev, bool stale, uint64_t prev_tick)
 
 /* @private Worker thread entrypoint which performs timer alloc/set/cancel/free
  * tests */
-static void *worker_entrypoint(void *arg TEST_UNUSED)
+static int worker_entrypoint(void *arg TEST_UNUSED)
 {
 	int thr = odp_thread_id();
-	uint32_t i;
+	uint32_t i, allocated;
 	unsigned seed = thr;
 	int rc;
 
-	odp_queue_t queue = odp_queue_create("timer_queue",
-					     ODP_QUEUE_TYPE_POLL,
-					     NULL);
+	odp_queue_t queue = odp_queue_create("timer_queue", NULL);
 	if (queue == ODP_QUEUE_INVALID)
 		CU_FAIL_FATAL("Queue create failed");
 
@@ -313,21 +318,32 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 
 	/* Prepare all timers */
 	for (i = 0; i < NTIMERS; i++) {
-		tt[i].tim = odp_timer_alloc(tp, queue, &tt[i]);
-		if (tt[i].tim == ODP_TIMER_INVALID)
-			CU_FAIL_FATAL("Failed to allocate timer");
 		tt[i].ev = odp_timeout_to_event(odp_timeout_alloc(tbp));
-		if (tt[i].ev == ODP_EVENT_INVALID)
-			CU_FAIL_FATAL("Failed to allocate timeout");
+		if (tt[i].ev == ODP_EVENT_INVALID) {
+			LOG_DBG("Failed to allocate timeout (%" PRIu32 "/%d)\n",
+				i, NTIMERS);
+			break;
+		}
+		tt[i].tim = odp_timer_alloc(tp, queue, &tt[i]);
+		if (tt[i].tim == ODP_TIMER_INVALID) {
+			LOG_DBG("Failed to allocate timer (%" PRIu32 "/%d)\n",
+				i, NTIMERS);
+			odp_event_free(tt[i].ev);
+			break;
+		}
 		tt[i].ev2 = tt[i].ev;
 		tt[i].tick = TICK_INVALID;
 	}
+	allocated = i;
+	if (allocated == 0)
+		CU_FAIL_FATAL("unable to alloc a timer");
+	odp_atomic_fetch_add_u32(&timers_allocated, allocated);
 
 	odp_barrier_wait(&test_barrier);
 
 	/* Initial set all timers with a random expiration time */
 	uint32_t nset = 0;
-	for (i = 0; i < NTIMERS; i++) {
+	for (i = 0; i < allocated; i++) {
 		uint64_t tck = odp_timer_current_tick(tp) + 1 +
 			       odp_timer_ns_to_tick(tp,
 						    (rand_r(&seed) % RANGE_MS)
@@ -350,7 +366,7 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 	uint32_t ms;
 	uint64_t prev_tick = odp_timer_current_tick(tp);
 
-	for (ms = 0; ms < 7 * RANGE_MS / 10; ms++) {
+	for (ms = 0; ms < 7 * RANGE_MS / 10 && allocated > 0; ms++) {
 		odp_event_t ev;
 		while ((ev = odp_queue_deq(queue)) != ODP_EVENT_INVALID) {
 			/* Subtract one from prev_tick to allow for timeouts
@@ -359,7 +375,7 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 			nrcv++;
 		}
 		prev_tick = odp_timer_current_tick(tp);
-		i = rand_r(&seed) % NTIMERS;
+		i = rand_r(&seed) % allocated;
 		if (tt[i].ev == ODP_EVENT_INVALID &&
 		    (rand_r(&seed) % 2 == 0)) {
 			/* Timer active, cancel it */
@@ -407,15 +423,13 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 
 	/* Cancel and free all timers */
 	uint32_t nstale = 0;
-	for (i = 0; i < NTIMERS; i++) {
+	for (i = 0; i < allocated; i++) {
 		(void)odp_timer_cancel(tt[i].tim, &tt[i].ev);
 		tt[i].tick = TICK_INVALID;
 		if (tt[i].ev == ODP_EVENT_INVALID)
 			/* Cancel too late, timer already expired and
 			 * timeout enqueued */
 			nstale++;
-		if (odp_timer_free(tt[i].tim) != ODP_EVENT_INVALID)
-			CU_FAIL("odp_timer_free");
 	}
 
 	LOG_DBG("Thread %u: %" PRIu32 " timers set\n", thr, nset);
@@ -428,12 +442,14 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 		thr, nstale);
 
 	/* Delay some more to ensure timeouts for expired timers can be
-	 * received */
+	 * received. Can not use busy loop here to make background timer
+	 * thread finish their work. */
 	struct timespec ts;
 	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000; /* 1ms */
+	ts.tv_nsec = (3 * RANGE_MS / 10 + 50) * ODP_TIME_MSEC_IN_NS;
 	if (my_nanosleep(&ts) < 0)
 		CU_FAIL_FATAL("nanosleep failed");
+
 	while (nstale != 0) {
 		odp_event_t ev = odp_queue_deq(queue);
 		if (ev != ODP_EVENT_INVALID) {
@@ -444,6 +460,12 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 			break;
 		}
 	}
+
+	for (i = 0; i < allocated; i++) {
+		if (odp_timer_free(tt[i].tim) != ODP_EVENT_INVALID)
+			CU_FAIL("odp_timer_free");
+	}
+
 	/* Check if there any more (unexpected) events */
 	odp_event_t ev = odp_queue_deq(queue);
 	if (ev != ODP_EVENT_INVALID)
@@ -451,14 +473,14 @@ static void *worker_entrypoint(void *arg TEST_UNUSED)
 
 	rc = odp_queue_destroy(queue);
 	CU_ASSERT(rc == 0);
-	for (i = 0; i < NTIMERS; i++) {
+	for (i = 0; i < allocated; i++) {
 		if (tt[i].ev != ODP_EVENT_INVALID)
 			odp_event_free(tt[i].ev);
 	}
 
 	free(tt);
 	LOG_DBG("Thread %u: exiting\n", thr);
-	return NULL;
+	return CU_get_number_of_failures();
 }
 
 /* @private Timer test case entrypoint */
@@ -467,19 +489,26 @@ void timer_test_odp_timer_all(void)
 	int rc;
 	odp_pool_param_t params;
 	odp_timer_pool_param_t tparam;
+	odp_cpumask_t unused;
+
 	/* Reserve at least one core for running other processes so the timer
 	 * test hopefully can run undisturbed and thus get better timing
 	 * results. */
-	odp_cpumask_t mask;
-	int num_workers = min(odp_cpumask_default_worker(&mask, odp_cpu_count()), MAX_WORKERS);
+	int num_workers = odp_cpumask_default_worker(&unused, 0);
+
+	/* force to max CPU count */
+	if (num_workers > MAX_WORKERS)
+		num_workers = MAX_WORKERS;
 
 	/* On a single-CPU machine run at least one thread */
 	if (num_workers < 1)
 		num_workers = 1;
 
 	/* Create timeout pools */
-	params.tmo.num = (NTIMERS + 1) * num_workers;
+	odp_pool_param_init(&params);
 	params.type    = ODP_POOL_TIMEOUT;
+	params.tmo.num = (NTIMERS + 1) * num_workers;
+
 	tbp = odp_pool_create("tmo_pool", &params);
 	if (tbp == ODP_POOL_INVALID)
 		CU_FAIL_FATAL("Timeout pool create failed");
@@ -511,6 +540,7 @@ void timer_test_odp_timer_all(void)
 	CU_ASSERT(tpinfo.param.max_tmo == MAX);
 	CU_ASSERT(strcmp(tpinfo.name, NAME) == 0);
 
+	LOG_DBG("Timer pool handle: %" PRIu64 "\n", odp_timer_pool_to_u64(tp));
 	LOG_DBG("#timers..: %u\n", NTIMERS);
 	LOG_DBG("Tmo range: %u ms (%" PRIu64 " ticks)\n", RANGE_MS,
 		odp_timer_ns_to_tick(tp, 1000000ULL * RANGE_MS));
@@ -532,6 +562,9 @@ void timer_test_odp_timer_all(void)
 	/* Initialize the shared timeout counter */
 	odp_atomic_init_u32(&ndelivtoolate, 0);
 
+	/* Initialize the number of finally allocated elements */
+	odp_atomic_init_u32(&timers_allocated, 0);
+
 	/* Create and start worker threads */
 	pthrd_arg thrdarg;
 	thrdarg.testcase = 0;
@@ -548,7 +581,7 @@ void timer_test_odp_timer_all(void)
 		CU_FAIL("odp_timer_pool_info");
 	CU_ASSERT(tpinfo.param.num_timers == (unsigned)num_workers * NTIMERS);
 	CU_ASSERT(tpinfo.cur_timers == 0);
-	CU_ASSERT(tpinfo.hwm_timers == (unsigned)num_workers * NTIMERS);
+	CU_ASSERT(tpinfo.hwm_timers == odp_atomic_load_u32(&timers_allocated));
 
 	/* Destroy timer pool, all timers must have been freed */
 	odp_timer_pool_destroy(tp);
@@ -573,8 +606,12 @@ odp_suiteinfo_t timer_suites[] = {
 	ODP_SUITE_INFO_NULL,
 };
 
-int timer_main(void)
+int timer_main(int argc, char *argv[])
 {
+	/* parse common options: */
+	if (odp_cunit_parse_options(argc, argv))
+		return -1;
+
 	int ret = odp_cunit_register(timer_suites);
 
 	if (ret == 0)

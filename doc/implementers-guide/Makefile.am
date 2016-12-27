@@ -1,14 +1,12 @@
-TARGET = $(top_builddir)/doc/output/implementers-guide.html
+include ../Makefile.inc
 
-EXTRA_DIST = implementers-guide.adoc
-COMMON_DOC_FLAGS = -a "imagesdir=$(abs_top_builddir)/doc/images" -a data-uri -a icons -a toc2  -a max-width=55em
+SRC    = $(top_srcdir)/doc/implementers-guide/implementers-guide.adoc
+TARGET = implementers-guide.html
 
-all-local: $(TARGET)
+EXTRA_DIST = $(SRC)
 
-$(TARGET): implementers-guide.adoc
-	@mkdir -p $(top_builddir)/doc/output
-	asciidoc -$(COMMON_DOC_FLAGS) -b html5 --out-file=$@ $< || \
-	asciidoc -$(COMMON_DOC_FLAGS) -b html4 --out-file=$@ $<
+doc_DATA = $(TARGET)
+$(TARGET): $(SRC)
 
 clean-local:
-	rm -f $(TARGET)
+	rm -f  $(builddir)/$(TARGET)

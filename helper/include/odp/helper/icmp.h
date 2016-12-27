@@ -18,9 +18,7 @@
 extern "C" {
 #endif
 
-#include <odp/align.h>
-#include <odp/debug.h>
-#include <odp/byteorder.h>
+#include <odp_api.h>
 
 /** @addtogroup odph_header ODPH HEADER
  *  @{
@@ -33,16 +31,16 @@ extern "C" {
 typedef struct ODP_PACKED {
 	uint8_t type;		/**< message type */
 	uint8_t code;		/**< type sub-code */
-	uint16sum_t chksum;	/**< checksum of icmp header */
+	odp_u16sum_t chksum;	/**< checksum of icmp header */
 	union {
 		struct {
-			uint16be_t id;
-			uint16be_t sequence;
+			odp_u16be_t id;
+			odp_u16be_t sequence;
 		} echo;			/**< echo datagram */
-		uint32be_t gateway;	/**< gateway address */
+		odp_u32be_t gateway;	/**< gateway address */
 		struct {
-			uint16be_t __unused;
-			uint16be_t mtu;
+			odp_u16be_t __unused;
+			odp_u16be_t mtu;
 		} frag;			/**< path mtu discovery */
 	} un;			/**< icmp sub header */
 } odph_icmphdr_t;
@@ -94,7 +92,8 @@ typedef struct ODP_PACKED {
 								exceeded*/
 
 /** @internal Compile time assert */
-_ODP_STATIC_ASSERT(sizeof(odph_icmphdr_t) == ODPH_ICMPHDR_LEN, "ODPH_ICMPHDR_T__SIZE_ERROR");
+ODP_STATIC_ASSERT(sizeof(odph_icmphdr_t) == ODPH_ICMPHDR_LEN,
+		  "ODPH_ICMPHDR_T__SIZE_ERROR");
 
 /**
  * @}

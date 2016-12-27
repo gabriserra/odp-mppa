@@ -4,18 +4,18 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-#include <odp/crypto.h>
+#include <odp/api/crypto.h>
 #include <odp_internal.h>
-#include <odp/atomic.h>
-#include <odp/spinlock.h>
-#include <odp/sync.h>
-#include <odp/debug.h>
-#include <odp/align.h>
-#include <odp/shared_memory.h>
+#include <odp/api/atomic.h>
+#include <odp/api/spinlock.h>
+#include <odp/api/sync.h>
+#include <odp/api/debug.h>
+#include <odp/api/align.h>
+#include <odp/api/shared_memory.h>
 #include <odp_crypto_internal.h>
 #include <odp_debug_internal.h>
-#include <odp/hints.h>
-#include <odp/random.h>
+#include <odp/api/hints.h>
+#include <odp/api/random.h>
 #include <odp_packet_internal.h>
 
 #include <string.h>
@@ -597,6 +597,30 @@ int process_sha256_params(odp_crypto_generic_session_t *session,
 	return 0;
 }
 
+int odp_crypto_capability(odp_crypto_capability_t *capa)
+{
+	if (NULL == capa)
+		return -1;
+
+	/* Initialize crypto capability structure */
+	memset(capa, 0, sizeof(odp_crypto_capability_t));
+
+	capa->ciphers.bit.null = 1;
+	capa->ciphers.bit.des = 1;
+	capa->ciphers.bit.trides_cbc  = 1;
+	capa->ciphers.bit.aes128_cbc  = 1;
+	capa->ciphers.bit.aes128_gcm  = 1;
+
+	capa->auths.bit.null = 1;
+	capa->auths.bit.md5_96 = 1;
+	capa->auths.bit.sha256_128 = 1;
+	capa->auths.bit.aes128_gcm  = 1;
+
+	capa->max_sessions = MAX_SESSIONS;
+
+	return 0;
+}
+
 int
 odp_crypto_session_create(odp_crypto_session_params_t *params,
 			  odp_crypto_session_t *session_out,
@@ -704,6 +728,8 @@ int odp_crypto_session_destroy(odp_crypto_session_t session)
 	odp_crypto_generic_session_t *generic;
 
 	generic = (odp_crypto_generic_session_t *)(intptr_t)session;
+	if (generic->cipher.alg == ODP_CIPHER_ALG_AES128_GCM)
+		EVP_CIPHER_CTX_free(generic->cipher.data.aes_gcm.ctx);
 	memset(generic, 0, sizeof(*generic));
 	free_session(generic);
 	return 0;
@@ -729,11 +755,11 @@ odp_crypto_operation(odp_crypto_op_params_t *params,
 	if (params->pkt != params->out_pkt) {
 		if (odp_unlikely(ODP_PACKET_INVALID == params->out_pkt))
 			ODP_ABORT();
-		(void)_odp_packet_copy_to_packet(params->pkt,
-						 0,
-						 params->out_pkt,
-						 0,
-						 odp_packet_len(params->pkt));
+		(void)odp_packet_copy_from_pkt(params->out_pkt,
+					       0,
+					       params->pkt,
+					       0,
+					       odp_packet_len(params->pkt));
 		_odp_packet_copy_md_to_packet(params->pkt, params->out_pkt);
 		odp_packet_free(params->pkt);
 		params->pkt = ODP_PACKET_INVALID;

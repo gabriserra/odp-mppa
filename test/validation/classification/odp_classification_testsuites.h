@@ -7,8 +7,9 @@
 #ifndef ODP_CLASSIFICATION_TESTSUITES_H_
 #define ODP_CLASSIFICATION_TESTSUITES_H_
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp_cunit_common.h>
+#include <stdbool.h>
 
 extern odp_testinfo_t classification_suite[];
 extern odp_testinfo_t classification_suite_basic[];
@@ -22,10 +23,12 @@ int classification_suite_pmr_init(void);
 
 odp_packet_t create_packet(odp_pool_t pool, bool vlan,
 			   odp_atomic_u32_t *seq, bool udp);
+odp_packet_t create_packet_len(odp_pool_t pool, bool vlan,
+			       odp_atomic_u32_t *seq, bool flag_udp,
+			       uint16_t len);
 int cls_pkt_set_seq(odp_packet_t pkt);
 uint32_t cls_pkt_get_seq(odp_packet_t pkt);
-odp_pktio_t create_pktio(odp_queue_type_t q_type);
-int create_default_inq(odp_pktio_t pktio, odp_queue_type_t qtype);
+odp_pktio_t create_pktio(odp_queue_type_t q_type, odp_pool_t pool);
 void configure_default_cos(odp_pktio_t pktio, odp_cos_t *cos,
 			   odp_queue_t *queue, odp_pool_t *pool);
 int parse_ipv4_string(const char *ipaddress, uint32_t *addr, uint32_t *mask);
@@ -43,8 +46,10 @@ void configure_cos_with_l2_priority(void);
 void test_cos_with_l2_priority(void);
 void configure_pmr_cos(void);
 void test_pmr_cos(void);
-void configure_pktio_pmr_match_set_cos(void);
-void test_pktio_pmr_match_set_cos(void);
-int destroy_inq(odp_pktio_t pktio);
+void configure_pktio_pmr_composite(void);
+void test_pktio_pmr_composite_cos(void);
+int stop_pktio(odp_pktio_t pktio);
+odp_cls_pmr_term_t find_first_supported_l3_pmr(void);
+int set_first_supported_pmr_port(odp_packet_t pkt, uint16_t port);
 
 #endif /* ODP_BUFFER_TESTSUITES_H_ */

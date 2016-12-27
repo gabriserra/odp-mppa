@@ -27,20 +27,19 @@
  * The total length of the 'iface' is limited by IF_NAMESIZE.
  */
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
+#include <odp_posix_extensions.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <linux/if_tun.h>
 
-#include <odp.h>
+#include <odp_api.h>
 #include <odp_packet_socket.h>
 #include <odp_packet_internal.h>
 #include <odp_packet_io_internal.h>
@@ -61,7 +60,8 @@ static int tap_pktio_open(odp_pktio_t id ODP_UNUSED,
 			  pktio_entry_t *pktio_entry,
 			  const char *devname, odp_pool_t pool)
 {
-	int fd, skfd, flags, mtu;
+	int fd, skfd, flags;
+	uint32_t mtu;
 	struct ifreq ifr;
 	pkt_tap_t *tap = &pktio_entry->s.pkt_tap;
 
@@ -125,7 +125,7 @@ static int tap_pktio_open(odp_pktio_t id ODP_UNUSED,
 	}
 
 	mtu = mtu_get_fd(skfd, devname + 4);
-	if (mtu < 0) {
+	if (mtu == 0) {
 		__odp_errno = errno;
 		ODP_ERR("mtu_get_fd failed: %s\n", strerror(errno));
 		goto sock_err;
@@ -180,59 +180,75 @@ static int tap_pktio_close(pktio_entry_t *pktio_entry)
 	return ret;
 }
 
-static odp_packet_t pack_odp_pkt(odp_pool_t pool,
-				 const void *data,
-				 unsigned int len)
+static odp_packet_t pack_odp_pkt(pktio_entry_t *pktio_entry, const void *data,
+				 unsigned int len, odp_time_t *ts)
 {
 	odp_packet_t pkt;
+	odp_packet_hdr_t *pkt_hdr;
 
-	pkt = packet_alloc(pool, len, 1);
+	pkt = packet_alloc(pktio_entry->s.pkt_tap.pool, len, 1);
 
 	if (pkt == ODP_PACKET_INVALID)
 		return pkt;
 
-	if (odp_packet_copydata_in(pkt, 0, len, data) < 0) {
+	if (odp_packet_copy_from_mem(pkt, 0, len, data) < 0) {
 		ODP_ERR("failed to copy packet data\n");
 		odp_packet_free(pkt);
 		return ODP_PACKET_INVALID;
 	}
 
-	packet_parse_l2(odp_packet_hdr(pkt));
+	pkt_hdr = odp_packet_hdr(pkt);
+	packet_parse_l2(&pkt_hdr->p, len);
+	packet_set_ts(pkt_hdr, ts);
+	pkt_hdr->input = pktio_entry->s.handle;
 
 	return pkt;
 }
 
-static int tap_pktio_recv(pktio_entry_t *pktio_entry, odp_packet_t pkts[],
-			  unsigned len)
+static int tap_pktio_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+			  odp_packet_t pkts[], int len)
 {
 	ssize_t retval;
-	unsigned i;
+	int i;
 	uint8_t buf[BUF_SIZE];
 	pkt_tap_t *tap = &pktio_entry->s.pkt_tap;
+	odp_time_t ts_val;
+	odp_time_t *ts = NULL;
+
+	odp_ticketlock_lock(&pktio_entry->s.rxl);
+
+	if (pktio_entry->s.config.pktin.bit.ts_all ||
+	    pktio_entry->s.config.pktin.bit.ts_ptp)
+		ts = &ts_val;
 
 	for (i = 0; i < len; i++) {
 		do {
 			retval = read(tap->fd, buf, BUF_SIZE);
 		} while (retval < 0 && errno == EINTR);
 
+		if (ts != NULL)
+			ts_val = odp_time_global();
+
 		if (retval < 0) {
 			__odp_errno = errno;
 			break;
 		}
 
-		pkts[i] = pack_odp_pkt(tap->pool, buf, retval);
+		pkts[i] = pack_odp_pkt(pktio_entry, buf, retval, ts);
 		if (pkts[i] == ODP_PACKET_INVALID)
 			break;
 	}
 
+	odp_ticketlock_unlock(&pktio_entry->s.rxl);
+
 	return i;
 }
 
-static int tap_pktio_send(pktio_entry_t *pktio_entry, odp_packet_t pkts[],
-			  unsigned len)
+static int tap_pktio_send_lockless(pktio_entry_t *pktio_entry,
+				   const odp_packet_t pkts[], int len)
 {
 	ssize_t retval;
-	unsigned i, n;
+	int i, n;
 	uint32_t pkt_len;
 	uint8_t buf[BUF_SIZE];
 	pkt_tap_t *tap = &pktio_entry->s.pkt_tap;
@@ -248,7 +264,7 @@ static int tap_pktio_send(pktio_entry_t *pktio_entry, odp_packet_t pkts[],
 			break;
 		}
 
-		if (odp_packet_copydata_out(pkts[i], 0, pkt_len, buf) < 0) {
+		if (odp_packet_copy_to_mem(pkts[i], 0, pkt_len, buf) < 0) {
 			ODP_ERR("failed to copy packet data\n");
 			break;
 		}
@@ -280,9 +296,23 @@ static int tap_pktio_send(pktio_entry_t *pktio_entry, odp_packet_t pkts[],
 	return i;
 }
 
-static int tap_mtu_get(pktio_entry_t *pktio_entry)
+static int tap_pktio_send(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+			  const odp_packet_t pkts[], int len)
 {
 	int ret;
+
+	odp_ticketlock_lock(&pktio_entry->s.txl);
+
+	ret = tap_pktio_send_lockless(pktio_entry, pkts, len);
+
+	odp_ticketlock_unlock(&pktio_entry->s.txl);
+
+	return ret;
+}
+
+static uint32_t tap_mtu_get(pktio_entry_t *pktio_entry)
+{
+	uint32_t ret;
 
 	ret =  mtu_get_fd(pktio_entry->s.pkt_tap.skfd,
 			  pktio_entry->s.name + 4);
@@ -311,8 +341,26 @@ static int tap_mac_addr_get(pktio_entry_t *pktio_entry, void *mac_addr)
 	return ETH_ALEN;
 }
 
+static int tap_capability(pktio_entry_t *pktio_entry ODP_UNUSED,
+			  odp_pktio_capability_t *capa)
+{
+	memset(capa, 0, sizeof(odp_pktio_capability_t));
+
+	capa->max_input_queues  = 1;
+	capa->max_output_queues = 1;
+	capa->set_op.op.promisc_mode = 1;
+
+	odp_pktio_config_init(&capa->config);
+	capa->config.pktin.bit.ts_all = 1;
+	capa->config.pktin.bit.ts_ptp = 1;
+	return 0;
+}
+
 const pktio_if_ops_t tap_pktio_ops = {
-	.init = NULL,
+	.name = "tap",
+	.print = NULL,
+	.init_global = NULL,
+	.init_local = NULL,
 	.term = NULL,
 	.open = tap_pktio_open,
 	.close = tap_pktio_close,
@@ -323,5 +371,9 @@ const pktio_if_ops_t tap_pktio_ops = {
 	.mtu_get = tap_mtu_get,
 	.promisc_mode_set = tap_promisc_mode_set,
 	.promisc_mode_get = tap_promisc_mode_get,
-	.mac_get = tap_mac_addr_get
+	.mac_get = tap_mac_addr_get,
+	.capability = tap_capability,
+	.pktin_ts_res = NULL,
+	.pktin_ts_from_ns = NULL,
+	.config = NULL
 };

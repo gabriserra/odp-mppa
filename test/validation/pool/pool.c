@@ -4,7 +4,7 @@
  * SPDX-License-Identifier:	BSD-3-Clause
  */
 
-#include <odp.h>
+#include <odp_api.h>
 #include "odp_cunit_common.h"
 #include "pool.h"
 
@@ -114,9 +114,15 @@ odp_suiteinfo_t pool_suites[] = {
 	ODP_SUITE_INFO_NULL,
 };
 
-int pool_main(void)
+int pool_main(int argc, char *argv[])
 {
-	int ret = odp_cunit_register(pool_suites);
+	int ret;
+
+	/* parse common options: */
+	if (odp_cunit_parse_options(argc, argv))
+		return -1;
+
+	ret = odp_cunit_register(pool_suites);
 
 	if (ret == 0)
 		ret = odp_cunit_run();

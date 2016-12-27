@@ -5,53 +5,64 @@
  */
 
 #include <string.h>
-#include <odp.h>
+#include <odp_api.h>
 #include <odp_cunit_common.h>
 #include <odp/helper/linux.h>
 /* Globals */
-static odph_linux_pthread_t thread_tbl[MAX_WORKERS];
+static odph_odpthread_t thread_tbl[MAX_WORKERS];
+static odp_instance_t instance;
 
 /*
  * global init/term functions which may be registered
  * defaults to functions performing odp init/term.
  */
-static int tests_global_init(void);
-static int tests_global_term(void);
+static int tests_global_init(odp_instance_t *inst);
+static int tests_global_term(odp_instance_t inst);
 static struct {
-	int (*global_init_ptr)(void);
-	int (*global_term_ptr)(void);
+	int (*global_init_ptr)(odp_instance_t *inst);
+	int (*global_term_ptr)(odp_instance_t inst);
 } global_init_term = {tests_global_init, tests_global_term};
 
 static odp_suiteinfo_t *global_testsuites;
 
 /** create test thread */
-int odp_cunit_thread_create(void *func_ptr(void *), pthrd_arg *arg)
+int odp_cunit_thread_create(int func_ptr(void *), pthrd_arg *arg)
 {
 	odp_cpumask_t cpumask;
+	odph_odpthread_params_t thr_params;
+
+	memset(&thr_params, 0, sizeof(thr_params));
+	thr_params.start    = func_ptr;
+	thr_params.arg      = arg;
+	thr_params.thr_type = ODP_THREAD_WORKER;
+	thr_params.instance = instance;
 
 	/* Create and init additional threads */
 	odp_cpumask_default_worker(&cpumask, arg->numthrds);
 
-	return odph_linux_pthread_create(thread_tbl, &cpumask, func_ptr,
-					 (void *)arg, ODP_THREAD_WORKER);
+	return odph_odpthreads_create(thread_tbl, &cpumask, &thr_params);
 }
 
 /** exit from test thread */
 int odp_cunit_thread_exit(pthrd_arg *arg)
 {
 	/* Wait for other threads to exit */
-	odph_linux_pthread_join(thread_tbl, arg->numthrds);
+	if (odph_odpthreads_join(thread_tbl) != arg->numthrds) {
+		fprintf(stderr,
+			"error: odph_odpthreads_join() failed.\n");
+		return -1;
+	}
 
 	return 0;
 }
 
-static int tests_global_init(void)
+static int tests_global_init(odp_instance_t *inst)
 {
-	if (0 != odp_init_global(NULL, NULL)) {
+	if (0 != odp_init_global(inst, NULL, NULL)) {
 		fprintf(stderr, "error: odp_init_global() failed.\n");
 		return -1;
 	}
-	if (0 != odp_init_local(ODP_THREAD_CONTROL)) {
+	if (0 != odp_init_local(*inst, ODP_THREAD_CONTROL)) {
 		fprintf(stderr, "error: odp_init_local() failed.\n");
 		return -1;
 	}
@@ -59,14 +70,14 @@ static int tests_global_init(void)
 	return 0;
 }
 
-static int tests_global_term(void)
+static int tests_global_term(odp_instance_t inst)
 {
 	if (0 != odp_term_local()) {
 		fprintf(stderr, "error: odp_term_local() failed.\n");
 		return -1;
 	}
 
-	if (0 != odp_term_global()) {
+	if (0 != odp_term_global(inst)) {
 		fprintf(stderr, "error: odp_term_global() failed.\n");
 		return -1;
 	}
@@ -82,12 +93,12 @@ static int tests_global_term(void)
  * Note that passing NULL as function pointer is valid and will simply
  * prevent the default (odp init/term) to be done.
  */
-void odp_cunit_register_global_init(int (*func_init_ptr)(void))
+void odp_cunit_register_global_init(int (*func_init_ptr)(odp_instance_t *inst))
 {
 	global_init_term.global_init_ptr = func_init_ptr;
 }
 
-void odp_cunit_register_global_term(int (*func_term_ptr)(void))
+void odp_cunit_register_global_term(int (*func_term_ptr)(odp_instance_t inst))
 {
 	global_init_term.global_term_ptr = func_term_ptr;
 }
@@ -280,6 +291,7 @@ int odp_cunit_run(void)
 	int ret;
 
 	printf("\tODP API version: %s\n", odp_version_api_str());
+	printf("\tODP implementation name:    %s\n", odp_version_impl_name());
 	printf("\tODP implementation version: %s\n", odp_version_impl_str());
 
 	CU_basic_set_mode(CU_BRM_VERBOSE);
@@ -291,7 +303,7 @@ int odp_cunit_run(void)
 
 	/* call test executable terminason hook, if any */
 	if (global_init_term.global_term_ptr &&
-	    ((*global_init_term.global_term_ptr)() != 0))
+	    ((*global_init_term.global_term_ptr)(instance) != 0))
 		return -1;
 
 	return (ret) ? -1 : 0;
@@ -321,9 +333,24 @@ int odp_cunit_update(odp_suiteinfo_t testsuites[])
 int odp_cunit_register(odp_suiteinfo_t testsuites[])
 {
 	/* call test executable init hook, if any */
-	if (global_init_term.global_init_ptr &&
-	    ((*global_init_term.global_init_ptr)() != 0))
-		return -1;
+	if (global_init_term.global_init_ptr) {
+		if ((*global_init_term.global_init_ptr)(&instance) == 0) {
+			/* After ODP initialization, set main thread's
+			 * CPU affinity to the 1st available control CPU core
+			 */
+			int cpu = 0;
+			odp_cpumask_t cpuset;
+
+			odp_cpumask_zero(&cpuset);
+			if (odp_cpumask_default_control(&cpuset, 1) == 1) {
+				cpu = odp_cpumask_first(&cpuset);
+				odph_odpthread_setaffinity(cpu);
+			}
+		} else {
+			/* ODP initialization failed */
+			return -1;
+		}
+	}
 
 	CU_set_error_action(CUEA_ABORT);
 
@@ -333,4 +360,14 @@ int odp_cunit_register(odp_suiteinfo_t testsuites[])
 	CU_set_fail_on_inactive(CU_FALSE);
 
 	return 0;
+}
+
+/*
+ * Parse command line options to extract options affectiong cunit_common.
+ * (hence also helpers options as cunit_common uses the helpers)
+ * Options private to the test calling cunit_common are not parsed here.
+ */
+int odp_cunit_parse_options(int argc, char *argv[])
+{
+	return odph_parse_options(argc, argv, NULL, NULL);
 }

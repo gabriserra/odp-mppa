@@ -19,6 +19,8 @@
 #define CLS_DEFAULT_DADDR	"10.0.0.100/32"
 #define CLS_DEFAULT_SPORT	1024
 #define CLS_DEFAULT_DPORT	2048
+#define CLS_DEFAULT_DMAC	0x010203040506
+#define CLS_DEFAULT_SMAC	0x060504030201
 
 /* Config values for Error CoS */
 #define TEST_ERROR		1
@@ -29,18 +31,18 @@
 #define CLS_PMR_CHAIN_SRC	2
 #define CLS_PMR_CHAIN_DST	3
 #define CLS_PMR_CHAIN_SADDR	"10.0.0.5/32"
-#define CLS_PMR_CHAIN_SPORT	3000
+#define CLS_PMR_CHAIN_PORT	3000
 
 /* Config values for PMR */
 #define TEST_PMR		1
 #define CLS_PMR			4
-#define CLS_PMR_SPORT		4000
+#define CLS_PMR_PORT		4000
 
 /* Config values for PMR SET */
 #define TEST_PMR_SET		1
 #define CLS_PMR_SET		5
 #define CLS_PMR_SET_SADDR	"10.0.0.6/32"
-#define CLS_PMR_SET_SPORT	5000
+#define CLS_PMR_SET_PORT	5000
 
 /* Config values for CoS L2 Priority */
 #define TEST_L2_QOS		1
@@ -57,17 +59,14 @@
 void classification_test_create_cos(void);
 void classification_test_destroy_cos(void);
 void classification_test_create_pmr_match(void);
-void classification_test_destroy_pmr(void);
 void classification_test_cos_set_queue(void);
 void classification_test_cos_set_pool(void);
 void classification_test_cos_set_drop(void);
-void classification_test_pmr_match_set_create(void);
-void classification_test_pmr_match_set_destroy(void);
+void classification_test_pmr_composite_create(void);
+void classification_test_pmr_composite_destroy(void);
 
 void classification_test_pktio_set_skip(void);
 void classification_test_pktio_set_headroom(void);
-void classification_test_pmr_terms_avail(void);
-void classification_test_pmr_terms_cap(void);
 void classification_test_pktio_configure(void);
 void classification_test_pktio_test(void);
 
@@ -76,6 +75,8 @@ void classification_test_pmr_term_tcp_sport(void);
 void classification_test_pmr_term_udp_dport(void);
 void classification_test_pmr_term_udp_sport(void);
 void classification_test_pmr_term_ipproto(void);
+void classification_test_pmr_term_dmac(void);
+void classification_test_pmr_term_packet_len(void);
 
 /* test arrays: */
 extern odp_testinfo_t classification_suite_basic[];
@@ -89,6 +90,6 @@ int classification_suite_term(void);
 extern odp_suiteinfo_t classification_suites[];
 
 /* main test program: */
-int classification_main(void);
+int classification_main(int argc, char *argv[]);
 
 #endif
