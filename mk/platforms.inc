@@ -8,6 +8,7 @@ BOARDS :=
 _BOARDS :=
 OSs :=
 _OSs :=
+_FIRMWARE_BOARDS :=
 
 $(foreach FIRM, $(FIRMWARES), $(eval $(FIRM)_CONFIGS := ))
 $(foreach FIRM, $(FIRMWARES), $(eval _$(FIRM)_CONFIGS := ))
@@ -32,7 +33,7 @@ k1b-kalray-nodeos_hw_VALID_TYPE  := jtag
 K1_CONFIGS += k1b-kalray-nodeos_hw
 
 k1b-kalray-nodeos_explorer_CONF_ENV    := CC="$(CCACHE) k1-nodeos-gcc"  CXX="$(CCACHE) k1-nodeos-g++" STRIP="k1-strip --strip-debug"
-k1b-kalray-nodeos_explorer_CONF_OPTS   :=
+k1b-kalray-nodeos_explorer_CONF_OPTS   := 
 k1b-kalray-nodeos_explorer_CFLAGS      := -march=k1b -DK1_NODEOS -mboard=explorer -DK1B_EXPLORER
 k1b-kalray-nodeos_explorer_LDFLAGS     :=
 k1b-kalray-nodeos_explorer_PLATFORM    := mppa
@@ -91,6 +92,36 @@ k1b-kalray-mos_simu_INSTALL     := true
 k1b-kalray-mos_simu_VALID_TYPE  := simu
 K1_CONFIGS += k1b-kalray-mos_simu
 
+#
+#
+#
+# Debug configs
+#
+#
+#
+define DEBUG_CONFIG_RULE
+#$(1) config name
+$(eval $(1)-debug_CONF_ENV    := $($(1)_CONF_ENV) CFLAGS="-g3 -Og")
+$(eval $(1)-debug_CONF_OPTS   := $($(1)_CONF_OPTS) $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS))
+$(eval $(1)-debug_CFLAGS      := $($(1)_CFLAGS))
+$(eval $(1)-debug_LDFLAGS     := $($(1)_LDFLAGS))
+$(eval $(1)-debug_PLATFORM    := $($(1)_PLATFORM))
+$(eval $(1)-debug_INC_DIR     := $($(1)_INC_DIR))
+$(eval $(1)-debug_MAKE_VALID  := $($(1)_MAKE_VALID))
+$(eval $(1)-debug_INSTALL     := $($(1)_INSTALL))
+$(eval $(1)-debug_VALID_TYPE  := $($(1)_VALID_TYPE))
+endef
+
+$(foreach config,$(_CONFIGS), \
+  $(eval $(call DEBUG_CONFIG_RULE,$(config))) \
+  $(eval _CONFIGS += $(config)-debug) \
+)
+
+$(foreach config,$(K1_CONFIGS), \
+  $(eval $(call DEBUG_CONFIG_RULE,$(config))) \
+  $(eval K1_CONFIGS += $(config)-debug) \
+)
+
 CONFIGS += $(K1_CONFIGS)
 
 #
@@ -123,32 +154,59 @@ firmware_k1b-kalray_developer_CC          := $(CCACHE) k1-gcc
 firmware_k1b-kalray_developer_CFLAGS      := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single
 firmware_k1b-kalray_developer_LDFLAGS     :=
 firmware_k1b-kalray_developer_INSTDIR      = $(K1ST_DIR)/share/odp/firmware/developer/k1b
+_FIRMWARE_BOARDS += k1b-kalray_developer
 
 firmware_k1b-kalray_konic80_CC            := $(CCACHE) k1-gcc
 firmware_k1b-kalray_konic80_CFLAGS        := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -mboard=konic80
 firmware_k1b-kalray_konic80_LDFLAGS       :=
 firmware_k1b-kalray_konic80_INSTDIR        = $(K1ST_DIR)/share/odp/firmware/konic80/k1b
+_FIRMWARE_BOARDS += k1b-kalray_konic80
 
 firmware_k1b-kalray_ab04_CC            := $(CCACHE) k1-gcc
 firmware_k1b-kalray_ab04_CFLAGS        := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -mboard=ab04
 firmware_k1b-kalray_ab04_LDFLAGS       :=
 firmware_k1b-kalray_ab04_INSTDIR        = $(K1ST_DIR)/share/odp/firmware/ab04/k1b
+_FIRMWARE_BOARDS += k1b-kalray_ab04
 
 firmware_k1b-kalray_emb01_CC              := $(CCACHE) k1-gcc
 firmware_k1b-kalray_emb01_CFLAGS          := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -mboard=emb01
 firmware_k1b-kalray_emb01_LDFLAGS         :=
 firmware_k1b-kalray_emb01_INSTDIR          = $(K1ST_DIR)/share/odp/firmware/emb01/k1b
+_FIRMWARE_BOARDS += k1b-kalray_emb01
 
 firmware_k1b-kalray_simu_CC               := $(CCACHE) k1-gcc
 firmware_k1b-kalray_simu_CFLAGS           := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr -mprocessing=single -DMAGIC_SCALL
 firmware_k1b-kalray_simu_LDFLAGS          :=
 firmware_k1b-kalray_simu_INSTDIR           = $(K1ST_DIR)/share/odp/firmware/simu/k1b
+_FIRMWARE_BOARDS += k1b-kalray_simu
 
 firmware_k1b-kalray_explorer_CC           := $(CCACHE) k1-gcc
 firmware_k1b-kalray_explorer_CFLAGS       := -march=k1b -mos=bare -mcore=k1bio -mcluster=ioddr \
 					     -mprocessing=single -mboard=explorer -DK1B_EXPLORER
 firmware_k1b-kalray_explorer_LDFLAGS      :=
 firmware_k1b-kalray_explorer_INSTDIR       = $(K1ST_DIR)/share/odp/firmware/explorer/k1b
+_FIRMWARE_BOARDS += k1b-kalray_explorer
+
+#
+#
+#
+# Debug Firmware Definitions
+#
+#
+#
+define FIRMWARE_CONFIG_RULE
+#$(1) config name
+firmware_$(1)-debug_CC          := $(firmware_$(1)_CC)
+firmware_$(1)-debug_CFLAGS      := $(firmware_$(1)_CFLAGS) -DVERBOSE -DDEBUG
+firmware_$(1)-debug_LDFLAGS     := $(firmware_$(1)_LDFLAGS)
+firmware_$(1)-debug_INSTDIR     := $(shell echo "$(firmware_$(1)_INSTDIR)" | sed -e 'sL\(/firmware/[^/]*\)/L\1-debug/L')
+endef
+
+$(foreach firmware, $(_FIRMWARE_BOARDS), \
+  $(eval $(call FIRMWARE_CONFIG_RULE,$(firmware))) \
+  $(eval _FIRMWARE_BOARDS += $(firmware)-debug) \
+)
+
 
 
 #
@@ -203,6 +261,14 @@ _ioeth_CONFIGS += k1b-kalray_emb01
 #
 _ioeth-storage_CONFIGS += k1b-kalray_konic80
 
+$(foreach firmware,$(FIRMWARES), \
+	$(foreach flavour,$($(firmware)_CONFIGS), \
+		$(eval $(firmware)_CONFIGS += $(flavour)-debug) \
+	) \
+	$(foreach flavour,$(_$(firmware)_CONFIGS), \
+		$(eval _$(firmware)_CONFIGS += $(flavour)-debug) \
+	) \
+)
 #
 #
 #
@@ -234,6 +300,14 @@ BOARD_ab04          := ab04
 BOARD_ab04_VER      := hw
 BOARDS              += ab04
 
+$(foreach B, $(_BOARDS), \
+ $(eval BOARD_$(B)-debug     := $(BOARD_$(B))) \
+ $(eval BOARD_$(B)-debug_VER := $(BOARD_$(B)_VER)-debug) \
+ $(eval _BOARDS += $(B)-debug))
+$(foreach B, $(BOARDS), \
+ $(eval BOARD_$(B)-debug     := $(BOARD_$(B))) \
+ $(eval BOARD_$(B)-debug_VER := $(BOARD_$(B)_VER)-debug) \
+ $(eval BOARDS += $(B)-debug))
 #
 #
 #
@@ -244,7 +318,7 @@ BOARDS              += ab04
 OS_mos := bare
 OSs += mos
 
-OS_nodeods := nodeos
+OS_nodeos := nodeos
 OSs += nodeos
 
 LONG_CONFIGS ?= $(foreach OS, $(OSs),\
