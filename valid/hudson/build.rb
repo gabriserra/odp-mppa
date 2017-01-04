@@ -263,14 +263,24 @@ b.target("package") do
     b.logtitle = "Report for odp package."
     cd odp_path
 
-    b.run(:cmd => "cd install/; tar cf ../odp.tar local/k1tools/lib/ local/k1tools/share/odp/firmware local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ local/k1tools/k1*/include local/k1tools/lib64", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp.tar "+
+                  "$(ls -d local/k1tools/lib/odp/* | grep -v -- -debug) "+
+                  "$(ls -d local/k1tools/share/odp/firmware/* | grep -v -- -debug) "+
+                  "local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ "+
+                  "local/k1tools/k1*/include local/k1tools/lib64", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-doc.tar local/k1tools/share/doc/ ", :env => $env)
-    b.run(:cmd => "cd install/; tar cf ../odp-tests.tar local/k1tools/share/odp/tests local/k1tools/share/odp/long", :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-tests.tar "+
+                  "$(ls -d local/k1tools/share/odp/tests/* | grep -v -- -debug) "+
+                  "$(ls -d local/k1tools/share/odp/long/* | grep -v -- -debug)", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-apps-internal.tar local/k1tools/share/odp/apps", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-runtime.tar local/k1tools/share/odp/apps/odp-netdev", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-headers-internal.tar local/k1tools/kalray_internal/odp", :env => $env)
-
+    b.run(:cmd => "cd install/; tar cf ../odp-debug.tar "+
+                  "$(ls -d local/k1tools/lib/odp/* | grep -- -debug) "+
+                  "$(ls -d local/k1tools/share/odp/firmware/* | grep -- -debug) " +
+                  "$(ls -d local/k1tools/share/odp/tests/* | grep -- -debug) "+
+                  "$(ls -d local/k1tools/share/odp/long/* | grep -- -debug)", :env => $env)
     (version,releaseID,sha1) = repo.describe()
     release_info = b.release_info(version,releaseID,sha1)
     sha1 = repo.sha1()
@@ -351,6 +361,17 @@ b.target("package") do
     depends.push b.depends_info_struct.new("k1-odp","=", release_info.full_version)
     package_description = "K1 ODP Internal Headers  (k1-odp-headers-internal-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp-headers-internal", release_info,
+                           package_description, 
+                           depends, "/usr", workspace)
+    b.create_package(tar_package, pinfo)
+
+    #K1 ODP Debug
+    tar_package = File.expand_path("odp-debug.tar")
+    depends = []
+    depends.push b.depends_info_struct.new("k1-odp","=", release_info.full_version)
+    depends.push b.depends_info_struct.new("k1-odp-tests","=", release_info.full_version)
+    package_description = "K1 ODP Debug Build  (k1-odp-debug-#{version}-#{releaseID} sha1 #{sha1})."
+    pinfo = b.package_info("k1-odp-debug", release_info,
                            package_description, 
                            depends, "/usr", workspace)
     b.create_package(tar_package, pinfo)
