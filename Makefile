@@ -19,7 +19,7 @@ CUNIT_INST_DIR:= $(INST_DIR)/local/k1tools/kalray_internal/cunit/
 MAKE_AMS:= $(shell find $(TOP_DIR) -name Makefile.am)
 MAKE_M4S:= $(shell find $(TOP_DIR) -name "*.m4")
 MAKE_DEPS:= $(MAKE_AMS) $(MAKE_M4S) $(TOP_DIR)/Makefile $(wildcard $(TOP_DIR)/mk/*.inc)
-FIRMWARE_VERSION= $(shell $(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
+FIRMWARE_VERSION := $(shell $(TOP_DIR)/scripts/git_hash.sh $(TOP_DIR))
 RPCFIRMWARE_PATH := $(K1_TOOLCHAIN_DIR)/kalray_internal/rpc-firmwares
 
 FIRMWARES := $(patsubst firmware/%/Makefile, %, $(wildcard firmware/*/Makefile))
