@@ -109,9 +109,10 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 
 	/* Also store the data on the host side of things */
 	uint64_t host_addr = c2h->host_addr;
-	if (!host_addr)
+	if (!host_addr) {
 		__builtin_k1_dinvall(&c2h->host_addr);
-	host_addr = c2h->host_addr;
+		host_addr = c2h->host_addr;
+	}
 
 	if (host_addr) {
 		uint64_t entry_addr = host_addr + tail * sizeof(*data);
@@ -136,12 +137,17 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 	/* __k1_wmb(); */
 
 	uint64_t h_tail_addr = c2h->h_tail_addr;
+	if (!h_tail_addr) {
+		__builtin_k1_dinvall(&c2h->h_tail_addr);
+		h_tail_addr = c2h->h_tail_addr;
+	}
+
 	if (h_tail_addr) {
 		__k1_pcie_write_32(h_tail_addr, next_tail);
 	}
 
 #ifdef NETDEV_VERBOSE
-	printf("C2H data 0x%llx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
+	printf("C2H data 0x%lx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
 #endif
 	if (it)
 		mppa_pcie_send_it_to_host();
@@ -223,7 +229,7 @@ static int netdev_setup_c2h(struct mpodp_if_config *if_cfg,
 			entries[i].pkt_addr = g_current_pkt_addr;
 			g_current_pkt_addr += if_cfg->mtu;
 #ifdef NETDEV_VERBOSE
-			printf("C2H Packet (%lu/%lu) entry at 0x%"PRIx64"\n", i,
+			printf("C2H Packet (%lu/%lu) entry at 0x%lx\n", i,
 			       cfg->n_c2h_entries, entries[i].pkt_addr);
 #endif
 		}

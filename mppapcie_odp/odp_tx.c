@@ -231,7 +231,6 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	uint32_t tx_submitted, tx_next, tx_done;
 	uint32_t tx_mppa_idx;
 	int qidx;
-	unsigned long flags = 0;
 	struct mpodp_txq *txq;
 
 	/* Fetch HW queue selected by the kernel */
@@ -343,7 +342,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	}
 
 	if (priv->n_txqs > MPODP_NOC_CHAN_COUNT)
-		spin_lock_irqsave(&priv->tx_lock[requested_engine], flags);
+		spin_lock(&priv->tx_lock[requested_engine]);
 
 	/* Prepare slave args */
 	priv->tx_config[requested_engine].cfg.dst_addr = tx->dst_addr;
@@ -386,7 +385,7 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	dma_async_issue_pending(priv->tx_chan[requested_engine]);
 
 	if (priv->n_txqs > MPODP_NOC_CHAN_COUNT)
-		spin_unlock_irqrestore(&priv->tx_lock[requested_engine], flags);
+		spin_unlock(&priv->tx_lock[requested_engine]);
 
 	/* Count number of bytes on the fly for DQL */
 	netdev_tx_sent_queue(txq->txq, skb->len);

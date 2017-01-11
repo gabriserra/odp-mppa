@@ -60,6 +60,8 @@ static int mpodp_poll(struct napi_struct *napi, int budget)
 	int i;
 
 	priv = container_of(napi, struct mpodp_if_priv, napi);
+	if (netif_msg_rx_status(priv))
+		netdev_info(priv->netdev, "Polling NAPI\n");
 
 	/* Check for Rx transfer completion and send the SKBs to the
 	 * network stack */
@@ -707,6 +709,9 @@ static irqreturn_t mpodp_interrupt(int irq, void *arg)
 		}
 
 		priv = netdev_priv(netdev->dev[i]);
+		if (netif_msg_intr(priv))
+			netdev_info(priv->netdev, "Interrupt\n");
+
 		if (priv->interrupt_status) {
 			priv->interrupt_status = 0;
 			writel(0, priv->interrupt_status_addr);
