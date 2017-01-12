@@ -24,6 +24,7 @@ __attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 #endif
 
 struct mpodp_control *eth_ctrl;
+iosync_service_t *iosync_ctrl;
 
 #define MEM_WRITE_32 0x40
 #define MEM_WRITE_64 0x60
@@ -36,24 +37,32 @@ __k1_uint32_t __k1_pcie_write_32( __k1_uint32_t address, __k1_uint32_t data)
 				     .cmd_type = MEM_WRITE_32,
 				     .byte_en = 0xf
 		}};
-	/* mppa_pcie_master_itf_mst_res_t    mst_res; */
 
+	if (iosync_ctrl) {
+		while(__builtin_k1_ldc(&iosync_ctrl->pcie_itf_lock) == 0ULL)
+			__k1_cpu_backoff(10);
+	}
 	// write
 	/* mppa_pcie_master_itf[0]->pcie_addr_hi.word = 0; */
 	mppa_pcie_master_itf[0]->pcie_addr.word    = address;
 	mppa_pcie_master_itf[0]->pcie_wr_data.word = data;
 	mppa_pcie_master_itf[0]->master_cmd   = master_cmd;
 
-	// FIXME: We should do this but it works without. Uncomment if transfers are weird
-	/* // wait for response */
-	/* do{ */
-	/* 	mst_res.word = mppa_pcie_master_itf[0]->mst_res.word; */
-	/* } while(mst_res._.cmd_done == 0); */
+	if (iosync_ctrl) {
+		/* If we are alone, no need to wait for an ack a we only do writes.
+		 * If we have a lock, wait for completion to avoid messign with other
+		 * threads */
+		mppa_pcie_master_itf_mst_res_t    mst_res;
+		// wait for response
+		do{
+			mst_res.word = mppa_pcie_master_itf[0]->mst_res.word;
+		} while(mst_res._.cmd_done == 0);
 
-	/* if (mst_res._.cmd_status) */
-	/* 	printf("BAD Status = %d\n", mst_res._.cmd_status); */
-	/* return mst_res._.cmd_status; */
+		/* Release the lock */
+		__builtin_k1_sdu(&iosync_ctrl->pcie_itf_lock, 1ULL);
 
+		return mst_res._.cmd_status;
+	}
 	return 0;
 }
 
@@ -363,6 +372,11 @@ int netdev_start()
 	pcie_ctrl->services[PCIE_SERVICE_ODP].magic = PCIE_SERVICE_MAGIC;
 	__k1_wmb();
 
+	uint32_t magic = __builtin_k1_lwu(&pcie_ctrl->services[PCIE_SERVICE_IOSYNC].magic);
+	if (magic == PCIE_SERVICE_MAGIC){
+		uint32_t ptr = __builtin_k1_lwu(&pcie_ctrl->services[PCIE_SERVICE_IOSYNC].addr);
+		iosync_ctrl = (iosync_service_t*)(unsigned long)(ptr);
+	}
 
 #ifdef __mos__
 	mOS_pcie_write_usr_it(0);
