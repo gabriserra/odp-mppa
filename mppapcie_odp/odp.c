@@ -19,6 +19,7 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/version.h>
+#include <linux/vmalloc.h>
 
 #include <mppa_pcie_api.h>
 #include "mppapcie_odp.h"

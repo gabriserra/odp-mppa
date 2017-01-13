@@ -291,6 +291,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp", release_info,
                            package_description,
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
     #K1 ODP Runtime
@@ -304,6 +305,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp-runtime", release_info,
                            package_description,
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
     #K1 ODP Documentation
@@ -313,6 +315,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp-doc", release_info,
                            package_description, 
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
     #K1 ODP Tests
@@ -323,6 +326,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp-tests", release_info,
                            package_description, 
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
     #K1 ODP Apps Internal
@@ -333,6 +337,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp-apps-internal", release_info,
                            package_description, 
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
     #K1 ODP CUnit
@@ -343,6 +348,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp-cunit", release_info,
                            package_description,
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
     #K1 ODP Internal Headers
@@ -353,6 +359,7 @@ b.target("package") do
     pinfo = b.package_info("k1-odp-headers-internal", release_info,
                            package_description, 
                            depends, "/usr", workspace)
+    pinfo.license = "BSD"
     b.create_package(tar_package, pinfo)
 
 
