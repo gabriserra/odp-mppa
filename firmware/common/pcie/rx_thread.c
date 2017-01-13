@@ -134,7 +134,7 @@ static void mppa_pcie_noc_poll_masks(rx_iface_t *iface)
 		while(bitmask.bitmask[i]) {
 			const int mask_bit = __k1_ctzdl(bitmask.bitmask[i]);
 			int rx_id = mask_bit + i * 8 * sizeof(bitmask.bitmask[i]);
-			bitmask.bitmask[i] &= ~(1 << mask_bit);
+			bitmask.bitmask[i] &= ~(1ULL << mask_bit);
 
 			reload_rx(iface, rx_id);
 		}

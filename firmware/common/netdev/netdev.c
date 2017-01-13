@@ -24,6 +24,7 @@ __attribute__((section(".lowmem_data") )) struct mpodp_control eth_control = {
 #endif
 
 struct mpodp_control *eth_ctrl;
+iosync_service_t *iosync_ctrl;
 
 #define MEM_WRITE_32 0x40
 #define MEM_WRITE_64 0x60
@@ -36,24 +37,32 @@ __k1_uint32_t __k1_pcie_write_32( __k1_uint32_t address, __k1_uint32_t data)
 				     .cmd_type = MEM_WRITE_32,
 				     .byte_en = 0xf
 		}};
-	/* mppa_pcie_master_itf_mst_res_t    mst_res; */
 
+	if (iosync_ctrl) {
+		while(__builtin_k1_ldc(&iosync_ctrl->pcie_itf_lock) == 0ULL)
+			__k1_cpu_backoff(10);
+	}
 	// write
 	/* mppa_pcie_master_itf[0]->pcie_addr_hi.word = 0; */
 	mppa_pcie_master_itf[0]->pcie_addr.word    = address;
 	mppa_pcie_master_itf[0]->pcie_wr_data.word = data;
 	mppa_pcie_master_itf[0]->master_cmd   = master_cmd;
 
-	// FIXME: We should do this but it works without. Uncomment if transfers are weird
-	/* // wait for response */
-	/* do{ */
-	/* 	mst_res.word = mppa_pcie_master_itf[0]->mst_res.word; */
-	/* } while(mst_res._.cmd_done == 0); */
+	if (iosync_ctrl) {
+		/* If we are alone, no need to wait for an ack a we only do writes.
+		 * If we have a lock, wait for completion to avoid messign with other
+		 * threads */
+		mppa_pcie_master_itf_mst_res_t    mst_res;
+		// wait for response
+		do{
+			mst_res.word = mppa_pcie_master_itf[0]->mst_res.word;
+		} while(mst_res._.cmd_done == 0);
 
-	/* if (mst_res._.cmd_status) */
-	/* 	printf("BAD Status = %d\n", mst_res._.cmd_status); */
-	/* return mst_res._.cmd_status; */
+		/* Release the lock */
+		__builtin_k1_sdu(&iosync_ctrl->pcie_itf_lock, 1ULL);
 
+		return mst_res._.cmd_status;
+	}
 	return 0;
 }
 
@@ -109,9 +118,10 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 
 	/* Also store the data on the host side of things */
 	uint64_t host_addr = c2h->host_addr;
-	if (!host_addr)
+	if (!host_addr) {
 		__builtin_k1_dinvall(&c2h->host_addr);
-	host_addr = c2h->host_addr;
+		host_addr = c2h->host_addr;
+	}
 
 	if (host_addr) {
 		uint64_t entry_addr = host_addr + tail * sizeof(*data);
@@ -136,12 +146,17 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 	/* __k1_wmb(); */
 
 	uint64_t h_tail_addr = c2h->h_tail_addr;
+	if (!h_tail_addr) {
+		__builtin_k1_dinvall(&c2h->h_tail_addr);
+		h_tail_addr = c2h->h_tail_addr;
+	}
+
 	if (h_tail_addr) {
 		__k1_pcie_write_32(h_tail_addr, next_tail);
 	}
 
 #ifdef NETDEV_VERBOSE
-	printf("C2H data 0x%llx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
+	printf("C2H data 0x%lx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
 #endif
 	if (it)
 		mppa_pcie_send_it_to_host();
@@ -223,7 +238,7 @@ static int netdev_setup_c2h(struct mpodp_if_config *if_cfg,
 			entries[i].pkt_addr = g_current_pkt_addr;
 			g_current_pkt_addr += if_cfg->mtu;
 #ifdef NETDEV_VERBOSE
-			printf("C2H Packet (%lu/%lu) entry at 0x%"PRIx64"\n", i,
+			printf("C2H Packet (%lu/%lu) entry at 0x%lx\n", i,
 			       cfg->n_c2h_entries, entries[i].pkt_addr);
 #endif
 		}
@@ -357,6 +372,11 @@ int netdev_start()
 	pcie_ctrl->services[PCIE_SERVICE_ODP].magic = PCIE_SERVICE_MAGIC;
 	__k1_wmb();
 
+	uint32_t magic = __builtin_k1_lwu(&pcie_ctrl->services[PCIE_SERVICE_IOSYNC].magic);
+	if (magic == PCIE_SERVICE_MAGIC){
+		uint32_t ptr = __builtin_k1_lwu(&pcie_ctrl->services[PCIE_SERVICE_IOSYNC].addr);
+		iosync_ctrl = (iosync_service_t*)(unsigned long)(ptr);
+	}
 
 #ifdef __mos__
 	mOS_pcie_write_usr_it(0);
