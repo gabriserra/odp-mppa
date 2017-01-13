@@ -1,3 +1,3 @@
 [submodule "metabuild"]
 	path = metabuild
-	url = git:software/tools/metabuild_accesscore_apps
+	url = git:software/tools/metabuild_odp
