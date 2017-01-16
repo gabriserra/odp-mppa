@@ -5,6 +5,14 @@
 #define DMA_SUCCESS DMA_COMPLETE
 #endif
 
+#ifdef RHEL_RELEASE_VERSION
+# if RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7, 3)
+#  define SELECT_QUEUEUE_3_13 1
+# endif
+#elif (LINUX_VERSION_CODE > KERNEL_VERSION (3, 13, 0))
+# define SELECT_QUEUEUE_3_13 1
+#endif
+
 #define MPODP_VERSION_STR "1.0.0"
 #define MPODP_NAPI_WEIGHT  NAPI_POLL_WEIGHT
 #define MPODP_MAX_TX_RECLAIM 16
@@ -158,7 +166,7 @@ struct mpodp_pdata_priv {
 netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 			     struct net_device *netdev);
 u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
-#if (LINUX_VERSION_CODE > KERNEL_VERSION (3, 13, 0))
+#ifdef SELECT_QUEUEUE_3_13
 		       , void *accel_priv, select_queue_fallback_t fallback
 #endif
 );
