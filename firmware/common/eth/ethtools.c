@@ -727,6 +727,7 @@ int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
 }
 
 int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
+			   int no_wait_link,
 			   mppa_rpc_odp_answer_t *answer)
 {
 	const int eth_if = if_id % 4;
@@ -755,7 +756,7 @@ int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
 	}
 
 	/* Make sure link is up */
-	if (!lb_status.loopback){
+	if (!lb_status.loopback && !no_wait_link){
 		enum mppa_eth_mac_ethernet_mode_e link_speed =
 			ethtool_get_mac_speed(if_id, answer);
 

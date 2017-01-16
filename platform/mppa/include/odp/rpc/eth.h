@@ -4,7 +4,7 @@
 #include <odp/rpc/defines.h>
 
 /** Version of the ETH CoS */
-#define MPPA_RPC_ODP_ETH_VERSION 0x5
+#define MPPA_RPC_ODP_ETH_VERSION 0x6
 
 /** Length of a mac address */
 #define ETH_ALEN 6
@@ -90,7 +90,14 @@ MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_promisc_t);
 /**
  * Command for MPPA_RPC_ODP_CMD_ETH_STATE
  */
-typedef mppa_rpc_odp_cmd_eth_promisc_t mppa_rpc_odp_cmd_eth_state_t;
+typedef union {
+	struct {
+		uint8_t ifId : 3; /* 0-3, 4 for 40G */
+		uint8_t enabled : 1;
+		uint8_t no_wait_link : 1;
+	};
+	mppa_rpc_odp_inl_data_t inl_data;
+} mppa_rpc_odp_cmd_eth_state_t;
 MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_eth_state_t);
 
 /**
