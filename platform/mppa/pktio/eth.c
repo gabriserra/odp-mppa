@@ -430,7 +430,7 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 20 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
