@@ -432,14 +432,6 @@ netdev_tx_t mpodp_start_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 }
 
-#ifdef RHEL_RELEASE_VERSION
-# if RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7, 3)
-#  define SELECT_QUEUEUE_3_13 1
-# endif
-#elif (LINUX_VERSION_CODE > KERNEL_VERSION (3, 13, 0))
-# define SELECT_QUEUEUE_3_13 1
-#endif
-
 u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
 #ifdef SELECT_QUEUEUE_3_13
 		       , void *accel_priv, select_queue_fallback_t fallback
