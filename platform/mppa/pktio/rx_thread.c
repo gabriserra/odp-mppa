@@ -307,7 +307,8 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		pkt_hdr->buf_hdr.order = info._.pkt_id;
 		hash_key = info._.hash_key;
 
-		packet_set_ts(pkt_hdr, &ts);
+		if (rx_config->ts_enabled)
+			packet_set_ts(pkt_hdr, &ts);
 
 		if (info._.pkt_size < sizeof(*header)) {
 			/* Probably a spurious EOT. */

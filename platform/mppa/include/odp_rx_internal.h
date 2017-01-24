@@ -67,6 +67,7 @@ typedef struct {
 	odp_buffer_ring_t *rings[MAX_MQUEUES];
 	struct {
 		uint8_t flow_controlled : 1;
+		uint8_t ts_enabled      : 1;
 	};
 } rx_config_t;
 
