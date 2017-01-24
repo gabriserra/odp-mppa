@@ -261,6 +261,12 @@ void  __attribute__ ((constructor (102))) __rpc_constructor()
 			mppa_noc_dnoc_rx_alloc(dma, i);
 		}
 	}
+
+	for (dma = 4; dma < 8; ++dma) {
+		for (i = 0; i < UNUSABLE_TX; ++i) {
+			mppa_noc_dnoc_tx_alloc(dma, i);
+		}
+	}
 }
 #endif
 int odp_rpc_server_start(void)
