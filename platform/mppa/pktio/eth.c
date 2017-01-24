@@ -168,6 +168,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	int verbose = 0;
 	int min_payload = 0;
 	int max_payload = 0;
+	int nowaitlink = 0;
 
 	pkt_rule_t *rules = NULL;
 	int nb_rules = 0;
@@ -257,6 +258,9 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 				return -1;
 			}
 			pptr = eptr;
+		} else if (!strncmp(pptr, "nowaitlink", strlen("nowaitlink"))){
+			pptr += strlen("nowaitlink");
+			nowaitlink = 1;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -293,6 +297,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	eth->verbose = verbose;
 	eth->min_payload = min_payload;
 	eth->max_payload = max_payload;
+	eth->no_wait_link = nowaitlink;
 	eth->tx_config.nofree = nofree;
 
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
@@ -408,6 +413,7 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 		{
 			.ifId = port_id,
 			.enabled = enabled,
+			.no_wait_link = eth->no_wait_link,
 		}
 	};
 	unsigned cluster_id = __k1_get_cluster_id();
@@ -425,7 +431,7 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 					 mppa_rpc_odp_get_io_tag_id(cluster_id),
 					 &cmd, NULL);
 
-	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 5 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
+	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 20 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
 		return 1;
 
