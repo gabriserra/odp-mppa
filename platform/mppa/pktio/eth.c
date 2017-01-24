@@ -504,20 +504,15 @@ static uint32_t eth_mtu_get(pktio_entry_t *const pktio_entry) {
 	return eth->mtu;
 }
 
-static int eth_stats(pktio_entry_t *const pktio_entry,
-		     odp_pktio_stats_t *stats)
+static mppa_rpc_odp_payload_eth_get_stat_t*
+eth_rpc_stats(pkt_eth_t *eth, mppa_rpc_odp_ack_eth_get_stat_t *ack_stats)
 {
-	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
-	unsigned cluster_id = __k1_get_cluster_id();
+	int ret;
+	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats;
 	mppa_rpc_odp_t *ack_msg;
 	mppa_rpc_odp_ack_eth_t ack;
-	int ret;
+	unsigned cluster_id = __k1_get_cluster_id();
 	uint8_t *payload;
-	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats;
-
-	/*
-	 * RPC Msg to IOETH  #N so the LB will dispatch to us
-	 */
 	mppa_rpc_odp_cmd_eth_get_stat_t stat_cmd = {
 		{
 			.ifId = eth->port_id,
@@ -540,20 +535,34 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 
 	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 2 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
-		return -1;
+		return NULL;
 
 	ack.inl_data = ack_msg->inl_data;
 	if (ack.status) {
 		fprintf(stderr, "[ETH] Error: Server declined retrieval of eth stats\n");
 		if (ack_msg->err_str && ack_msg->data_len > 0)
 			fprintf(stderr, "[ETH] Error Log: %s\n", payload);
-		return -1;
+		return NULL;
 	}
 
 	if (ack_msg->data_len != sizeof(mppa_rpc_odp_payload_eth_get_stat_t))
-		return -1;
+		return NULL;
 
 	rpc_stats = (mppa_rpc_odp_payload_eth_get_stat_t*)payload;
+	if (ack_stats)
+		*ack_stats = ack.cmd.eth_get_stat;
+
+	return rpc_stats;
+}
+
+static int eth_stats(pktio_entry_t *const pktio_entry,
+		     odp_pktio_stats_t *stats)
+{
+	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats = eth_rpc_stats(eth, NULL);
+
+	if (!rpc_stats)
+		return -1;
 
 	stats->in_octets         = rpc_stats->in_octets;
 	stats->in_ucast_pkts     = rpc_stats->in_ucast_pkts;
@@ -569,7 +578,19 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 	if (rx_thread_fetch_stats(eth->rx_config.pktio_id,
 				  &stats->in_unknown_protos, &stats->in_discards))
 		return -1;
+
 	return 0;
+}
+
+static int eth_link_status(pktio_entry_t *pktio_entry)
+{
+	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+	mppa_rpc_odp_ack_eth_get_stat_t ack_stat;
+	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats = eth_rpc_stats(eth, &ack_stat);
+	if (!rpc_stats)
+		return -1;
+
+	return ack_stat.link_status;
 }
 
 const pktio_if_ops_t eth_pktio_ops = {
@@ -587,4 +608,5 @@ const pktio_if_ops_t eth_pktio_ops = {
 	.promisc_mode_set = eth_promisc_mode_set,
 	.promisc_mode_get = eth_promisc_mode,
 	.mac_get = eth_mac_addr_get,
+	.link_status = eth_link_status,
 };
