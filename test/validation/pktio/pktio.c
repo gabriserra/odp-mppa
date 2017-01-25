@@ -40,8 +40,6 @@ static const char *iface_name[MAX_NUM_IFACES];
 /** number of interfaces being used (1=loopback, 2=pair) */
 static int num_ifaces;
 
-static int segmentation_support;
-
 /** while testing real-world interfaces additional time may be
     needed for external network to enable link to pktio
     interface that just become up.*/
@@ -100,13 +98,6 @@ pkt_segmented_e pool_segmentation = PKT_POOL_UNSEGMENTED;
 
 odp_pool_t pool[MAX_NUM_IFACES] = {ODP_POOL_INVALID, ODP_POOL_INVALID};
 
-
-int pool_check_segmentation_support(void)
-{
-	if (segmentation_support)
-		return ODP_TEST_ACTIVE;
-	return ODP_TEST_INACTIVE;
-}
 
 static inline void _pktio_wait_linkup(odp_pktio_t pktio)
 {
@@ -1695,13 +1686,6 @@ int pktio_check_send_failure(void)
 	return ODP_TEST_INACTIVE;
 }
 
-int pktio_check_send_failure_segmented(void)
-{
-	if (pool_check_segmentation_support() == ODP_TEST_INACTIVE)
-		return ODP_TEST_INACTIVE;
-	return pktio_check_send_failure();
-}
-
 void pktio_test_send_failure(void)
 {
 	odp_pktio_t pktio_tx, pktio_rx;
@@ -2043,7 +2027,6 @@ static int create_pool(const char *iface, int num)
 		fprintf(stderr, "Failed to retreive pool capabilities\n");
 		return -1;
 	}
-	segmentation_support = pool_cap.pkt.max_segs_per_pkt > 1;
 	return 0;
 }
 
@@ -2166,22 +2149,15 @@ odp_testinfo_t pktio_suite_unsegmented[] = {
 };
 
 odp_testinfo_t pktio_suite_segmented[] = {
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_plain_queue,
-				  pool_check_segmentation_support),
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_plain_multi,
-				  pool_check_segmentation_support),
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_sched_queue,
-				  pool_check_segmentation_support),
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_sched_multi,
-				  pool_check_segmentation_support),
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_recv,
-				  pool_check_segmentation_support),
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_recv_multi,
-				  pool_check_segmentation_support),
-	ODP_TEST_INFO_CONDITIONAL(pktio_test_recv_mtu,
-				  pool_check_segmentation_support),
+	ODP_TEST_INFO(pktio_test_plain_queue),
+	ODP_TEST_INFO(pktio_test_plain_multi),
+	ODP_TEST_INFO(pktio_test_sched_queue),
+	ODP_TEST_INFO(pktio_test_sched_multi),
+	ODP_TEST_INFO(pktio_test_recv),
+	ODP_TEST_INFO(pktio_test_recv_multi),
+	ODP_TEST_INFO(pktio_test_recv_mtu),
 	ODP_TEST_INFO_CONDITIONAL(pktio_test_send_failure,
-				  pktio_check_send_failure_segmented),
+				  pktio_check_send_failure),
 	ODP_TEST_INFO_NULL
 };
 
