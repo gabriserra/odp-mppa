@@ -182,7 +182,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	eth->slot_id = slot_id;
 	rx_options_default(&eth->rx_opts);
 	eth->rx_opts.nRx = N_RX_P_ETH;
-
+	eth->no_wait_link = 1;
 
 	pptr = eptr;
 	if (*pptr == 'p') {
@@ -247,9 +247,6 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 				return -1;
 			}
 			pptr = eptr;
-		} else if (!strncmp(pptr, "nowaitlink", strlen("nowaitlink"))){
-			pptr += strlen("nowaitlink");
-			eth->no_wait_link = 1;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
