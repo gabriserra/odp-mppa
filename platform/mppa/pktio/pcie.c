@@ -152,18 +152,13 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		    const char *devname, odp_pool_t pool)
 {
 	int ret = 0;
-	rx_opts_t rx_opts;
-	int port_id, slot_id;
-	int nofree = 0;
+	int slot_id;
 
 	/*
 	 * Check device name and extract slot/port
 	 */
 	const char* pptr = devname;
 	char * eptr;
-
-	rx_options_default(&rx_opts);
-	rx_opts.nRx = N_RX_P_PCIE;
 
 	if (*(pptr++) != 'p')
 		return -1;
@@ -173,14 +168,22 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		ODP_ERR("Invalid PCIE name %s\n", devname);
 		return -1;
 	}
-
 	pptr = eptr;
+
+	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+	memset(pcie, 0, sizeof(*pcie));
+
+	pcie->slot_id = slot_id;
+
+	rx_options_default(&pcie->rx_opts);
+	pcie->rx_opts.nRx = N_RX_P_PCIE;
+
 	if (*pptr == 'p') {
 		/* Found a port */
 		pptr++;
-		port_id = strtoul(pptr, &eptr, 10);
+		pcie->pcie_eth_if_id = strtoul(pptr, &eptr, 10);
 
-		if (eptr == pptr || port_id < 0 || port_id >= MAX_PCIE_INTERFACES) {
+		if (eptr == pptr || pcie->pcie_eth_if_id >= MAX_PCIE_INTERFACES) {
 			ODP_ERR("Invalid PCIE name %s\n", devname);
 			return -1;
 		}
@@ -190,11 +193,12 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		return -1;
 	}
 
+
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
 
-		ret = rx_parse_options(&pptr, &rx_opts);
+		ret = rx_parse_options(&pptr, &pcie->rx_opts);
 		if (ret < 0)
 			return -1;
 		if (ret > 0)
@@ -202,7 +206,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 
 		if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
-			nofree = 1;
+			pcie->tx_config.nofree = 1;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -219,7 +223,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	return 1;
 #endif
 
-	if (rx_opts.flow_controlled) {
+	if (pcie->rx_opts.flow_controlled) {
 		ODP_ERR("Cannot enable fc=1 on a PCIE interface");
 		return -1;
 	}
@@ -227,13 +231,9 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	uintptr_t ucode;
 	ucode = (uintptr_t)ucode_pcie_v2;
 
-	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 
-	pcie->slot_id = slot_id;
-	pcie->pcie_eth_if_id = port_id;
 	pcie->pool = pool;
 	odp_spinlock_init(&pcie->wlock);
-	pcie->tx_config.nofree = nofree;
 
 	pcie->mtu = ((pool_entry_t*)pool)->s.params.pkt.len;
 	/* Setup Rx threads */
@@ -242,11 +242,11 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		pcie->rx_config.pool = pool;
 		pcie->rx_config.if_type = RX_IF_TYPE_PCI;
 		pcie->rx_config.pktio_id = RX_PCIE_IF_BASE +
-			slot_id * MAX_PCIE_INTERFACES + port_id +
-			MAX_RX_ETH_IF;
+			pcie->slot_id * MAX_PCIE_INTERFACES +
+			pcie->pcie_eth_if_id;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		rx_thread_link_open(&pcie->rx_config, &rx_opts);
+		rx_thread_link_open(&pcie->rx_config, &pcie->rx_opts);
 	}
 
 	pcie->cnoc_rx = ret = pcie_init_cnoc_rx();

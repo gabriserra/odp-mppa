@@ -152,6 +152,7 @@ typedef struct {
 	uint16_t mtu;                   /**< Interface MTU */
 
 	/* Rx Data */
+	rx_opts_t rx_opts;
 	rx_config_t rx_config;
 
 	uint8_t slot_id;                /**< IO Eth Id */
