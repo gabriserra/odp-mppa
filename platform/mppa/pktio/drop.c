@@ -72,6 +72,12 @@ static int drop_promisc_mode_get(pktio_entry_t *pktio_entry ODP_UNUSED)
 	return 0;
 }
 
+static int drop_link_status(pktio_entry_t *pktio_entry ODP_UNUSED)
+{
+	/* drop interfaces are always up */
+	return 1;
+}
+
 const pktio_if_ops_t drop_pktio_ops = {
 	.name = "drop",
 	.init = NULL,
@@ -85,5 +91,6 @@ const pktio_if_ops_t drop_pktio_ops = {
 	.mtu_get = drop_mtu_get,
 	.promisc_mode_set = drop_promisc_mode_set,
 	.promisc_mode_get = drop_promisc_mode_get,
-	.mac_get = drop_mac_addr_get
+	.mac_get = drop_mac_addr_get,
+	.link_status = drop_link_status,
 };
