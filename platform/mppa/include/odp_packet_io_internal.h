@@ -99,6 +99,7 @@ typedef struct {
 		uint8_t min_payload: 6;
 		uint8_t max_payload: 6;
 		uint8_t no_wait_link : 1;
+		uint8_t link_state : 1;
 	};
 
 	/* LB Rules */

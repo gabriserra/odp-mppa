@@ -412,6 +412,8 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 		return 1;
 	}
 
+	eth->link_state = ack.cmd.eth_state.link_state;
+
 	return ack.status;
 }
 
@@ -432,9 +434,6 @@ static int eth_mac_addr_get(pktio_entry_t *pktio_entry,
 	memcpy(mac_addr, eth->mac_addr, ETH_ALEN);
 	return ETH_ALEN;
 }
-
-
-
 
 static int eth_recv(pktio_entry_t *pktio_entry, odp_packet_t pkt_table[],
 		    unsigned len)
