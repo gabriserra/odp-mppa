@@ -465,6 +465,12 @@ static int pcie_stats(pktio_entry_t *const pktio_entry,
 	return 0;
 }
 
+static int pcie_link_status(pktio_entry_t *pktio_entry ODP_UNUSED)
+{
+	/* pcie interfaces are always up */
+	return 1;
+}
+
 const pktio_if_ops_t pcie_pktio_ops = {
 	.name = "pcie",
 	.init = pcie_init,
@@ -480,4 +486,5 @@ const pktio_if_ops_t pcie_pktio_ops = {
 	.promisc_mode_set = pcie_promisc_mode_set,
 	.promisc_mode_get = pcie_promisc_mode,
 	.mac_get = pcie_mac_addr_get,
+	.link_status = pcie_link_status,
 };
