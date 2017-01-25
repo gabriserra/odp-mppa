@@ -161,6 +161,12 @@ static uint32_t magic_mtu_get(__attribute__ ((unused)) pktio_entry_t *const pkti
 	return -1;
 }
 
+static int magic_link_status(pktio_entry_t *pktio_entry ODP_UNUSED)
+{
+	/* magic interfaces are always up */
+	return 1;
+}
+
 const pktio_if_ops_t magic_pktio_ops = {
 	.name = "magic",
 	.init = magic_init,
@@ -175,4 +181,5 @@ const pktio_if_ops_t magic_pktio_ops = {
 	.promisc_mode_set = magic_promisc_mode_set,
 	.promisc_mode_get = magic_promisc_mode,
 	.mac_get = magic_mac_addr_get,
+	.link_status = magic_link_status,
 };
