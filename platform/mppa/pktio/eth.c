@@ -88,7 +88,7 @@ static int eth_destroy(void)
 	return 0;
 }
 
-static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int nb_rules, pkt_rule_t *rules)
+static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth)
 {
 	unsigned cluster_id = __k1_get_cluster_id();
 	mppa_rpc_odp_t *ack_msg;
@@ -109,7 +109,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 			.jumbo = eth->jumbo,
 			.rx_enabled = 1,
 			.tx_enabled = 1,
-			.nb_rules = nb_rules,
+			.nb_rules = eth->nb_rules,
 			.verbose = eth->verbose,
 			.min_payload = eth->min_payload,
 			.max_payload = eth->max_payload,
@@ -122,7 +122,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 			open_cmd.tx_enabled = 0;
 	}
 	mppa_rpc_odp_t cmd = {
-		.data_len = nb_rules * sizeof(pkt_rule_t),
+		.data_len = eth->nb_rules * sizeof(pkt_rule_t),
 		.pkt_class = MPPA_RPC_ODP_CLASS_ETH,
 		.pkt_subtype = MPPA_RPC_ODP_CMD_ETH_OPEN,
 		.cos_version = MPPA_RPC_ODP_ETH_VERSION,
@@ -132,7 +132,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth, int
 
 	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(eth->slot_id, cluster_id),
 					 mppa_rpc_odp_get_io_tag_id(cluster_id),
-					 &cmd, rules);
+					 &cmd, eth->rules);
 
 	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 30 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
 	if (ret <= 0)
@@ -160,26 +160,12 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		    const char *devname, odp_pool_t pool)
 {
 	int ret = 0;
-	rx_opts_t rx_opts;
-	int port_id, slot_id;
-	int loopback = 0;
-	int nofree = 0;
-	int jumbo = 0;
-	int verbose = 0;
-	int min_payload = 0;
-	int max_payload = 0;
-	int nowaitlink = 0;
-
-	pkt_rule_t *rules = NULL;
-	int nb_rules = 0;
 	/*
 	 * Check device name and extract slot/port
 	 */
 	const char* pptr = devname;
 	char * eptr;
-
-	rx_options_default(&rx_opts);
-	rx_opts.nRx = N_RX_P_ETH;
+	int slot_id;
 
 	if (*(pptr++) != 'e')
 		return -1;
@@ -190,61 +176,64 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		return -1;
 	}
 
+	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+	memset(eth, 0, sizeof(*eth));
+
+	eth->slot_id = slot_id;
+	rx_options_default(&eth->rx_opts);
+	eth->rx_opts.nRx = N_RX_P_ETH;
+
+
 	pptr = eptr;
 	if (*pptr == 'p') {
 		/* Found a port */
 		pptr++;
-		port_id = strtoul(pptr, &eptr, 10);
+		eth->port_id = strtoul(pptr, &eptr, 10);
 
-		if (eptr == pptr || port_id < 0 || port_id >= MAX_ETH_PORTS) {
+		if (eptr == pptr || eth->port_id >= MAX_ETH_PORTS) {
 			ODP_ERR("Invalid Ethernet name %s\n", devname);
 			return -1;
 		}
 		pptr = eptr;
 	} else {
 		/* Default port is 4 (40G), but physically lane 0 */
-		port_id = 4;
+		eth->port_id = 4;
 	}
 
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
-		ret = rx_parse_options(&pptr, &rx_opts);
+		ret = rx_parse_options(&pptr, &eth->rx_opts);
 		if (ret < 0)
 			return -1;
 		if (ret > 0)
 			continue;
 		if (!strncmp(pptr, "hashpolicy=", strlen("hashpolicy="))){
-			if ( rules ) {
+			if ( eth->nb_rules ) {
 				ODP_ERR("hashpolicy can only be set once\n");
 				return -1;
 			}
-			rules = calloc(1, sizeof(pkt_rule_t) * 8);
-			if ( rules == NULL ) {
-				ODP_ERR("hashpolicy alloc failed\n");
-				return -1;
-			}
 			pptr += strlen("hashpolicy=");
-			pptr = parse_hashpolicy(pptr, &nb_rules,
-						rules, port_id < 4 ? 2 : 8);
+			pptr = parse_hashpolicy(pptr, &eth->nb_rules,
+						eth->rules, eth->port_id < 4 ? 2 : 8);
 			if ( pptr == NULL ) {
 				return -1;
 			}
 		} else if (!strncmp(pptr, "loop", strlen("loop"))){
 			pptr += strlen("loop");
-			loopback = 1;
+			eth->loopback = 1;
 		} else if (!strncmp(pptr, "jumbo", strlen("jumbo"))){
 			pptr += strlen("jumbo");
-			jumbo = 1;
+			eth->jumbo = 1;
 		} else if (!strncmp(pptr, "verbose", strlen("verbose"))){
 			pptr += strlen("verbose");
-			verbose = 1;
+			eth->verbose = 1;
 		} else if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
-			nofree = 1;
+			eth->tx_config.nofree = 1;
 		} else if (!strncmp(pptr, "min_payload=", strlen("min_payload="))){
 			pptr += strlen("min_payload=");
-			min_payload = strtoul(pptr, &eptr, 10);
+			eth->min_payload = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
 				ODP_ERR("Invalid min_payload %s\n", pptr);
 				return -1;
@@ -252,7 +241,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr = eptr;
 		} else if (!strncmp(pptr, "max_payload=", strlen("max_payload="))){
 			pptr += strlen("max_payload=");
-			max_payload = strtoul(pptr, &eptr, 10);
+			eth->max_payload = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
 				ODP_ERR("Invalid max_payload %s\n", pptr);
 				return -1;
@@ -260,7 +249,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr = eptr;
 		} else if (!strncmp(pptr, "nowaitlink", strlen("nowaitlink"))){
 			pptr += strlen("nowaitlink");
-			nowaitlink = 1;
+			eth->no_wait_link = 1;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -277,46 +266,26 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	return 1;
 #endif
 
-	if (rx_opts.flow_controlled) {
+	if (eth->rx_opts.flow_controlled) {
 		ODP_ERR("Cannot enable fc=1 on an ETH interface");
 		return -1;
 	}
 
 	uintptr_t ucode;
 	ucode = (uintptr_t)ucode_eth_v2;
-
-	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
-	/*
-	 * Init eth status
-	 */
-	eth->slot_id = slot_id;
-	eth->port_id = port_id;
-	eth->pool = pool;
-	eth->loopback = loopback;
-	eth->jumbo = jumbo;
-	eth->verbose = verbose;
-	eth->min_payload = min_payload;
-	eth->max_payload = max_payload;
-	eth->no_wait_link = nowaitlink;
-	eth->tx_config.nofree = nofree;
-
 	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
 		/* Setup Rx threads */
 		eth->rx_config.dma_if = 0;
 		eth->rx_config.pool = pool;
 		eth->rx_config.if_type = RX_IF_TYPE_ETH;
-		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + port_id;
+		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + eth->port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
-		ret = rx_thread_link_open(&eth->rx_config, &rx_opts);
+		ret = rx_thread_link_open(&eth->rx_config, &eth->rx_opts);
 		if(ret < 0)
 			return -1;
 	}
 
-	ret = eth_rpc_send_eth_open(&pktio_entry->s.param, eth, nb_rules, rules);
-
-	if ( rules ) {
-		free(rules);
-	}
+	ret = eth_rpc_send_eth_open(&pktio_entry->s.param, eth);
 
 	if (pktio_entry->s.param.out_mode != ODP_PKTOUT_MODE_DISABLED) {
 		tx_uc_flags_t flags = TX_UC_FLAGS_DEFAULT;

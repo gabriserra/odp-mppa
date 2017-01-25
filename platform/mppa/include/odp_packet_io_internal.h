@@ -25,6 +25,7 @@ extern "C" {
 #include <odp_debug_internal.h>
 #include <odp_buffer_inlines.h>
 #include <odp_rx_internal.h>
+#include <odp/rpc/rpc.h>
 
 #include <odp/config.h>
 #include <odp/hints.h>
@@ -98,7 +99,12 @@ typedef struct {
 		uint8_t no_wait_link : 1;
 	};
 
+	/* LB Rules */
+	pkt_rule_t rules[8];
+	int nb_rules;
+
 	/* Rx Data */
+	rx_opts_t rx_opts;
 	rx_config_t rx_config;
 	int promisc;
 
