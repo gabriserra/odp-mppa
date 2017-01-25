@@ -336,6 +336,12 @@ static int ioddr_stats(pktio_entry_t *const pktio_entry,
 	return 0;
 }
 
+static int ioddr_link_status(pktio_entry_t *pktio_entry ODP_UNUSED)
+{
+	/* drop interfaces are always up */
+	return 1;
+}
+
 const pktio_if_ops_t ioddr_pktio_ops = {
 	.name = "ioddr",
 	.init = ioddr_init,
@@ -351,4 +357,5 @@ const pktio_if_ops_t ioddr_pktio_ops = {
 	.promisc_mode_set = ioddr_promisc_mode_set,
 	.promisc_mode_get = ioddr_promisc_mode,
 	.mac_get = ioddr_mac_addr_get,
+	.link_status = ioddr_link_status,
 };
