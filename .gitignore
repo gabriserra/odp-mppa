@@ -56,6 +56,7 @@ artifacts/
 Testing/
 long/Testing
 .confcache
+platform/mppa/include/odp/rpc/rpc_byteorder.h
 platform/mppa/include/odp/rpc/c2c.h
 platform/mppa/include/odp/rpc/bas.h
 platform/mppa/include/odp/rpc/defines.h
