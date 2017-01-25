@@ -61,6 +61,8 @@ typedef struct {
 	odp_pool_t pool; 		/**< pool to alloc packets from */
 	odp_bool_t promisc;		/**< promiscuous mode state */
 
+	rx_opts_t rx_opts;
+
 	pkt_c2c_cfg_t local;
 	pkt_c2c_cfg_t remote;
 
