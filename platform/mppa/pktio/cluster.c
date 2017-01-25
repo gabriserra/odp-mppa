@@ -595,6 +595,34 @@ static int cluster_stats(pktio_entry_t *const pktio_entry,
 		return -1;
 	return 0;
 }
+
+static int cluster_link_status(pktio_entry_t *pktio_entry)
+{
+	pkt_cluster_t *pkt_cluster = &pktio_entry->s.pkt_cluster;
+
+	if (pkt_cluster->clus_id == __k1_get_cluster_id())
+		return 1;
+
+	if (pkt_cluster->remote.cnoc_rx < 0 ||
+	    pkt_cluster->remote.min_rx < 0){
+		/* Link is not up yet */
+		if (cluster_rpc_send_c2c_query(pkt_cluster)) {
+			return 0;
+		}
+	}
+	return 1;
+
+	/* Get credits first */
+	int remote_pkt_count =
+		mppa_noc_cnoc_rx_get_value(NOC_CLUS_IFACE_ID,
+					   pkt_cluster->local.cnoc_rx);
+
+	if (remote_pkt_count == -1)
+		return 0;
+
+	return 1;
+}
+
 const pktio_if_ops_t cluster_pktio_ops = {
 	.name = "cluster",
 	.init = cluster_init,
@@ -610,4 +638,5 @@ const pktio_if_ops_t cluster_pktio_ops = {
 	.promisc_mode_set = cluster_promisc_mode_set,
 	.promisc_mode_get = cluster_promisc_mode,
 	.mac_get = cluster_mac_addr_get,
+	.link_status = cluster_link_status,
 };
