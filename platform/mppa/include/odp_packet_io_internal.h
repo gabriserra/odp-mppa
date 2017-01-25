@@ -130,9 +130,11 @@ typedef struct {
 	uint16_t mtu;                   /**< Interface MTU */
 
 	/* Rx Data */
+	rx_opts_t rx_opts;
 	rx_config_t rx_config;
 	int promisc;
 	int log2_fragments;
+	int cnoc_port;
 
 	uint8_t slot_id;                /**< IO Eth Id */
 
