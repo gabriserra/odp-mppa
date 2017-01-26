@@ -190,12 +190,20 @@ void mppa_rpc_odp_print_msg(const mppa_rpc_odp_t * cmd, const uint8_t *payload)
 			}
 			break;
 		case MPPA_RPC_ODP_CMD_ETH_PROMISC:
-		case MPPA_RPC_ODP_CMD_ETH_STATE:
 			{
 				mppa_rpc_odp_cmd_eth_promisc_t promisc = { .inl_data = cmd->inl_data };
 				printf("\t\tifId: %d\n"
 				       "\t\tEnabled: %d\n",
 				       promisc.ifId, promisc.enabled);
+			}
+			break;
+		case MPPA_RPC_ODP_CMD_ETH_STATE:
+			{
+				mppa_rpc_odp_cmd_eth_state_t state = { .inl_data = cmd->inl_data };
+				printf("\t\tifId: %d\n"
+				       "\t\tEnabled: %d\n"
+				       "\t\tNoWaitLink: %d\n",
+				       state.ifId, state.enabled, state.no_wait_link);
 			}
 			break;
 		case MPPA_RPC_ODP_CMD_ETH_GET_STAT:

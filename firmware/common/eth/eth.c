@@ -138,7 +138,8 @@ void eth_set_state(unsigned remoteClus, mppa_rpc_odp_t *msg,
 	}
 
 	if (data.enabled) {
-		if (ethtool_enable_cluster(remoteClus, data.ifId, answer)) {
+		if (ethtool_enable_cluster(remoteClus, data.ifId,
+					   data.no_wait_link, answer)) {
 			return;
 		}
 	} else {

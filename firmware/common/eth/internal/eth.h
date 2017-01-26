@@ -46,6 +46,7 @@ int ethtool_configure_policy(unsigned remoteClus, unsigned if_id,
 			     mppa_rpc_odp_answer_t *answer);
 
 int ethtool_enable_cluster(unsigned remoteClus, unsigned if_id,
+			   int no_wait_link,
 			   mppa_rpc_odp_answer_t *answer);
 int ethtool_disable_cluster(unsigned remoteClus, unsigned if_id,
 			    mppa_rpc_odp_answer_t *answer);
