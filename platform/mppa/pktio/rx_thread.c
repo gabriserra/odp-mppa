@@ -700,7 +700,7 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 	int ring_size = 2 * n_rx;
 	if (ring_size < MIN_RING_SIZE)
 		ring_size = MIN_RING_SIZE;
-	odp_buffer_hdr_t * addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*) * rx_config->n_rings);
+	odp_buffer_hdr_t ** addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*) * rx_config->n_rings);
 	if (!addr) {
 		ODP_ERR("Failed to allocate Ring buffer");
 		return -1;
