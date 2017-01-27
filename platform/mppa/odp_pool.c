@@ -46,25 +46,27 @@ typedef struct odp_any_hdr_stride {
 } odp_any_hdr_stride;
 
 /* The pool table */
-pool_table_t pool_tbl;
+static pool_table_t pool_tbl_cached;
+pool_table_t *pool_tbl_ptr;
 
 /* Local cache for buffer alloc/free acceleration */
 static __thread local_cache_t local_cache[POOL_HAS_LOCAL_CACHE * ODP_CONFIG_POOLS];
 
 static inline void *get_pool_entry(uint32_t pool_id)
 {
-	return &pool_tbl.pool[pool_id];
+	return &pool_tbl_ptr->pool[pool_id];
 }
 
 int odp_pool_init_global(void)
 {
 	uint32_t i;
 
-	memset(&pool_tbl, 0, sizeof(pool_table_t));
+	pool_tbl_ptr = CACHED_TO_UNCACHED(&pool_tbl_cached);
+	memset(pool_tbl_ptr, 0, sizeof(*pool_tbl_ptr));
 
 	for (i = 0; i < ODP_CONFIG_POOLS; i++) {
 		/* init locks */
-		pool_entry_t *pool = &pool_tbl.pool[i];
+		pool_entry_t *pool = &pool_tbl_ptr->pool[i];
 		POOL_LOCK_INIT(&pool->s.lock);
 		POOL_LOCK_INIT(&pool->s.buf_lock);
 		POOL_LOCK_INIT(&pool->s.blk_lock);
@@ -510,7 +512,7 @@ void odp_buffer_free(odp_buffer_t buf)
 	odp_buffer_hdr_t *buf_hdr = odp_buf_to_hdr(buf);
 	pool_entry_t *pool = odp_buf_to_pool(buf_hdr);
 
-	if (!POOL_HAS_LOCAL_CACHE || odp_unlikely(LOAD_U32(pool->s.low_wm_assert)))
+	if (!POOL_HAS_LOCAL_CACHE || odp_unlikely(pool->s.low_wm_assert))
 		ret_buf(&pool->s, &buf_hdr, 1);
 	else
 		ret_local_buf(&local_cache[pool->s.pool_id], buf_hdr, buf_hdr);
@@ -625,8 +627,8 @@ int get_buf_multi(struct pool_entry_s *pool, odp_buffer_hdr_t *buffers[],
 	if (POOL_HAS_LOCAL_CACHE &&
 	    bufcount <= pool->low_wm &&
 	    bufcount + n_buffers > pool->low_wm &&
-	    !LOAD_U32(pool->low_wm_assert)) {
-		STORE_U32(pool->low_wm_assert, 1);
+	    !pool->low_wm_assert) {
+		pool->low_wm_assert = 1;
 	}
 
 	return n_bufs;
@@ -651,7 +653,7 @@ void ret_buf(struct pool_entry_s *pool, odp_buffer_hdr_t *buffers[],
 	if(POOL_HAS_LOCAL_CACHE &&
 	   bufcount >= pool->high_wm &&
 	   bufcount - n_buffers < pool->high_wm &&
-	   LOAD_U32(pool->low_wm_assert)) {
-		STORE_U32(pool->low_wm_assert, 0);
+	   pool->low_wm_assert) {
+		pool->low_wm_assert = 0;
 	}
 }
