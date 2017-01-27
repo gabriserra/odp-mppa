@@ -94,7 +94,7 @@ typedef struct queue_table_t {
 	queue_entry_t  queue[ODP_CONFIG_QUEUES];
 } queue_table_t;
 
-extern queue_table_t queue_tbl;
+extern queue_table_t *queue_tbl_ptr;
 
 int queue_enq(queue_entry_t *queue, odp_buffer_hdr_t *buf_hdr, int sustain);
 odp_buffer_hdr_t *queue_deq(queue_entry_t *queue);
@@ -126,13 +126,13 @@ static inline queue_entry_t *queue_to_qentry(odp_queue_t handle)
 static inline uint32_t queue_to_id(odp_queue_t handle)
 {
 	queue_entry_t *entry = queue_to_qentry(handle);
-	return entry - &queue_tbl.queue[0];
+	return entry - &queue_tbl_ptr->queue[0];
 }
 
 
 static inline uint32_t qentry_to_id(queue_entry_t *entry)
 {
-	return entry - &queue_tbl.queue[0];
+	return entry - &queue_tbl_ptr->queue[0];
 }
 
 static inline odp_queue_t queue_handle(queue_entry_t *qe)
@@ -142,7 +142,7 @@ static inline odp_queue_t queue_handle(queue_entry_t *qe)
 
 static inline queue_entry_t *get_qentry(uint32_t queue_id)
 {
-	return &queue_tbl.queue[queue_id];
+	return &queue_tbl_ptr->queue[queue_id];
 }
 static inline odp_queue_t queue_from_id(uint32_t queue_id)
 {
