@@ -388,7 +388,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		int queue = 0;
 
 		if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE))
-			queue = hash_key % rx_config->n_rings;
+			queue = (hash_key >> 4) % rx_config->n_rings;
 
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list[queue];
 		if_th->queue_mask |= (1 << queue);
