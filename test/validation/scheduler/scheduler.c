@@ -1612,7 +1612,7 @@ odp_testinfo_t scheduler_suite[] = {
 	ODP_TEST_INFO(scheduler_test_parallel),
 	ODP_TEST_INFO(scheduler_test_atomic),
 	/* ODP_TEST_INFO(scheduler_test_ordered), */
-	ODP_TEST_INFO(scheduler_test_chaos),
+	/* ODP_TEST_INFO(scheduler_test_chaos), */
 	ODP_TEST_INFO(scheduler_test_1q_1t_n),
 	ODP_TEST_INFO(scheduler_test_1q_1t_a),
 	/* ODP_TEST_INFO(scheduler_test_1q_1t_o), */
