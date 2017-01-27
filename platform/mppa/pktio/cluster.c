@@ -607,20 +607,13 @@ static int cluster_link_status(pktio_entry_t *pktio_entry)
 	    pkt_cluster->remote.min_rx < 0){
 		/* Link is not up yet */
 		if (cluster_rpc_send_c2c_query(pkt_cluster)) {
+			if (__odp_errno == EACCES)
+				return 1;
 			return 0;
 		}
 	}
 	return 1;
 
-	/* Get credits first */
-	int remote_pkt_count =
-		mppa_noc_cnoc_rx_get_value(NOC_CLUS_IFACE_ID,
-					   pkt_cluster->local.cnoc_rx);
-
-	if (remote_pkt_count == -1)
-		return 0;
-
-	return 1;
 }
 
 const pktio_if_ops_t cluster_pktio_ops = {
