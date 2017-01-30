@@ -215,15 +215,10 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			const char *devname, odp_pool_t pool)
 {
 	int ret;
-	rx_opts_t rx_opts;
 	const char *pptr = devname;
 	char *eptr;
 	int cluster_id;
-	int nofree = 0;
 
-
-	rx_options_default(&rx_opts);
-	rx_opts.nRx = 3;
 
 	/* String should in the following format: "cluster<cluster_id>" */
 	if(strncmp("cluster", devname, strlen("cluster")))
@@ -236,11 +231,19 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		return -1;
 	}
 	pptr = eptr;
+
+	pkt_cluster_t * pkt_cluster = &pktio_entry->s.pkt_cluster;
+	memset(pkt_cluster, 0, sizeof(*pkt_cluster));
+
+	pkt_cluster->clus_id = cluster_id;
+	rx_options_default(&pkt_cluster->rx_opts);
+	pkt_cluster->rx_opts.nRx = 3;
+
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
 
-		ret = rx_parse_options(&pptr, &rx_opts);
+		ret = rx_parse_options(&pptr, &pkt_cluster->rx_opts);
 		if (ret < 0)
 			return -1;
 		if (ret > 0)
@@ -248,7 +251,7 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 
 		if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
-			nofree = 1;
+			pkt_cluster->tx_config.nofree = 1;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);
@@ -261,16 +264,12 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		return -1;
 	}
 
-	pkt_cluster_t * pkt_cluster = &pktio_entry->s.pkt_cluster;
 	uintptr_t ucode;
 	mppa_routing_ret_t rret;
 
-	memset(pkt_cluster, 0, sizeof(*pkt_cluster));
 	ucode = (uintptr_t)ucode_eth_v2;
 
-	pkt_cluster->clus_id = cluster_id;
 	pkt_cluster->pool = pool;
-	pkt_cluster->tx_config.nofree = nofree;
 	pkt_cluster->remote.cnoc_rx = pkt_cluster->local.cnoc_rx = -1;
 	pkt_cluster->remote.min_rx = pkt_cluster->remote.max_rx = -1;
 	pkt_cluster->mtu = odp_buffer_pool_segment_size(pool) -
@@ -296,7 +295,8 @@ static int cluster_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		if (rret != MPPA_ROUTING_RET_SUCCESS)
 			return 1;
 
-		ret = rx_thread_link_open(&pkt_cluster->rx_config, &rx_opts);
+		ret = rx_thread_link_open(&pkt_cluster->rx_config,
+					  &pkt_cluster->rx_opts);
 		if(ret < 0) {
 			ODP_ERR("Failed to setup rx threads\n");
 			return -1;

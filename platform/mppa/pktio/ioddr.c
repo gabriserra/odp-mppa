@@ -88,10 +88,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		    const char *devname, odp_pool_t pool)
 {
 	int ret = 0;
-	rx_opts_t rx_opts;
 	int slot_id;
-	int log2_fragments = 0;
-	int cnoc_port = -1;
 
 	/*
 	 * Check device name and extract slot/port
@@ -99,8 +96,6 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	const char* pptr = devname;
 	char * eptr;
 
-	rx_options_default(&rx_opts);
-	rx_opts.nRx = N_RX_P_IODDR;
 
 	if (strncmp(pptr, "ioddr", strlen("ioddr")))
 		return -1;
@@ -112,11 +107,18 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	}
 	pptr = eptr;
 
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+	memset(ioddr, 0, sizeof(*ioddr));
+
+	ioddr->slot_id = slot_id;
+	rx_options_default(&ioddr->rx_opts);
+	ioddr->rx_opts.nRx = N_RX_P_IODDR;
+
 	while (*pptr == ':') {
 		/* Parse arguments */
 		pptr++;
 
-		ret = rx_parse_options(&pptr, &rx_opts);
+		ret = rx_parse_options(&pptr, &ioddr->rx_opts);
 		if (ret < 0)
 			return -1;
 		if (ret > 0)
@@ -124,7 +126,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 
 		if (!strncmp(pptr, "log2fragments=", strlen("log2fragments="))){
 			pptr += strlen("log2fragments=");
-			log2_fragments = strtoul(pptr, &eptr, 10);
+			ioddr->log2_fragments = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
 				ODP_ERR("Invalid log2fragments %s\n", pptr);
 				return -1;
@@ -132,7 +134,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pptr = eptr;
 		}  else if (!strncmp(pptr, "cnoc=", strlen("cnoc="))){
 			pptr += strlen("cnoc=");
-			cnoc_port = strtoul(pptr, &eptr, 10);
+			ioddr->cnoc_port = strtoul(pptr, &eptr, 10);
 			if(pptr == eptr){
 				ODP_ERR("Invalid cnoc %s\n", pptr);
 				return -1;
@@ -151,19 +153,16 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		return -1;
 	}
 
-	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
 	/*
 	 * Init ioddr status
 	 */
-	ioddr->slot_id = slot_id;
 	ioddr->pool = pool;
-	ioddr->log2_fragments = log2_fragments;
-	ioddr->tx_config.nofree = 0;
-	if (rx_opts.min_rx == -1 || rx_opts.max_rx == -1) {
+
+	if (ioddr->rx_opts.min_rx == -1 || ioddr->rx_opts.max_rx == -1) {
 		ODP_ERR("min_rx and max_rx options must be specified\n");
 		return -1;
 	}
-	if (cnoc_port == -1) {
+	if (ioddr->cnoc_port == -1) {
 		ODP_ERR("cnoc option must be specified\n");
 		return -1;
 	}
@@ -177,7 +176,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
 	ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 	ioddr->rx_config.if_type = RX_IF_TYPE_IODDR;
-	ret = rx_thread_link_open(&ioddr->rx_config, &rx_opts);
+	ret = rx_thread_link_open(&ioddr->rx_config, &ioddr->rx_opts);
 	if(ret < 0)
 		return -1;
 
@@ -190,7 +189,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 						   128 + 64 * slot_id,
 						   &ioddr->config,
 						   &ioddr->header);
-	ioddr->header._.tag = cnoc_port + __k1_get_cluster_id();
+	ioddr->header._.tag = ioddr->cnoc_port + __k1_get_cluster_id();
 	return 0;
 }
 

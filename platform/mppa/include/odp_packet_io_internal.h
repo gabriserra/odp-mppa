@@ -26,6 +26,7 @@ extern "C" {
 #include <odp_buffer_inlines.h>
 #include <odp_rx_internal.h>
 #include <odp/api/hints.h>
+#include <odp/rpc/rpc.h>
 
 #define PKTIO_NAME_LEN 256
 #define PKTIO_MAX_QUEUES 16
@@ -61,6 +62,8 @@ typedef struct {
 	int clus_id;			/**< Cluster ID */
 	odp_pool_t pool; 		/**< pool to alloc packets from */
 	odp_bool_t promisc;		/**< promiscuous mode state */
+
+	rx_opts_t rx_opts;
 
 	pkt_c2c_cfg_t local;
 	pkt_c2c_cfg_t remote;
@@ -100,7 +103,12 @@ typedef struct {
 		uint8_t no_wait_link : 1;
 	};
 
+	/* LB Rules */
+	pkt_rule_t rules[8];
+	int nb_rules;
+
 	/* Rx Data */
+	rx_opts_t rx_opts;
 	rx_config_t rx_config;
 	int promisc;
 
@@ -124,9 +132,11 @@ typedef struct {
 	uint16_t mtu;                   /**< Interface MTU */
 
 	/* Rx Data */
+	rx_opts_t rx_opts;
 	rx_config_t rx_config;
 	int promisc;
 	int log2_fragments;
+	int cnoc_port;
 
 	uint8_t slot_id;                /**< IO Eth Id */
 
@@ -144,6 +154,7 @@ typedef struct {
 	uint16_t mtu;                   /**< Interface MTU */
 
 	/* Rx Data */
+	rx_opts_t rx_opts;
 	rx_config_t rx_config;
 
 	uint8_t slot_id;                /**< IO Eth Id */
