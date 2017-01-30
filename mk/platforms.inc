@@ -233,4 +233,4 @@ ioeth_CONFIGS += k1b-kalray_emb01
 #
 # IOETH storage
 #
-ioeth-storage_CONFIGS += k1b-kalray_konic80
+ioeth-storage_CONFIGS += k1b-kalray_konic80 k1b-kalray_ab04
