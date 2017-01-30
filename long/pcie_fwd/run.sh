@@ -1,4 +1,4 @@
-cd #!/bin/bash -x
+#!/bin/bash -x
 
 CUR_DIR=$(readlink -e $(dirname $0))
 cd $CUR_DIR
