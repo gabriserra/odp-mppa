@@ -797,82 +797,97 @@ int rx_thread_link_start(const rx_config_t *rx_config)
 	return 0;
 }
 
-int rx_thread_link_close(uint8_t pktio_id)
+int rx_thread_link_stop(uint8_t pktio_id)
 {
 	int i;
 	rx_ifce_t *ifce =
 		&rx_hdl.ifce[pktio_id];
 
+
 	odp_rwlock_write_lock(&rx_hdl.lock);
-	{
-		INVALIDATE(&rx_hdl);
+	INVALIDATE(&rx_hdl);
 
-		if (ifce->status == RX_IFCE_DOWN) {
-			odp_rwlock_write_unlock(&rx_hdl.lock);
-			return 0;
-		}
-		for (i = ifce->rx_config.min_port;
-		     i <= ifce->rx_config.max_port; ++i)
-			rx_hdl.tag[i].pktio_id = -1;
+	if (ifce->status != RX_IFCE_STARTED) {
+		odp_rwlock_write_unlock(&rx_hdl.lock);
+		return -1;
+	}
 
-		int n_ports = ifce->rx_config.max_port -
-			ifce->rx_config.min_port + 1;
-		const unsigned nrx_per_th = rx_thread_n_rx_per_th(n_ports);
+	const int n_ports = ifce->rx_config.max_port -
+		ifce->rx_config.min_port + 1;
+	const unsigned nrx_per_th = rx_thread_n_rx_per_th(n_ports);
+	for (i = ifce->rx_config.min_port;
+	     i <= ifce->rx_config.max_port; ++i)
+		rx_hdl.tag[i].pktio_id = -1;
 
-		for (int i = ifce->rx_config.min_port;
-		     i <= ifce->rx_config.max_port; ++i)
-			_close_rx(&ifce->rx_config, i);
 
-		ifce->rx_config.pool = ODP_POOL_INVALID;
-		ifce->rx_config.min_port = -1;
-		ifce->rx_config.max_port = -1;
+	for (uint32_t i = 0; i < odp_global_data.n_rx_thr; ++i) {
+		rx_th_t *th = &rx_hdl.th[i];
 
-		for (uint32_t i = 0; i < odp_global_data.n_rx_thr; ++i) {
-			rx_th_t *th = &rx_hdl.th[i];
+		th->pools[ifce->pool_id].n_rx -= nrx_per_th;
 
-			th->pools[ifce->pool_id].n_rx -= nrx_per_th;
+		th->min_mask = (uint8_t) -1;
+		th->max_mask = 0;
 
-			th->min_mask = (uint8_t) -1;
-			th->max_mask = 0;
-
-			for (int j = 0; j < 4; ++j) {
-				th->ev_masks[j] &= ~ifce->ev_masks[j];
-				if (th->ev_masks[j]) {
-					if (j < th->min_mask)
-						th->min_mask = j;
-					if (j > th->max_mask)
-						th->max_mask = j;
-				}
+		for (int j = 0; j < 4; ++j) {
+			th->ev_masks[j] &= ~ifce->ev_masks[j];
+			if (th->ev_masks[j]) {
+				if (j < th->min_mask)
+					th->min_mask = j;
+				if (j > th->max_mask)
+					th->max_mask = j;
 			}
 		}
+	}
 
-		odp_atomic_add_u64(&rx_hdl.update_id, 1ULL);
-
-		for (uint32_t i = 0; i < ifce->rx_config.n_rings; ++i){
-			/** free all the buffers */
-			odp_buffer_hdr_t * buffers[10];
-			int nbufs;
-			while ((nbufs = odp_buffer_ring_get_multi(&ifce->rings[i],
-								  buffers, 10, 0,
-								  NULL)) > 0) {
-				odp_buffer_free_multi((odp_buffer_t*)buffers,
-						      nbufs);
-			}
-		}
-		free(ifce->rings[0].buf_ptrs);
-		ifce->rx_config.n_rings = 1;
-		ifce->status = RX_IFCE_DOWN;
-		rx_hdl.if_opened--;
-		/* No more interface open. */
-		if (rx_hdl.if_opened == 0 &&
-		    rx_hdl.drop_pkt != ODP_PACKET_INVALID) {
-			odp_packet_free_multi(&rx_hdl.drop_pkt, 1);
-			rx_hdl.drop_pkt = ODP_PACKET_INVALID;
-		}
+	odp_atomic_add_u64(&rx_hdl.update_id, 1ULL);
+	ifce->status = RX_IFCE_OPENED;
+	rx_hdl.if_opened--;
+	/* No more interface open. */
+	if (rx_hdl.if_opened == 0 &&
+	    rx_hdl.drop_pkt != ODP_PACKET_INVALID) {
+		odp_packet_free_multi(&rx_hdl.drop_pkt, 1);
+		rx_hdl.drop_pkt = ODP_PACKET_INVALID;
 	}
 	odp_rwlock_write_unlock(&rx_hdl.lock);
 
 
+
+	return 0;
+}
+
+int rx_thread_link_close(uint8_t pktio_id)
+{
+	rx_ifce_t *ifce =
+		&rx_hdl.ifce[pktio_id];
+
+	INVALIDATE(&rx_hdl);
+
+	if (ifce->status != RX_IFCE_OPENED)
+		return -1;
+
+	for (int i = ifce->rx_config.min_port;
+	     i <= ifce->rx_config.max_port; ++i)
+		_close_rx(&ifce->rx_config, i);
+
+	ifce->rx_config.pool = ODP_POOL_INVALID;
+	ifce->rx_config.min_port = -1;
+	ifce->rx_config.max_port = -1;
+
+	for (uint32_t i = 0; i < ifce->rx_config.n_rings; ++i){
+		/** free all the buffers */
+		odp_buffer_hdr_t * buffers[10];
+		int nbufs;
+		while ((nbufs = odp_buffer_ring_get_multi(&ifce->rings[i],
+							  buffers, 10, 0,
+							  NULL)) > 0) {
+			odp_buffer_free_multi((odp_buffer_t*)buffers,
+					      nbufs);
+		}
+	}
+	free(ifce->rings[0].buf_ptrs);
+	ifce->status = RX_IFCE_DOWN;
+
+	__k1_wmb();
 
 	return 0;
 }

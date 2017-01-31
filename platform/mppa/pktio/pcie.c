@@ -356,6 +356,20 @@ static int pcie_start(pktio_entry_t * const pktio_entry)
 	return 0;
 }
 
+static int pcie_stop(pktio_entry_t * const pktio_entry)
+{
+	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
+		pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+		int ret;
+
+		ret = rx_thread_link_stop(pcie->rx_config.pktio_id);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int pcie_mac_addr_get(pktio_entry_t *pktio_entry ODP_UNUSED,
 			    void *mac_addr ODP_UNUSED)
 {
@@ -492,7 +506,7 @@ const pktio_if_ops_t pcie_pktio_ops = {
 	.open = pcie_open,
 	.close = pcie_close,
 	.start = pcie_start,
-	.stop = NULL,
+	.stop = pcie_stop,
 	.stats = pcie_stats,
 	.recv = pcie_recv,
 	.send = pcie_send,
