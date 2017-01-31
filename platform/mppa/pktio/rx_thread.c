@@ -251,7 +251,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	int mapped_pkt = 0;
 	uint64_t _mask = (*mask) & ifce->ev_masks[rx_id / 64];
 	int n_events = __builtin_k1_cbs(_mask & 0xFFFFFFFF) + __builtin_k1_cbs(_mask >> 32) + 1;
-	uint16_t hash_key;
+	uint16_t hash_key = 0;
 
 	if (rx_config->flow_controlled) {
 		if (n_events > rx_pool->n_spares) {
