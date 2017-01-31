@@ -559,6 +559,12 @@ static void *_rx_thread_start(void *arg)
 	return NULL;
 }
 
+static inline unsigned rx_thread_n_rx_per_th(int n_ports)
+{
+	return (n_ports + odp_global_data.n_rx_thr - 1) /
+		odp_global_data.n_rx_thr;
+}
+
 int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 {
 	const int dma_if = 0;
@@ -633,8 +639,7 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 	/*
 	 * Compute event mask to detect events on our own tags later
 	 */
-	const unsigned nrx_per_th = (n_ports + odp_global_data.n_rx_thr - 1) /
-		odp_global_data.n_rx_thr;
+	const unsigned nrx_per_th = rx_thread_n_rx_per_th(n_ports);
 	uint64_t ev_masks[odp_global_data.n_rx_thr][N_EV_MASKS];
 	int i;
 	uint32_t th_id;
@@ -797,7 +802,7 @@ int rx_thread_link_close(uint8_t pktio_id)
 
 		int n_ports = ifce->rx_config.max_port -
 			ifce->rx_config.min_port + 1;
-		const unsigned nrx_per_th = n_ports / odp_global_data.n_rx_thr;
+		const unsigned nrx_per_th = rx_thread_n_rx_per_th(n_ports);
 
 		for (int i = ifce->rx_config.min_port;
 		     i <= ifce->rx_config.max_port; ++i)
