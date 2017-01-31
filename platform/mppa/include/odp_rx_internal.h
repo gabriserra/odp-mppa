@@ -125,6 +125,14 @@ int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
 void rx_options_default(rx_opts_t *options);
 int rx_parse_options(const char **str, rx_opts_t *options);
 
+/* Common capability and config fonction for
+ * all pktio using Rx threads */
+struct odp_pktio_capability_t;
+struct odp_pktio_config_t;
+int rx_thread_capability(struct odp_pktio_capability_t *capa);
+int rx_thread_config(rx_config_t *rx_config,
+		     const struct odp_pktio_config_t *config);
+
 static inline odp_buffer_ring_t * rx_get_ring(rx_config_t *rx_config, int index)
 {
 	return rx_config->rings[index];

@@ -986,3 +986,20 @@ int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
 
 	return 0;
 }
+
+int rx_thread_capability(odp_pktio_capability_t *capa)
+{
+	memset(capa, 0, sizeof(*capa));
+	capa->max_input_queues = ODP_CONFIG_PKTIO_MAX_MQUEUES;
+	capa->max_output_queues = 1;
+	capa->config.pktin.bit.ts_all = 1;
+	return 0;
+}
+
+int rx_thread_config(rx_config_t *rx_config,
+		     const odp_pktio_config_t *config)
+{
+	if (config->pktin.bit.ts_all)
+		rx_config->ts_enabled = 1;
+	return 0;
+}
