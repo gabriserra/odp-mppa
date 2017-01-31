@@ -501,6 +501,20 @@ static int pcie_link_status(pktio_entry_t *pktio_entry ODP_UNUSED)
 	return 1;
 }
 
+static int pcie_capability(pktio_entry_t *pktio_entry ODP_UNUSED,
+			   odp_pktio_capability_t *capa)
+{
+	return rx_thread_capability(capa);
+}
+
+static int pcie_config(pktio_entry_t *pktio_entry,
+		       const odp_pktio_config_t *config)
+{
+	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
+
+	return rx_thread_config(&pcie->rx_config, config);
+}
+
 const pktio_if_ops_t pcie_pktio_ops = {
 	.name = "pcie",
 	.init = pcie_init,
@@ -517,4 +531,6 @@ const pktio_if_ops_t pcie_pktio_ops = {
 	.promisc_mode_get = pcie_promisc_mode,
 	.mac_get = pcie_mac_addr_get,
 	.link_status = pcie_link_status,
+	.capability = pcie_capability,
+	.config = pcie_config,
 };
