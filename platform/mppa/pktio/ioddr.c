@@ -205,8 +205,17 @@ static int ioddr_close(pktio_entry_t * const pktio_entry)
 }
 
 
-static int ioddr_start(pktio_entry_t * const pktio_entry ODP_UNUSED)
+static int ioddr_start(pktio_entry_t * const pktio_entry)
 {
+	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
+		pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+		int ret;
+
+		ret = rx_thread_link_start(&ioddr->rx_config);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 

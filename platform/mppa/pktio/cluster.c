@@ -410,6 +410,19 @@ static int cluster_close(pktio_entry_t * const pktio_entry ODP_UNUSED)
 	return ack.status;
 }
 
+static int cluster_start(pktio_entry_t * const pktio_entry)
+{
+	if (pktio_entry->s.param.in_mode != ODP_PKTIN_MODE_DISABLED) {
+		pkt_cluster_t *pktio_clus = &pktio_entry->s.pkt_cluster;
+		int ret;
+
+		ret = rx_thread_link_start(&pktio_clus->rx_config);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
 
 static int cluster_mac_addr_get(pktio_entry_t *pktio_entry,
 				void *mac_addr)
@@ -621,7 +634,7 @@ const pktio_if_ops_t cluster_pktio_ops = {
 	.term = NULL,
 	.open = cluster_open,
 	.close = cluster_close,
-	.start = NULL,
+	.start = cluster_start,
 	.stop = NULL,
 	.stats = cluster_stats,
 	.recv = cluster_recv,

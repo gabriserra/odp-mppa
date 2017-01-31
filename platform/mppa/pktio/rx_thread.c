@@ -733,10 +733,23 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 		_configure_rx(rx_config, i);
 	ifce->status = RX_IFCE_OPENED;
 
+	return 0;
+}
+
+int rx_thread_link_start(const rx_config_t *rx_config)
+{
+	const int dma_if = 0;
+	int i;
+	int n_rx = rx_config->max_port - rx_config->min_port + 1;
+	rx_ifce_t *ifce =
+		&rx_hdl.ifce[rx_config->pktio_id];
+	const unsigned nrx_per_th = rx_thread_n_rx_per_th(n_rx);
+
 	/* Push Context to handling threads */
 	odp_rwlock_write_lock(&rx_hdl.lock);
 	{
 		INVALIDATE(&rx_hdl);
+
 		for (i = rx_config->min_port; i <= rx_config->max_port; ++i)
 			rx_hdl.tag[i].pktio_id = rx_config->pktio_id;
 
