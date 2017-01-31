@@ -45,7 +45,7 @@ extern "C" {
 #define DEF_N_RX_THR 2
 #endif
 
-#define MAX_MQUEUES (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE) ? ODP_CONFIG_PKTIO_MAX_MQUEUES : 1)
+#define MAX_MQUEUES ODP_CONFIG_PKTIO_MAX_MQUEUES
 
 typedef enum {
 	RX_IF_TYPE_ETH,
@@ -123,13 +123,9 @@ int rx_thread_fetch_stats(uint8_t pktio_id, uint64_t *dropped,
 void rx_options_default(rx_opts_t *options);
 int rx_parse_options(const char **str, rx_opts_t *options);
 
-static inline odp_buffer_ring_t * rx_get_ring(rx_config_t *rx_config)
+static inline odp_buffer_ring_t * rx_get_ring(rx_config_t *rx_config, int index)
 {
-	int mqueue_id = 0;
-	if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE)) {
-		mqueue_id = odp_cpu_id() & (rx_config->n_rings - 1);
-	}
-	return rx_config->rings[mqueue_id];
+	return rx_config->rings[index];
 }
 
 #ifdef __cplusplus

@@ -432,12 +432,12 @@ static int eth_mac_addr_get(pktio_entry_t *pktio_entry,
 	return ETH_ALEN;
 }
 
-static int eth_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+static int eth_recv(pktio_entry_t *pktio_entry, int index,
 		    odp_packet_t pkt_table[], unsigned len)
 {
 	int n_packet;
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
-	odp_buffer_ring_t *ring = rx_get_ring(&eth->rx_config);
+	odp_buffer_ring_t *ring = rx_get_ring(&eth->rx_config, index);
 
 	n_packet = odp_buffer_ring_get_multi(ring,
 					     (odp_buffer_hdr_t **)pkt_table,

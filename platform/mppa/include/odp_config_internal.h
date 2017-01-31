@@ -112,7 +112,6 @@ extern "C" {
  */
 #define ODP_CONFIG_SHM_BLOCKS (ODP_CONFIG_POOLS + 48)
 
-/* #define ODP_CONFIG_ENABLE_PKTIO_MQUEUE 1 */
 #define ODP_CONFIG_PKTIO_MAX_MQUEUES 8
 
 /**

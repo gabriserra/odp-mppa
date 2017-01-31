@@ -435,8 +435,7 @@ static int cluster_send_recv_pkt_count(pkt_cluster_t *pktio_clus)
 }
 
 
-static int cluster_recv(pktio_entry_t *const pktio_entry,
-			int index ODP_UNUSED,
+static int cluster_recv(pktio_entry_t *const pktio_entry, int index,
 			odp_packet_t pkt_table[], unsigned len)
 {
 	int n_packet;
@@ -451,7 +450,7 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 	}
 
 
-	ring = rx_get_ring(&clus->rx_config);
+	ring = rx_get_ring(&clus->rx_config, index);
 	n_packet = odp_buffer_ring_get_multi(ring,
 					     (odp_buffer_hdr_t **)pkt_table,
 					     len, 0, NULL);

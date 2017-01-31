@@ -249,7 +249,7 @@ static void _ioddr_compute_pkt_size(odp_packet_t pkt)
 	packet_parse_l2(&pkt_hdr->p, frame_len);
 }
 
-static int ioddr_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+static int ioddr_recv(pktio_entry_t *pktio_entry, int index,
 		      odp_packet_t pkt_table[], unsigned len)
 {
 	int total_packet = 0, n_packet;
@@ -259,7 +259,7 @@ static int ioddr_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
 	const unsigned wanted_segs = len << log2_frag_per_pkt;
 	odp_packet_t tmp_table[wanted_segs];
 	uint64_t pkt_count;
-	odp_buffer_ring_t *ring = rx_get_ring(&ioddr->rx_config);
+	odp_buffer_ring_t *ring = rx_get_ring(&ioddr->rx_config, index);
 
 	total_packet =
 		odp_buffer_ring_get_multi(ring,

@@ -28,11 +28,6 @@
 #define MIN_RING_SIZE (2 * PKT_BURST_SZ)
 #define BUFFER_ORDER_BITS 25
 
-#ifdef ODP_CONFIG_ENABLE_PKTIO_MQUEUE
-#if ODP_CONFIG_ENABLE_PKTIO_MQUEUE != 1
-#error "ODP_CONFIG_ENABLE_PKTIO_MQUEUE must be either 1 or unset"
-#endif
-#endif
 typedef struct {
 	odp_packet_t pkt;
 	uint8_t broken;
@@ -395,7 +390,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 	if (odp_likely(pkt != ODP_PACKET_INVALID)) {
 		int queue = 0;
 
-		if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE))
+		if (rx_config->n_rings > 1)
 			queue = (hash_key >> 4) % rx_config->n_rings;
 
 		rx_buffer_list_t * hdr_list = &if_th->hdr_list[queue];
@@ -496,11 +491,8 @@ static void _poll_masks(int th_id)
 				i = __builtin_k1_ctzdl(if_mask);
 				if_mask ^= (1ULL << i);
 
-				if (IS_SET(ODP_CONFIG_ENABLE_PKTIO_MQUEUE)) {
-					ret_mask = flush_ifce_mqueues(th_id, i);
-				} else {
-					ret_mask = flush_ifce_queue(th_id, i, 0);
-				}
+				ret_mask = flush_ifce_mqueues(th_id, i);
+
 				/* Not all buffers were flushed to the ring */
 				if_mask_incomplete |= ret_mask;
 			}

@@ -350,12 +350,12 @@ static int pcie_mac_addr_get(pktio_entry_t *pktio_entry ODP_UNUSED,
 	return PCIE_ALEN;
 }
 
-static int pcie_recv(pktio_entry_t *pktio_entry, int index ODP_UNUSED,
+static int pcie_recv(pktio_entry_t *pktio_entry, int index,
 		     odp_packet_t pkt_table[], unsigned len)
 {
 	int n_packet;
 	pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
-	odp_buffer_ring_t *ring = rx_get_ring(&pcie->rx_config);
+	odp_buffer_ring_t *ring = rx_get_ring(&pcie->rx_config, index);
 	n_packet = odp_buffer_ring_get_multi(ring,
 					     (odp_buffer_hdr_t **)pkt_table,
 					     len, 0, NULL);
