@@ -610,6 +610,20 @@ static int eth_link_status(pktio_entry_t *pktio_entry)
 	return eth->link_state;
 }
 
+static int eth_capability(pktio_entry_t *pktio_entry ODP_UNUSED,
+			  odp_pktio_capability_t *capa)
+{
+	return rx_thread_capability(capa);
+}
+
+static int eth_config(pktio_entry_t *pktio_entry,
+		      const odp_pktio_config_t *config)
+{
+	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
+
+	return rx_thread_config(&eth->rx_config, config);
+}
+
 const pktio_if_ops_t eth_pktio_ops = {
 	.name = "eth",
 	.init = eth_init,
@@ -626,4 +640,6 @@ const pktio_if_ops_t eth_pktio_ops = {
 	.promisc_mode_get = eth_promisc_mode,
 	.mac_get = eth_mac_addr_get,
 	.link_status = eth_link_status,
+	.capability = eth_capability,
+	.config = eth_config,
 };
