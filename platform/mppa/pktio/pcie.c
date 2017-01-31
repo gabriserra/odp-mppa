@@ -246,6 +246,7 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 			pcie->pcie_eth_if_id;
 		/* FIXME */
 		pcie->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
+		pcie->rx_config.n_rings = 1;
 		rx_thread_link_open(&pcie->rx_config, &pcie->rx_opts);
 	}
 
@@ -348,6 +349,7 @@ static int pcie_start(pktio_entry_t * const pktio_entry)
 		pkt_pcie_t *pcie = &pktio_entry->s.pkt_pcie;
 		int ret;
 
+		pcie->rx_config.n_rings = pktio_entry->s.num_in_queue;
 		ret = rx_thread_link_start(&pcie->rx_config);
 		if (ret)
 			return ret;

@@ -176,6 +176,7 @@ static int ioddr_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	ioddr->rx_config.pktio_id = RX_IODDR_IF_BASE + slot_id;
 	ioddr->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
 	ioddr->rx_config.if_type = RX_IF_TYPE_IODDR;
+	ioddr->rx_config.n_rings = 1;
 	ret = rx_thread_link_open(&ioddr->rx_config, &ioddr->rx_opts);
 	if(ret < 0)
 		return -1;
@@ -211,6 +212,7 @@ static int ioddr_start(pktio_entry_t * const pktio_entry)
 		pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
 		int ret;
 
+		ioddr->rx_config.n_rings = pktio_entry->s.num_in_queue;
 		ret = rx_thread_link_start(&ioddr->rx_config);
 		if (ret)
 			return ret;

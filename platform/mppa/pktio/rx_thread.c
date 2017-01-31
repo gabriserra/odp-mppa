@@ -707,25 +707,8 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 		for (i = 0; i < 4; ++i)
 			rx_hdl.th[th_id].ifce[rx_config->pktio_id].ev_masks[i] = ev_masks[th_id][i];
 
-	rx_config->n_rings = opts->n_rings;
-	/* Setup buffer ring */
-	int ring_size = 2 * n_rx;
-	if (ring_size < MIN_RING_SIZE)
-		ring_size = MIN_RING_SIZE;
-	odp_buffer_hdr_t ** addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*) * rx_config->n_rings);
-	if (!addr) {
-		ODP_ERR("Failed to allocate Ring buffer");
-		return -1;
-	}
-	for (i = 0; i < rx_config->n_rings; ++i) {
-		odp_buffer_ring_init(&ifce->rings[i], addr, ring_size);
-		rx_config->rings[i] = &ifce->rings[i];
-		addr += ring_size;
-	}
-
 	rx_config->flow_controlled = opts->flow_controlled;
 
-	/* Copy config to Thread data */
 	memcpy(&ifce->rx_config, rx_config, sizeof(*rx_config));
 	ifce->pool_id = pool_to_id(rx_config->pool);
 
@@ -736,22 +719,38 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 	return 0;
 }
 
-int rx_thread_link_start(const rx_config_t *rx_config)
+int rx_thread_link_start(rx_config_t *rx_config)
 {
 	const int dma_if = 0;
-	int i;
+	int i, ret;
 	int n_rx = rx_config->max_port - rx_config->min_port + 1;
 	rx_ifce_t *ifce =
 		&rx_hdl.ifce[rx_config->pktio_id];
 	const unsigned nrx_per_th = rx_thread_n_rx_per_th(n_rx);
+	int ring_size = 2 * n_rx;
+	odp_buffer_hdr_t ** addr;
+
+	/* Setup buffer ring */
+	if (ring_size < MIN_RING_SIZE)
+		ring_size = MIN_RING_SIZE;
+	addr = malloc(ring_size * sizeof(odp_buffer_hdr_t*) * rx_config->n_rings);
+	if (!addr) {
+		ODP_ERR("Failed to allocate Ring buffer");
+		return -1;
+	}
+	for (i = 0; i < rx_config->n_rings; ++i) {
+		odp_buffer_ring_init(&ifce->rings[i], addr, ring_size);
+		rx_config->rings[i] = &ifce->rings[i];
+		addr += ring_size;
+	}
+	/* Copy config to Thread data */
+	memcpy(&ifce->rx_config, rx_config, sizeof(*rx_config));
+	__k1_wmb();
 
 	/* Push Context to handling threads */
 	odp_rwlock_write_lock(&rx_hdl.lock);
 	{
 		INVALIDATE(&rx_hdl);
-
-		for (i = rx_config->min_port; i <= rx_config->max_port; ++i)
-			rx_hdl.tag[i].pktio_id = rx_config->pktio_id;
 
 		/* Allocate one packet to put all the broken ones
 		 * coming from the NoC */
@@ -765,12 +764,17 @@ int rx_thread_link_start(const rx_config_t *rx_config)
 					mppa_noc_dnoc_rx_free(dma_if,
 							      rx_config->min_port + n_rx);
 				}
-				return -1;
+				ret = -1;
+				odp_rwlock_write_unlock(&rx_hdl.lock);
+				goto rx_fail;
 			}
 			hdr = odp_packet_hdr(rx_hdl.drop_pkt);
 			rx_hdl.drop_pkt_ptr = hdr->buf_hdr.addr;
 			rx_hdl.drop_pkt_len = hdr->frame_len;
 		}
+
+		for (i = rx_config->min_port; i <= rx_config->max_port; ++i)
+			rx_hdl.tag[i].pktio_id = rx_config->pktio_id;
 
 		for (uint32_t i = 0; i < odp_global_data.n_rx_thr; ++i) {
 			rx_th_t *th = &rx_hdl.th[i];
@@ -795,6 +799,11 @@ int rx_thread_link_start(const rx_config_t *rx_config)
 	}
 	odp_rwlock_write_unlock(&rx_hdl.lock);
 	return 0;
+
+ rx_fail:
+	free(ifce->rings[0].buf_ptrs);
+
+	return ret;
 }
 
 int rx_thread_link_stop(uint8_t pktio_id)
@@ -848,6 +857,19 @@ int rx_thread_link_stop(uint8_t pktio_id)
 		odp_packet_free_multi(&rx_hdl.drop_pkt, 1);
 		rx_hdl.drop_pkt = ODP_PACKET_INVALID;
 	}
+	for (uint32_t i = 0; i < ifce->rx_config.n_rings; ++i){
+		/** free all the buffers */
+		odp_buffer_hdr_t * buffers[10];
+		int nbufs;
+		while ((nbufs = odp_buffer_ring_get_multi(&ifce->rings[i],
+							  buffers, 10, 0,
+							  NULL)) > 0) {
+			odp_buffer_free_multi((odp_buffer_t*)buffers,
+					      nbufs);
+		}
+	}
+	free(ifce->rings[0].buf_ptrs);
+
 	odp_rwlock_write_unlock(&rx_hdl.lock);
 
 
@@ -873,18 +895,6 @@ int rx_thread_link_close(uint8_t pktio_id)
 	ifce->rx_config.min_port = -1;
 	ifce->rx_config.max_port = -1;
 
-	for (uint32_t i = 0; i < ifce->rx_config.n_rings; ++i){
-		/** free all the buffers */
-		odp_buffer_hdr_t * buffers[10];
-		int nbufs;
-		while ((nbufs = odp_buffer_ring_get_multi(&ifce->rings[i],
-							  buffers, 10, 0,
-							  NULL)) > 0) {
-			odp_buffer_free_multi((odp_buffer_t*)buffers,
-					      nbufs);
-		}
-	}
-	free(ifce->rings[0].buf_ptrs);
 	ifce->status = RX_IFCE_DOWN;
 
 	__k1_wmb();

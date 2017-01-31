@@ -277,6 +277,7 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		eth->rx_config.if_type = RX_IF_TYPE_ETH;
 		eth->rx_config.pktio_id = RX_ETH_IF_BASE + slot_id * MAX_ETH_PORTS + eth->port_id;
 		eth->rx_config.header_sz = sizeof(mppa_ethernet_header_t);
+		eth->rx_config.n_rings = 1;
 		ret = rx_thread_link_open(&eth->rx_config, &eth->rx_opts);
 		if(ret < 0)
 			return -1;
@@ -420,6 +421,7 @@ static int eth_start(pktio_entry_t * const pktio_entry)
 		pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 		int ret;
 
+		eth->rx_config.n_rings = pktio_entry->s.num_in_queue;
 		ret = rx_thread_link_start(&eth->rx_config);
 		if (ret)
 			return ret;

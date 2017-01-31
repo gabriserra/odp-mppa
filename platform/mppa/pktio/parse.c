@@ -20,7 +20,6 @@ void rx_options_default(rx_opts_t *options)
 	options->flow_controlled = 0;
 	options->min_rx = -1;
 	options->max_rx = -1;
-	options->n_rings = 1;
 }
 
 int rx_parse_options(const char **str, rx_opts_t *options)
