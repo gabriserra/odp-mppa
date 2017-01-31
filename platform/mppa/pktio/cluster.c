@@ -644,6 +644,19 @@ static int cluster_link_status(pktio_entry_t *pktio_entry)
 
 }
 
+static int cluster_capability(pktio_entry_t *pktio_entry ODP_UNUSED,
+			      odp_pktio_capability_t *capa)
+{
+	return rx_thread_capability(capa);
+}
+
+static int cluster_config(pktio_entry_t *pktio_entry,
+		      const odp_pktio_config_t *config)
+{
+	pkt_cluster_t *pkt_cluster = &pktio_entry->s.pkt_cluster;
+
+	return rx_thread_config(&pkt_cluster->rx_config, config);
+}
 const pktio_if_ops_t cluster_pktio_ops = {
 	.name = "cluster",
 	.init = cluster_init,
@@ -660,4 +673,6 @@ const pktio_if_ops_t cluster_pktio_ops = {
 	.promisc_mode_get = cluster_promisc_mode,
 	.mac_get = cluster_mac_addr_get,
 	.link_status = cluster_link_status,
+	.capability = cluster_capability,
+	.config = cluster_config,
 };
