@@ -60,7 +60,8 @@ typedef struct {
 
 	enum {
 		RX_IFCE_DOWN,
-		RX_IFCE_UP
+		RX_IFCE_OPENED,
+		RX_IFCE_STARTED,
 	} status;
 } rx_ifce_t;
 
@@ -730,6 +731,7 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 
 	for (i = rx_config->min_port; i <= rx_config->max_port; ++i)
 		_configure_rx(rx_config, i);
+	ifce->status = RX_IFCE_OPENED;
 
 	/* Push Context to handling threads */
 	odp_rwlock_write_lock(&rx_hdl.lock);
@@ -748,7 +750,7 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 				ODP_ERR("failed to allocate a packet\n");
 				for ( ; n_rx >= 0; --n_rx) {
 					mppa_noc_dnoc_rx_free(dma_if,
-							      first_rx + n_rx);
+							      rx_config->min_port + n_rx);
 				}
 				return -1;
 			}
@@ -764,8 +766,8 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 			memset(&th->ifce[rx_config->pktio_id], sizeof(rx_ifce_th_t), 0);
 
 			for (int j = 0; j < 4; ++j) {
-				th->ev_masks[j] |= ev_masks[i][j];
-				if (ev_masks[i][j]) {
+				th->ev_masks[j] |= th->ifce[rx_config->pktio_id].ev_masks[j];
+				if (th->ifce[rx_config->pktio_id].ev_masks[j]) {
 					if (j < th->min_mask)
 						th->min_mask = j;
 					if (j > th->max_mask)
@@ -774,12 +776,12 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 			}
 		}
 
-		ifce->status = RX_IFCE_UP;
+		ifce->status = RX_IFCE_STARTED;
 		rx_hdl.if_opened++;
 		odp_atomic_add_u64(&rx_hdl.update_id, 1ULL);
 	}
 	odp_rwlock_write_unlock(&rx_hdl.lock);
-	return first_rx;
+	return 0;
 }
 
 int rx_thread_link_close(uint8_t pktio_id)
