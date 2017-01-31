@@ -43,6 +43,8 @@ typedef struct {
 
 typedef struct {
 	rx_buffer_list_t hdr_list[MAX_MQUEUES];
+	uint64_t ev_masks[N_EV_MASKS];    /**< Mask to isolate events that
+					   * belong to us (pktio, thread)*/
 	uint32_t queue_mask;
 	uint64_t recv_pkts;
 	uint64_t dropped_pkts;
@@ -51,7 +53,7 @@ typedef struct {
 
 typedef struct {
 	uint64_t ev_masks[N_EV_MASKS];    /**< Mask to isolate events that
-					   * belong to us */
+					   * belong to us (pktio)*/
 	uint8_t pool_id;
 	rx_config_t rx_config;
 	odp_buffer_ring_t rings[MAX_MQUEUES];
@@ -694,6 +696,10 @@ int rx_thread_link_open(rx_config_t *rx_config, const rx_opts_t *opts)
 			}
 		}
 	}
+	/* Copy to per Thread/pktio struct */
+	for (th_id = 0; th_id < odp_global_data.n_rx_thr; ++th_id)
+		for (i = 0; i < 4; ++i)
+			rx_hdl.th[th_id].ifce[rx_config->pktio_id].ev_masks[i] = ev_masks[th_id][i];
 
 	rx_config->n_rings = opts->n_rings;
 	/* Setup buffer ring */
