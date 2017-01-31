@@ -36,6 +36,7 @@ int main()
 				"-i", "e0:tags=50,p0p0:tags=50,e1:tags=50,p1p0:tags=50",
 				"-m", "0",
 				"-s", "0",
+				"-d", "0",
 				"-c", "10", "--allow_fail", NULL
 			};
 

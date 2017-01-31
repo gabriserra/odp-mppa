@@ -52,6 +52,7 @@ int main(int argc, char *const argv[])
 				"-i", "e0:tags=120:min_payload=48:max_payload=48,e1:tags=120:min_payload=48:max_payload=48",
 				"-m", "0",
 				"-s", "0",
+				"-d", "0",
 				"-a", "2",
 				//"-S",
 				//"-t", "30",

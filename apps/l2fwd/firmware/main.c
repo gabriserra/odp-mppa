@@ -62,6 +62,7 @@ int main(int argc, char *const argv[])
 				"-i", "e0:tags=120:rrpolicy=120:rroffset=120,e1:tags=120:rrpolicy=120",
 				"-m", "0",
 				"-s", "0",
+				"-d", "0",
 				"-c", "10", NULL
 			};
 
