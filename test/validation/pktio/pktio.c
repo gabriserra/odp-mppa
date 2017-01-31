@@ -118,7 +118,7 @@ static inline void _pktio_wait_linkup(odp_pktio_t pktio)
 	if (ret != -1) {
 		/* assert only if link state supported and
 		 * it's down. */
-		CU_ASSERT_FATAL(ret == 1);
+		CU_ASSERT_FATAL("Link is down" && ret == 1);
 	}
 }
 
