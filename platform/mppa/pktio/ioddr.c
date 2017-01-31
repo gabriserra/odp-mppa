@@ -362,6 +362,20 @@ static int ioddr_link_status(pktio_entry_t *pktio_entry ODP_UNUSED)
 	return 1;
 }
 
+static int ioddr_capability(pktio_entry_t *pktio_entry ODP_UNUSED,
+			    odp_pktio_capability_t *capa)
+{
+	return rx_thread_capability(capa);
+}
+
+static int ioddr_config(pktio_entry_t *pktio_entry,
+			const odp_pktio_config_t *config)
+{
+	pkt_ioddr_t *ioddr = &pktio_entry->s.pkt_ioddr;
+
+	return rx_thread_config(&ioddr->rx_config, config);
+}
+
 const pktio_if_ops_t ioddr_pktio_ops = {
 	.name = "ioddr",
 	.init = ioddr_init,
@@ -378,4 +392,6 @@ const pktio_if_ops_t ioddr_pktio_ops = {
 	.promisc_mode_get = ioddr_promisc_mode,
 	.mac_get = ioddr_mac_addr_get,
 	.link_status = ioddr_link_status,
+	.capability = ioddr_capability,
+	.config = ioddr_config,
 };
