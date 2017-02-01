@@ -1218,8 +1218,6 @@ int packet_parse_common(packet_parser_t *prs, const uint8_t *ptr,
 	const uint8_t *parseptr;
 	uint16_t macaddr0, macaddr2, macaddr4;
 
-	INVALIDATE_AREA(ptr, seg_len);
-
 	offset = sizeof(_odp_ethhdr_t);
 	if (packet_parse_l2_not_done(prs))
 		packet_parse_l2(prs, frame_len);

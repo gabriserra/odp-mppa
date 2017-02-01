@@ -86,11 +86,11 @@ static inline void queue_add_list(queue_entry_t *queue,
 				  odp_buffer_hdr_t *buf_head,
 				  odp_buffer_hdr_t *buf_tail)
 {
-	odp_buffer_hdr_t ** q_tail = LOAD_PTR(queue->s.tail);
+	odp_buffer_hdr_t ** q_tail = queue->s.tail;
 
-	STORE_PTR(buf_tail->next, NULL);
-	STORE_PTR(queue->s.tail, &buf_tail->next);
-	STORE_PTR_IMM(q_tail, buf_head);
+	buf_tail->next = NULL;
+	queue->s.tail = &buf_tail->next;
+	*q_tail = buf_head;
 }
 
 static inline void queue_add_chain(queue_entry_t *queue,
@@ -266,6 +266,8 @@ static inline void reorder_complete(queue_entry_t *origin_qe,
 static inline void get_queue_order(queue_entry_t **origin_qe, uint64_t *order,
 				   odp_buffer_hdr_t *buf_hdr)
 {
+	ODP_ASSERT(CACHED_TO_UNCACHED(buf_hdr) == buf_hdr);
+
 	if (buf_hdr && buf_hdr->origin_qe) {
 		*origin_qe = buf_hdr->origin_qe;
 		*order     = buf_hdr->order;
@@ -360,13 +362,13 @@ static int ordered_queue_enq(queue_entry_t *queue, odp_buffer_hdr_t *buf_hdr,
 
 	/* Move the list from the reorder queue to the target queue */
 
-	odp_buffer_hdr_t ** q_tail = LOAD_PTR(queue->s.tail);
+	odp_buffer_hdr_t ** q_tail = queue->s.tail;
 
-	STORE_PTR(queue->s.tail, &reorder_tail->next);
-	STORE_PTR_IMM(q_tail, origin_qe->s.reorder_head);
+	queue->s.tail = &reorder_tail->next;
+	*q_tail = origin_qe->s.reorder_head;
 
-	STORE_PTR(origin_qe->s.reorder_head, reorder_tail->next);
-	STORE_PTR(reorder_tail->next, NULL);
+	origin_qe->s.reorder_head = reorder_tail->next;
+	reorder_tail->next = NULL;
 
 	/* Reflect resolved orders in the output sequence */
 	order_release(origin_qe, release_count + placeholder_count);

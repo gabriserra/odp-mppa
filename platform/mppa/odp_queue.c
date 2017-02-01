@@ -372,9 +372,9 @@ static int _queue_enq_update(queue_entry_t *queue, odp_buffer_hdr_t *head,
 
 	odp_buffer_hdr_t ** q_tail = queue->s.tail;
 
-	STORE_PTR(tail->next, NULL);
+	tail->next = NULL;
 	queue->s.tail = &tail->next;
-	STORE_PTR_IMM(q_tail, head);
+	*q_tail = head;
 
 	if (status == QUEUE_STATUS_NOTSCHED) {
 		queue->s.status = QUEUE_STATUS_SCHED;
@@ -487,8 +487,6 @@ odp_buffer_hdr_t *queue_deq(queue_entry_t *queue)
 		return NULL;
 	}
 
-	INVALIDATE((odp_packet_hdr_t*)buf_hdr);
-
 	/* Note that order should really be assigned on enq to an
 	 * ordered queue rather than deq, however the logic is simpler
 	 * to do it here and has the same effect.
@@ -545,7 +543,6 @@ int queue_deq_multi(queue_entry_t *queue, odp_buffer_hdr_t *buf_hdr[], int num)
 	}
 
 	for (i = 0; i < num && hdr; i++) {
-		INVALIDATE((odp_packet_hdr_t*)hdr);
 		buf_hdr[i]       = hdr;
 		hdr              = hdr->next;
 		buf_hdr[i]->next = NULL;
