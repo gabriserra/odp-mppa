@@ -136,7 +136,7 @@ typedef struct pool_table_t {
 
 
 /* The pool table */
-extern pool_table_t pool_tbl;
+extern pool_table_t *pool_tbl_ptr;
 
 #if defined(ODP_CONFIG_SECURE_POOLS) && (ODP_CONFIG_SECURE_POOLS == 1)
 #define buffer_is_secure(buf) (buf->flags.zeroized)
@@ -228,7 +228,7 @@ static inline uint32_t odp_buffer_pool_tailroom(odp_pool_t pool)
 static inline int pool_to_id(odp_pool_t pool)
 {
 	pool_entry_t * entry = odp_pool_to_entry(pool);
-	return entry - pool_tbl.pool;
+	return entry - pool_tbl_ptr->pool;
 }
 
 static inline odp_pool_t pool_handle(pool_entry_t *pool)

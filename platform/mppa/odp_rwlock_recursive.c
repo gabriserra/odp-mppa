@@ -13,10 +13,8 @@
 
 void odp_rwlock_recursive_init(odp_rwlock_recursive_t *rlock)
 {
-	INVALIDATE(rlock);
 	memset(rlock, 0, sizeof(odp_rwlock_recursive_t));
 	rlock->wr_owner = NO_OWNER;
-	__builtin_k1_wpurge();
 	odp_rwlock_init(&rlock->lock);
 }
 
@@ -69,13 +67,13 @@ void odp_rwlock_recursive_write_lock(odp_rwlock_recursive_t *rlock)
 {
 	int thr = odp_thread_id();
 
-	if (LOAD_S32(rlock->wr_owner) == thr) {
+	if (rlock->wr_owner == thr) {
 		rlock->wr_cnt++;
 		return;
 	}
 
 	odp_rwlock_write_lock(&rlock->lock);
-	STORE_U32(rlock->wr_owner, thr);
+	rlock->wr_owner = thr;
 	rlock->wr_cnt   = 1;
 }
 
@@ -105,6 +103,6 @@ void odp_rwlock_recursive_write_unlock(odp_rwlock_recursive_t *rlock)
 	if (rlock->wr_cnt > 0)
 		return;
 
-	STORE_S32(rlock->wr_owner, NO_OWNER);
+	rlock->wr_owner = NO_OWNER;
 	odp_rwlock_write_unlock(&rlock->lock);
 }

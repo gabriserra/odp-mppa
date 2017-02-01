@@ -253,7 +253,6 @@ static void _ioddr_compute_pkt_size(odp_packet_t pkt)
 		((uint8_t *)pkt_hdr->buf_hdr.addr) +
 		pkt_hdr->headroom;
 
-	INVALIDATE(pkt_hdr);
 	packet_parse_reset(pkt_hdr);
 
 	union mppa_ethernet_header_info_t info;
@@ -262,7 +261,7 @@ static void _ioddr_compute_pkt_size(odp_packet_t pkt)
 	mppa_ethernet_header_t * const header =
 		(mppa_ethernet_header_t *)hdr_addr;
 
-	info.dword = LOAD_U64(header->info.dword);
+	info.dword = header->info.dword;
 	const unsigned frame_len =
 		info._.pkt_size - sizeof(mppa_ethernet_header_t);
 	pull_tail(pkt_hdr, pkt_hdr->frame_len - frame_len);

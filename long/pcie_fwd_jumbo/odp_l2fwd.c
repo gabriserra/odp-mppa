@@ -783,9 +783,9 @@ static int print_speed_stats(int num_workers, stats_t *thr_stats,
 		sleep(timeout);
 
 		for (i = 0; i < num_workers; i++) {
-			pkts += LOAD_U64(thr_stats[i].s.packets);
-			rx_drops += LOAD_U64(thr_stats[i].s.rx_drops);
-			tx_drops += LOAD_U64(thr_stats[i].s.tx_drops);
+			pkts += thr_stats[i].s.packets;
+			rx_drops += thr_stats[i].s.rx_drops;
+			tx_drops += thr_stats[i].s.tx_drops;
 		}
 		if (stats_enabled) {
 			pps = (pkts - pkts_prev) / timeout;

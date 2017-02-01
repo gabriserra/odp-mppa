@@ -29,7 +29,7 @@ extern "C" {
 typedef ODP_HANDLE_T(odp_shm_t);
 
 /* Returns uncached memory */
-#define _ODP_SHM_UNCACHED    0x8UL
+#define _ODP_SHM_CACHED    0x8UL
 
 #define ODP_SHM_INVALID _odp_cast_scalar(odp_shm_t, 0)
 #define ODP_SHM_NULL ODP_SHM_INVALID

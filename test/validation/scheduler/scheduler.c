@@ -523,7 +523,6 @@ static int chaos_thread(void *arg)
 
 		cbuf = odp_buffer_addr(odp_buffer_from_event(ev));
 		CU_ASSERT_FATAL(cbuf != NULL);
-		INVALIDATE(cbuf);
 		if (CHAOS_DEBUG)
 			printf("Thread %d received event %" PRIu64
 			       " seq %" PRIu64
@@ -702,7 +701,6 @@ static int schedule_common_(void *arg)
 		num = 0;
 
 		odp_ticketlock_lock(&globals->lock);
-		INVALIDATE(globals);
 		if (globals->buf_count == 0) {
 			odp_ticketlock_unlock(&globals->lock);
 			break;
@@ -757,8 +755,6 @@ static int schedule_common_(void *arg)
 					odp_buffer_from_event(events[0]));
 				for (ndx = 0; ndx < ndx_max; ndx++) {
 					odp_schedule_order_lock(ndx);
-					INVALIDATE(qctx);
-					INVALIDATE(bctx);
 					CU_ASSERT(bctx->sequence ==
 						  qctx->lock_sequence[ndx]);
 					qctx->lock_sequence[ndx] += num;
@@ -798,8 +794,6 @@ static int schedule_common_(void *arg)
 
 				for (ndx = 0; ndx < ndx_max; ndx++) {
 					odp_schedule_order_lock(ndx);
-					INVALIDATE(qctx);
-					INVALIDATE(bctx);
 					CU_ASSERT(bctx->sequence ==
 						  qctx->lock_sequence[ndx]);
 					qctx->lock_sequence[ndx] += num;
@@ -833,7 +827,6 @@ static int schedule_common_(void *arg)
 			odp_schedule_release_ordered();
 
 		odp_ticketlock_lock(&globals->lock);
-		INVALIDATE(globals);
 
 		globals->buf_count -= num;
 		if (globals->buf_count < 0) {
@@ -1611,33 +1604,33 @@ odp_testinfo_t scheduler_suite[] = {
 	ODP_TEST_INFO(scheduler_test_pause_resume),
 	ODP_TEST_INFO(scheduler_test_parallel),
 	ODP_TEST_INFO(scheduler_test_atomic),
-	/* ODP_TEST_INFO(scheduler_test_ordered), */
+	ODP_TEST_INFO(scheduler_test_ordered),
 	/* ODP_TEST_INFO(scheduler_test_chaos), */
 	ODP_TEST_INFO(scheduler_test_1q_1t_n),
 	ODP_TEST_INFO(scheduler_test_1q_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_1q_1t_o), */
+	ODP_TEST_INFO(scheduler_test_1q_1t_o),
 	ODP_TEST_INFO(scheduler_test_mq_1t_n),
 	ODP_TEST_INFO(scheduler_test_mq_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_mq_1t_o), */
+	ODP_TEST_INFO(scheduler_test_mq_1t_o),
 	ODP_TEST_INFO(scheduler_test_mq_1t_prio_n),
 	ODP_TEST_INFO(scheduler_test_mq_1t_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_mq_1t_prio_o), */
+	ODP_TEST_INFO(scheduler_test_mq_1t_prio_o),
 	ODP_TEST_INFO(scheduler_test_mq_mt_prio_n),
 	ODP_TEST_INFO(scheduler_test_mq_mt_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_mq_mt_prio_o), */
+	ODP_TEST_INFO(scheduler_test_mq_mt_prio_o),
 	ODP_TEST_INFO(scheduler_test_1q_mt_a_excl),
 	ODP_TEST_INFO(scheduler_test_multi_1q_1t_n),
 	ODP_TEST_INFO(scheduler_test_multi_1q_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_1q_1t_o), */
+	ODP_TEST_INFO(scheduler_test_multi_1q_1t_o),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_n),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_mq_1t_o), */
+	ODP_TEST_INFO(scheduler_test_multi_mq_1t_o),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_n),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_o), */
+	ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_o),
 	ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_n),
 	ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_o), */
+	ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_o),
 	ODP_TEST_INFO(scheduler_test_multi_1q_mt_a_excl),
 	ODP_TEST_INFO_NULL,
 };

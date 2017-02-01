@@ -135,7 +135,7 @@ static int schedule_init_global(void)
 
 	shm = odp_shm_reserve("odp_scheduler",
 			      sizeof(sched_global_t),
-			      ODP_CACHE_LINE_SIZE, _ODP_SHM_UNCACHED);
+			      ODP_CACHE_LINE_SIZE, _ODP_SHM_CACHED);
 
 	sched = odp_shm_addr(shm);
 
@@ -567,7 +567,7 @@ static int do_schedule(odp_queue_t *out_queue, odp_event_t out_ev[],
 				continue;
 
 			buf       = odp_buffer_from_event(ev);
-			sched_cmd = CACHED_TO_UNCACHED(odp_buffer_addr(buf));
+			sched_cmd = odp_buffer_addr(buf);
 			qi        = sched_cmd->queue_index;
 			grp       = sched_cb_queue_grp(qi);
 
