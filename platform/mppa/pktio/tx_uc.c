@@ -143,8 +143,9 @@ static int _tx_uc_send_packets(const pkt_tx_uc_config *tx_config,
 		pkt_hdr = odp_packet_hdr(pkt_table[i]);
 
 		int len = pkt_hdr->frame_len;
-		uint8_t * base_addr = (uint8_t*)pkt_hdr->buf_hdr.addr +
-			pkt_hdr->headroom;
+		uint8_t * base_addr =
+			UNCACHED_TO_CACHED((uint8_t*)pkt_hdr->buf_hdr.addr +
+					   pkt_hdr->headroom);
 
 		if (len > mtu) {
 			pkt_count = i;

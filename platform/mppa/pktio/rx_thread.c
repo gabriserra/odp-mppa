@@ -137,8 +137,8 @@ static int _configure_rx(rx_config_t *rx_config, int rx_id)
 
 	int ret;
 	mppa_noc_dnoc_rx_configuration_t conf = {
-		.buffer_base = (unsigned long)pkt_hdr->buf_hdr.addr +
-		rx_config->pkt_offset,
+		.buffer_base = UNCACHED_TO_CACHED((unsigned long)pkt_hdr->buf_hdr.addr +
+						  rx_config->pkt_offset),
 		.buffer_size = pkt_hdr->buf_hdr.size -
 		1 * rx_config->header_sz,
 		.current_offset = 0,
@@ -331,7 +331,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		 * buffer to receive NoC packet but drop
 		 * the frame */
 		rx_queue->buffer_base.dword =
-			(unsigned long)rx_hdl.drop_pkt_ptr;
+			UNCACHED_TO_CACHED((unsigned long)rx_hdl.drop_pkt_ptr);
 		rx_queue->buffer_size.dword = rx_hdl.drop_pkt_len;
 		/* We willingly do not change the offset here as we want
 		 * to spread DMA Rx within the drop_pkt buffer */
@@ -342,9 +342,10 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		newpkt = rx_pool->spares[--rx_pool->n_spares];
 		pkt_hdr = odp_packet_hdr(newpkt);
 
-		rx_queue->buffer_base.dword = (unsigned long)
-			((uint8_t *)(pkt_hdr->buf_hdr.addr) +
-			 rx_config->pkt_offset);
+		rx_queue->buffer_base.dword =
+			UNCACHED_TO_CACHED((unsigned long)
+					   ((uint8_t *)(pkt_hdr->buf_hdr.addr) +
+					    rx_config->pkt_offset));
 
 		/* Rearm the DMA Rx and check for droppped packets */
 		rx_queue->current_offset.reg = 0ULL;
@@ -364,7 +365,7 @@ static uint64_t _reload_rx(int th_id, int rx_id, uint64_t *mask)
 		 * We will drop those next ones anyway ! */
 		if (newpkt != ODP_PACKET_INVALID) {
 			rx_queue->buffer_base.dword =
-				(unsigned long)rx_hdl.drop_pkt_ptr;
+				UNCACHED_TO_CACHED((unsigned long)rx_hdl.drop_pkt_ptr);
 			rx_queue->buffer_size.dword = rx_hdl.drop_pkt_len;
 			/* Value was still in rx_pool. No need to store it again */
 			rx_pool->n_spares++;
