@@ -223,6 +223,10 @@ odp_shm_t odp_shm_reserve(const char *name, uint64_t size, uint64_t align,
 
 	/* move to correct alignment */
 	addr = ODP_ALIGN_ROUNDUP_PTR(addr, align);
+	if (flags & _ODP_SHM_CACHED)
+		addr = UNCACHED_TO_CACHED(addr);
+	else
+		addr = CACHED_TO_UNCACHED(addr);
 
 	strncpy(block->name, name, ODP_SHM_NAME_LEN - 1);
 	block->name[ODP_SHM_NAME_LEN - 1] = 0;
@@ -264,10 +268,7 @@ void *odp_shm_addr(odp_shm_t shm)
 	if (i > (ODP_CONFIG_SHM_BLOCKS - 1))
 		return NULL;
 
-	if (odp_shm_tbl->block[i].flags & _ODP_SHM_UNCACHED)
-		return CACHED_TO_UNCACHED(odp_shm_tbl->block[i].addr);
-	else
-		return odp_shm_tbl->block[i].addr;
+	return odp_shm_tbl->block[i].addr;
 }
 
 
