@@ -139,7 +139,6 @@ static void custom_barrier_wait(custom_barrier_t *custom_barrier)
 	}
 }
 
-
 static uint32_t barrier_test(per_thread_mem_t *per_thread_mem,
 			     odp_bool_t no_barrier_test)
 {
@@ -160,8 +159,8 @@ static uint32_t barrier_test(per_thread_mem_t *per_thread_mem,
 		/* Wait here until all of the threads reach this point */
 		custom_barrier_wait(&global_mem->custom_barrier1[cnt]);
 
-		barrier_cnt1 = LOAD_U32(global_mem->barrier_cnt1);
-		barrier_cnt2 = LOAD_U32(global_mem->barrier_cnt2);
+		barrier_cnt1 = global_mem->barrier_cnt1;
+		barrier_cnt2 = global_mem->barrier_cnt2;
 
 		if ((barrier_cnt1 != cnt) || (barrier_cnt2 != cnt)) {
 			printf("thread_num=%" PRIu32 " barrier_cnts of %" PRIu32
@@ -173,7 +172,7 @@ static uint32_t barrier_test(per_thread_mem_t *per_thread_mem,
 		/* Wait here until all of the threads reach this point */
 		custom_barrier_wait(&global_mem->custom_barrier2[cnt]);
 
-		slow_thread_num = LOAD_U32(global_mem->slow_thread_num);
+		slow_thread_num = global_mem->slow_thread_num;
 		i_am_slow_thread = thread_num == slow_thread_num;
 		next_slow_thread = slow_thread_num + 1;
 		if (num_threads < next_slow_thread)
@@ -190,9 +189,9 @@ static uint32_t barrier_test(per_thread_mem_t *per_thread_mem,
 		if (i_am_slow_thread) {
 			thread_delay(per_thread_mem, lock_owner_delay);
 			lock_owner_delay += BASE_DELAY;
-			if ((LOAD_U32(global_mem->barrier_cnt1) != cnt) ||
-			    (LOAD_U32(global_mem->barrier_cnt2) != cnt) ||
-			    (LOAD_U32(global_mem->slow_thread_num)
+			if ((global_mem->barrier_cnt1 != cnt) ||
+			    (global_mem->barrier_cnt2 != cnt) ||
+			    (global_mem->slow_thread_num
 					!= slow_thread_num))
 				barrier_errs++;
 		}
@@ -200,19 +199,16 @@ static uint32_t barrier_test(per_thread_mem_t *per_thread_mem,
 		if (no_barrier_test == 0)
 			odp_barrier_wait(&global_mem->test_barriers[cnt]);
 
-		STORE_U32(global_mem->barrier_cnt1, cnt + 1);
+		global_mem->barrier_cnt1 = cnt + 1;
 		odp_mb_full();
 
 		if (i_am_slow_thread) {
-			STORE_U32(global_mem->slow_thread_num, next_slow_thread);
-			STORE_U32(global_mem->barrier_cnt2, cnt + 1);
+			global_mem->slow_thread_num = next_slow_thread;
+			global_mem->barrier_cnt2 = cnt + 1;
 			odp_mb_full();
 		} else {
-			uint32_t cnt2 = LOAD_U32(global_mem->barrier_cnt2);
-			while (cnt2 != (cnt + 1)){
+			while (global_mem->barrier_cnt2 != (cnt + 1))
 				thread_delay(per_thread_mem, BASE_DELAY);
-				cnt2 = LOAD_U32(global_mem->barrier_cnt2);
-			}
 		}
 	}
 
