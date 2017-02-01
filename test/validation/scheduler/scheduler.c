@@ -1604,33 +1604,33 @@ odp_testinfo_t scheduler_suite[] = {
 	ODP_TEST_INFO(scheduler_test_pause_resume),
 	ODP_TEST_INFO(scheduler_test_parallel),
 	ODP_TEST_INFO(scheduler_test_atomic),
-	/* ODP_TEST_INFO(scheduler_test_ordered), */
+	ODP_TEST_INFO(scheduler_test_ordered),
 	/* ODP_TEST_INFO(scheduler_test_chaos), */
 	ODP_TEST_INFO(scheduler_test_1q_1t_n),
 	ODP_TEST_INFO(scheduler_test_1q_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_1q_1t_o), */
+	ODP_TEST_INFO(scheduler_test_1q_1t_o),
 	ODP_TEST_INFO(scheduler_test_mq_1t_n),
 	ODP_TEST_INFO(scheduler_test_mq_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_mq_1t_o), */
+	ODP_TEST_INFO(scheduler_test_mq_1t_o),
 	ODP_TEST_INFO(scheduler_test_mq_1t_prio_n),
 	ODP_TEST_INFO(scheduler_test_mq_1t_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_mq_1t_prio_o), */
+	ODP_TEST_INFO(scheduler_test_mq_1t_prio_o),
 	ODP_TEST_INFO(scheduler_test_mq_mt_prio_n),
 	ODP_TEST_INFO(scheduler_test_mq_mt_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_mq_mt_prio_o), */
+	ODP_TEST_INFO(scheduler_test_mq_mt_prio_o),
 	ODP_TEST_INFO(scheduler_test_1q_mt_a_excl),
 	ODP_TEST_INFO(scheduler_test_multi_1q_1t_n),
 	ODP_TEST_INFO(scheduler_test_multi_1q_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_1q_1t_o), */
+	ODP_TEST_INFO(scheduler_test_multi_1q_1t_o),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_n),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_mq_1t_o), */
+	ODP_TEST_INFO(scheduler_test_multi_mq_1t_o),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_n),
 	ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_o), */
+	ODP_TEST_INFO(scheduler_test_multi_mq_1t_prio_o),
 	ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_n),
 	ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_a),
-	/* ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_o), */
+	ODP_TEST_INFO(scheduler_test_multi_mq_mt_prio_o),
 	ODP_TEST_INFO(scheduler_test_multi_1q_mt_a_excl),
 	ODP_TEST_INFO_NULL,
 };
