@@ -42,7 +42,14 @@ struct odp_atomic_u32_s {
  */
 struct odp_atomic_u64_s {
 	union {
+#ifdef ODP_ENABLE_CAS64
 		uint64_t v;
+#else
+		struct {
+			uint64_t v: 63;
+			uint8_t lock : 1;
+		};
+#endif
 		uint64_t _type;
 		uint64_t _u64;
 	};
@@ -51,7 +58,6 @@ struct odp_atomic_u64_s {
 #endif
 } ODP_ALIGNED(sizeof(uint64_t)); /* Enforce alignement! */;
 
-#ifdef ODP_ENABLE_CAS64
 /**
  * @internal
  * Helper macro for lock-based atomic operations on 64-bit integers
@@ -59,17 +65,33 @@ struct odp_atomic_u64_s {
  * @param expr Expression used update the variable.
  * @return The old value of the variable.
  */
+#ifdef ODP_ENABLE_CAS64
 #define ATOMIC_OP(atom, expr) \
 	({										\
-		uint64_t _old_val;							\
+ 		uint64_t _old_val;							\
 		uint32_t _lock_zero = 0;						\
 		/* Loop while lock is already taken,					\
 		 * stop when lock becomes clear */					\
 		while (!odp_atomic_cas_u32(&(atom)->lock, &_lock_zero, 1))		\
 			_lock_zero = 0;							\
 		_old_val = LOAD_U64((atom)->v);						\
-		(expr); /* Perform whatever update is desired */			\
+		STORE_U64(atom->_u64, (expr)); /* Perform whatever update is desired */	\
 		odp_atomic_store_u32(&(atom)->lock, 0);					\
+ 		_old_val; /* Return old value */					\
+ 	})
+#else
+#define ATOMIC_OP(atom, expr) \
+	({										\
+		odp_atomic_u64_t _tmp;							\
+		uint64_t _old_val;							\
+		/* Loop while lock is already taken,					\
+		 * stop when lock becomes clear */					\
+		do {									\
+			_tmp._u64 = __builtin_k1_ldc(&atom->_u64);			\
+		} while(_tmp.lock == 0);						\
+		_old_val = _tmp.v;							\
+		_tmp.v = (expr); /* Perform whatever update is desired */		\
+		STORE_U64(atom->_u64, _tmp._u64);					\
 		_old_val; /* Return old value */					\
 	})
 #endif

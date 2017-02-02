@@ -17,6 +17,9 @@
 extern "C" {
 #endif
 
+/* Enable full 64bits atomics.
+ * When not set atomics are mostly lock less but are only 63 bits
+ */
 #define ODP_ENABLE_CAS64
 
 #include <stdint.h>
@@ -152,20 +155,41 @@ static inline void odp_atomic_min_u32(odp_atomic_u32_t *atom, uint32_t new_min)
 
 static inline uint64_t odp_atomic_load_u64(odp_atomic_u64_t *atom)
 {
+#ifdef ODP_ENABLE_CAS64
 	return LOAD_U64(atom->v);
+#else
+	odp_atomic_u64_t val;
+	do {
+		val._u64 = LOAD_U64(atom->_u64);
+	} while(val.lock == 0);
+	return val.v;
+#endif
+
 }
 
 static inline void odp_atomic_store_u64(odp_atomic_u64_t *atom,
 					uint64_t val)
 {
+#ifdef ODP_ENABLE_CAS64
 	return STORE_U64(atom->v, val);
+#else
+	odp_atomic_u64_t tmp;
+	tmp.v = val;
+	tmp.lock = 1;
+	return STORE_U64(atom->_u64, tmp._u64);
+#endif
 }
 
 static inline void odp_atomic_init_u64(odp_atomic_u64_t *atom, uint64_t val)
 {
-	STORE_U64(atom->v, val);
 #ifdef ODP_ENABLE_CAS64
+	STORE_U64(atom->v, val);
 	odp_atomic_store_u32(&atom->lock, 0);
+#else
+	odp_atomic_u64_t tmp;
+	tmp.v = val;
+	tmp.lock = 1;
+	STORE_U64(atom->_u64, tmp._u64);
 #endif
 }
 
@@ -173,11 +197,14 @@ static inline uint64_t odp_atomic_fetch_add_u64(odp_atomic_u64_t *atom,
 						uint64_t val)
 {
 #ifdef ODP_ENABLE_CAS64
-	return ATOMIC_OP(atom, STORE_U64(atom->v, _old_val + val));
+	return ATOMIC_OP(atom, _old_val + val);
 #else
-	unsigned long long val64 = val;
-	asm volatile ("afdau 0[%1] = %0\n;;\n" : "+r"(val64) : "r" (&atom->_u64): "memory");
-	return (unsigned)val64;
+	odp_atomic_u64_t tmp;
+	do {
+		tmp._u64 = val;
+		asm volatile ("afdau 0[%1] = %0\n;;\n" : "+r"(tmp._u64) : "r" (&atom->_u64): "memory");
+	} while(tmp.lock == 0);
+	return tmp.v;
 #endif
 }
 
@@ -185,11 +212,14 @@ static inline uint64_t odp_atomic_fetch_sub_u64(odp_atomic_u64_t *atom,
 						uint64_t val)
 {
 #ifdef ODP_ENABLE_CAS64
-	return ATOMIC_OP(atom, STORE_U64(atom->v, _old_val - val));
+	return ATOMIC_OP(atom, _old_val - val);
 #else
-	long long val64 = -val;
-	asm volatile ("afdau 0[%1] = %0\n;;\n" : "+r"(val64) : "r" (&atom->_u64): "memory");
-	return (unsigned)val64;
+	odp_atomic_u64_t tmp;
+	do {
+		tmp._u64 = -val;
+		asm volatile ("afdau 0[%1] = %0\n;;\n" : "+r"(tmp._u64) : "r" (&atom->_u64): "memory");
+	} while(tmp.lock == 0);
+	return tmp.v;
 #endif
 }
 
@@ -223,7 +253,6 @@ static inline void odp_atomic_dec_u64(odp_atomic_u64_t *atom)
 	odp_atomic_sub_u64(atom, 1ULL);
 }
 
-#ifdef ODP_ENABLE_CAS64
 static inline int odp_atomic_cas_u64(odp_atomic_u64_t *atom, uint64_t *old_val,
 				     uint64_t new_val)
 {
@@ -231,13 +260,12 @@ static inline int odp_atomic_cas_u64(odp_atomic_u64_t *atom, uint64_t *old_val,
 	ATOMIC_OP(atom,
 		  {
 			  if (_old_val == *old_val) {
-				  STORE_U64(atom->v, new_val);
 				  ret = 1;
 			  } else {
 				  ret = 0;
 			  }
 			  *old_val = _old_val;
-
+			  ret ? new_val : _old_val;
 		  });
 	return ret;
 }
@@ -245,7 +273,7 @@ static inline int odp_atomic_cas_u64(odp_atomic_u64_t *atom, uint64_t *old_val,
 static inline uint64_t odp_atomic_xchg_u64(odp_atomic_u64_t *atom,
 					   uint64_t new_val)
 {
-	return ATOMIC_OP(atom, STORE_U64(atom->v, new_val));
+	return ATOMIC_OP(atom, new_val);
 }
 
 static inline void odp_atomic_max_u64(odp_atomic_u64_t *atom, uint64_t new_max)
@@ -271,7 +299,6 @@ static inline void odp_atomic_min_u64(odp_atomic_u64_t *atom, uint64_t new_min)
 			break;
 	}
 }
-#endif
 
 static inline uint32_t odp_atomic_load_acq_u32(odp_atomic_u32_t *atom)
 {
@@ -338,7 +365,6 @@ static inline void odp_atomic_sub_rel_u64(odp_atomic_u64_t *atom,
 	odp_atomic_sub_u64(atom, val);
 }
 
-#ifdef ODP_ENABLE_CAS64
 static inline int odp_atomic_cas_acq_u64(odp_atomic_u64_t *atom,
 					 uint64_t *old_val, uint64_t new_val)
 {
@@ -357,7 +383,6 @@ static inline int odp_atomic_cas_acq_rel_u64(odp_atomic_u64_t *atom,
 {
 	return odp_atomic_cas_u64(atom, old_val, new_val);
 }
-#endif
 
 /**
  * @}

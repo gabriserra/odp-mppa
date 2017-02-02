@@ -25,6 +25,6 @@ int odp_atomic_lock_free_u64(odp_atomic_op_t *atomic_op)
 		atomic_op->op.init  = 0;
 	}
 
-	return 2;
+	return 1;
 #endif
 }
