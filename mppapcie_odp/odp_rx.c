@@ -68,7 +68,13 @@ int mpodp_clean_rx(struct mpodp_if_priv *priv, struct mpodp_rxq *rxq,
 
 		/* fill skb field */
 		skb_put(rx->skb, rx->len);
-		skb_record_rx_queue(rx->skb, rxq->id);
+
+		/* Mark the packet as already checksummed if
+		 * the NOCSUM config flag is set on the interface */
+		if (priv->config->flags & MPODP_CONFIG_NOCSUM)
+			rx->skb->ip_summed = CHECKSUM_UNNECESSARY; 
+
+ 		skb_record_rx_queue(rx->skb, rxq->id);
 		rx->skb->tstamp = now;
 
 		rx->skb->protocol = eth_type_trans(rx->skb, netdev);
