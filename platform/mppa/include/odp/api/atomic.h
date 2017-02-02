@@ -20,7 +20,7 @@ extern "C" {
 /* Enable full 64bits atomics.
  * When not set atomics are mostly lock less but are only 63 bits
  */
-#define ODP_ENABLE_CAS64
+//#define ODP_ENABLE_CAS64
 
 #include <stdint.h>
 #include <odp/api/align.h>

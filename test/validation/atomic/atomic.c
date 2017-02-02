@@ -20,7 +20,7 @@
 #define U32_INIT_VAL		(1UL << 10)
 #define U64_INIT_VAL		(1ULL << 33)
 #define U32_MAGIC		0xa23f65b2
-#define U64_MAGIC		0xf2e1c5430cb6a52e
+#define U64_MAGIC		0x72e1c5430cb6a52e
 
 #define GLOBAL_SHM_NAME		"GlobalLockTest"
 
