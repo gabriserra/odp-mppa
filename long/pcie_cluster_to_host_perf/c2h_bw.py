@@ -36,7 +36,7 @@ for size in packet_sizes:
 		"--exec-multibin=IODDR0:iopcie",
 		"--", "-c", "pcie_cluster_to_host_perf",
 		"-a",
-		"-I p0p0:nofree --srcmac fe:0f:97:c9:e0:44 --dstmac 02:de:ad:be:ef:00 --srcip 192.168.0.1 --dstip 192.168.0.2 -m u -P " + str(size) +" -i 0"
+		"-I p0p0:nofree --srcmac fe:0f:97:c9:e0:44 --dstmac 02:de:ad:be:ef:00 --srcip 192.168.0.1 --dstip 192.168.0.2 -P " + str(size) +" -i 0"
 	]
 	print "#",' '.join(jtag_cmd)
 	jtag_p = subprocess.Popen(jtag_cmd, stdout = subprocess.PIPE)
