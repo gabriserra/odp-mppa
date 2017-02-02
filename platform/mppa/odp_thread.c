@@ -10,6 +10,7 @@
 #include <sched.h>
 
 #include <odp/thread.h>
+#include <odp/atomic.h>
 #include <odp/thrmask.h>
 #include <odp_internal.h>
 #include <odp/spinlock.h>
@@ -148,6 +149,7 @@ int odp_thread_init_local(odp_thread_type_t type)
 	int cpu;
 
 	odp_spinlock_lock(&thread_globals->lock);
+	INVALIDATE(thread_globals);
 	id = alloc_id(type);
 	odp_spinlock_unlock(&thread_globals->lock);
 
@@ -181,6 +183,7 @@ int odp_thread_term_local(void)
 	int id = this_thread->thr;
 
 	odp_spinlock_lock(&thread_globals->lock);
+	INVALIDATE(thread_globals);
 	num = free_id(id);
 	odp_spinlock_unlock(&thread_globals->lock);
 
@@ -214,12 +217,14 @@ odp_thread_type_t odp_thread_type(void)
 
 int odp_thrmask_worker(odp_thrmask_t *mask)
 {
+	INVALIDATE(thread_globals);
 	odp_thrmask_copy(mask, &thread_globals->worker);
 	return thread_globals->num_worker;
 }
 
 int odp_thrmask_control(odp_thrmask_t *mask)
 {
+	INVALIDATE(thread_globals);
 	odp_thrmask_copy(mask, &thread_globals->control);
 	return thread_globals->num_control;
 }
