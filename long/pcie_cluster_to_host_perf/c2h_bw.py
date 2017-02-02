@@ -47,6 +47,7 @@ for size in packet_sizes:
 			o = "# " + line
 			print o,
 			if "[13] created mode: SEND" in line:
+				os.kill(jtag_p.pid, signal.SIGSTOP)
 				break
 		time.sleep(2)
 		packets_src_str = os.popen("cat /proc/net/dev | grep " + ifce +" | awk '{ print $3}'").read()
