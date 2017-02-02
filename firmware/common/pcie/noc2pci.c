@@ -105,7 +105,7 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 	uint32_t left;
 	mppa_noc_dnoc_rx_configuration_t conf = MPPA_NOC_DNOC_RX_CONFIGURATION_INIT;
 	int ret;
-	while ( buffer_ring_get_multi(&g_free_buf_pool, &buf, 1, &left) == -1 );
+	while ( buffer_ring_get_multi(&g_free_buf_pool, &buf, 1, &left) != 1 );
 
 	iface->rx_cfgs[rx_id].mapped_buf = buf;
 
