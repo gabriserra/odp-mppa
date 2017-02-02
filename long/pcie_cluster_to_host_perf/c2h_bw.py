@@ -60,6 +60,8 @@ for size in packet_sizes:
 		perff.write("PPS " + test_name + str(pps) + "\n")
 		perff.write("MBPS " + test_name + str(bw_mbps) + "\n")
 
+                print "Start:" + packets_src_str + " End:" + packets_dst_str + " PPS:" + \
+                        str(pps) + " MBPS:" + str(bw_mbps)
 		os.kill(jtag_p.pid, signal.SIGCONT)
 
 		jtag_p.kill()
