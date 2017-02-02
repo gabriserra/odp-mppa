@@ -85,11 +85,31 @@ int netdev_c2h_is_full(struct mpodp_if_config *cfg, uint32_t c2h_q)
 	return 0;
 }
 
+void netdev_c2h_flush(struct mpodp_if_config *cfg,
+		     uint32_t c2h_q, int it)
+{
+
+	struct mpodp_ring_buff_desc *c2h =
+		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
+	uint64_t h_tail_addr = c2h->h_tail_addr;
+	if (!h_tail_addr) {
+		__builtin_k1_dinvall(&c2h->h_tail_addr);
+		h_tail_addr = c2h->h_tail_addr;
+	}
+
+	if (h_tail_addr) {
+		__k1_pcie_write_32(h_tail_addr, c2h->tail);
+	}
+
+	if (it)
+		mppa_pcie_send_it_to_host();
+}
+
 int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 			    uint32_t c2h_q,
 			    struct mpodp_c2h_entry *data,
 			    struct mpodp_c2h_entry *old_entry,
-			    int it)
+			    int it, int flush)
 {
 	struct mpodp_ring_buff_desc *c2h =
 		(void*)(unsigned long)cfg->c2h_addr[c2h_q];
@@ -145,21 +165,12 @@ int netdev_c2h_enqueue_data(struct mpodp_if_config *cfg,
 	c2h->tail = next_tail;
 	/* __k1_wmb(); */
 
-	uint64_t h_tail_addr = c2h->h_tail_addr;
-	if (!h_tail_addr) {
-		__builtin_k1_dinvall(&c2h->h_tail_addr);
-		h_tail_addr = c2h->h_tail_addr;
-	}
-
-	if (h_tail_addr) {
-		__k1_pcie_write_32(h_tail_addr, next_tail);
-	}
+	if (flush)
+		netdev_c2h_flush(cfg, c2h_q, it);
 
 #ifdef NETDEV_VERBOSE
 	printf("C2H data 0x%lx pushed in if:%p | at offset:%lu\n", data->pkt_addr, cfg, tail);
 #endif
-	if (it)
-		mppa_pcie_send_it_to_host();
 
 	return 0;
 }
