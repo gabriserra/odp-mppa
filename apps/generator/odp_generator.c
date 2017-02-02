@@ -418,10 +418,10 @@ static int gen_send_thread(void *arg)
 		int err;
 
 		err = odp_pktout_send(pktout, pkt, PKT_BURST_SZ);
+		if (err > 0)
+			odp_atomic_fetch_add_u64(&counters.seq, err);
 		if (err != PKT_BURST_SZ) {
-			odp_atomic_add_u64(&counters.tx_drops, 1);
-			odp_time_wait_ns(ODP_TIME_MSEC_IN_NS);
-			continue;
+			odp_atomic_add_u64(&counters.tx_drops, PKT_BURST_SZ - err);
 		}
 
 		static uint64_t toto = 0;
