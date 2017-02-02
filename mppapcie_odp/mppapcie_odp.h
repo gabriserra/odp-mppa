@@ -30,7 +30,11 @@
 /**
  * Flags for config flags
  */
-#define MPODP_CONFIG_DISABLED		(1 << 0)
+#define MPODP_CONFIG_DISABLED		(1 << 0)  /*< This interface is disabled and
+						   *  should not be brought up */
+#define MPODP_CONFIG_NOCSUM		(1 << 1)  /*< Disable all checksumming (Tx/Rx).
+						   *  External (ETH) packets must be checksumed
+						   *  by the clusters */
 
 /**
  * Maximum number of Tx queues

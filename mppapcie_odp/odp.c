@@ -285,6 +285,8 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 	netdev->mtu = config->mtu < 1500 ? config->mtu : 1500;
 	memcpy(netdev->dev_addr, &(config->mac_addr), 6);
 	netdev->features |= NETIF_F_SG | NETIF_F_HIGHDMA;
+	if (config->flags & MPODP_CONFIG_NOCSUM)
+		netdev->features |= NETIF_F_HW_CSUM;
 	mpodp_set_ethtool_ops(netdev);
 
 	/* init priv */
@@ -463,8 +465,9 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		    (unsigned long) priv);
 
 	if (netif_msg_probe(priv))
-		printk(KERN_INFO "Registered netdev for %s (txq:%d, rxq:%d)\n",
-		       netdev->name, priv->n_txqs, priv->n_rxqs);
+		printk(KERN_INFO "Registered netdev for %s (txq:%d, rxq:%d csum:%d)\n",
+		       netdev->name, priv->n_txqs, priv->n_rxqs,
+		       !(priv->config->flags & MPODP_CONFIG_NOCSUM));
 
 	return netdev;
 
