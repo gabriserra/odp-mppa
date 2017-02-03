@@ -307,7 +307,7 @@ $(foreach B, $(_BOARDS), \
 $(foreach B, $(BOARDS), \
  $(eval BOARD_$(B)-debug     := $(BOARD_$(B))) \
  $(eval BOARD_$(B)-debug_VER := $(BOARD_$(B)_VER)-debug) \
- $(eval BOARDS += $(B)-debug))
+ $(eval _BOARDS += $(B)-debug))
 #
 #
 #
