@@ -26,6 +26,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 
 	if (netdev_c2h_is_full(cfg, c2h_q)) {
 		dbg_printf("PCIe eth tx is full !!!\n");
+		netdev_c2h_flush(cfg, c2h_q, __builtin_k1_lwu(&cfg->interrupt_status));
 		return;
 	}
 
@@ -47,6 +48,8 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 			do {
 				ret = netdev_c2h_enqueue_data(cfg, c2h_q, &buf->pkts[pkt_idx], &free_pkt,
 							      interrupt_status, do_flush);
+				if (ret < 0)
+					netdev_c2h_flush(cfg, c2h_q, __builtin_k1_lwu(&cfg->interrupt_status));
 			} while (ret < 0);
 
 			if (free_pkt.data)
