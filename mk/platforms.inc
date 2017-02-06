@@ -119,7 +119,7 @@ $(foreach config,$(_CONFIGS), \
 
 $(foreach config,$(K1_CONFIGS), \
   $(eval $(call DEBUG_CONFIG_RULE,$(config))) \
-  $(eval K1_CONFIGS += $(config)-debug) \
+  $(eval _CONFIGS += $(config)-debug) \
 )
 
 CONFIGS += $(K1_CONFIGS)
