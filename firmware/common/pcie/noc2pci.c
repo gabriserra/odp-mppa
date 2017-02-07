@@ -10,8 +10,6 @@
 #include "internal/noc2pci.h"
 #include "pcie.h"
 
-#define PKT_BURSTINESS 32
-
 static uint64_t pkt_count[MPPA_PCIE_ETH_IF_MAX] = {0};
 static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 {
@@ -25,8 +23,8 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 	const int interrupt_status = __builtin_k1_lwu(&cfg->interrupt_status);
 
 	if (netdev_c2h_is_full(cfg, c2h_q)) {
-		dbg_printf("PCIe eth tx is full !!!\n");
 		netdev_c2h_flush(cfg, c2h_q, __builtin_k1_lwu(&cfg->interrupt_status));
+		dbg_printf("PCIe eth c2h %ld is full !!!\n", c2h_q);
 		return;
 	}
 
@@ -34,9 +32,8 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 					MPPA_PCIE_MULTIBUF_BURST, NULL);
 	if (nb_bufs == 0)
 		return;
-	assert(ret <= MPPA_PCIE_MULTIBUF_COUNT);
 
-	dbg_printf("%d buffer ready to be sent\n", nb_bufs);
+	dbg_printf("c2hq:%ld %d multibufs ready to be sent\n", c2h_q, nb_bufs);
 	for(buf_idx = 0, count = 0; buf_idx < nb_bufs; buf_idx++) {
 		buf = bufs[buf_idx];
 
@@ -44,7 +41,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 			/* Read header from packet */
 			count++;
 			local_pkt_count++;
-			do_flush = (count % PKT_BURSTINESS == 0);
+			do_flush = (count % MPPA_PCIE_PKT_BURSTINESS == 0);
 			do {
 				ret = netdev_c2h_enqueue_data(cfg, c2h_q, &buf->pkts[pkt_idx], &free_pkt,
 							      interrupt_status, do_flush);
@@ -62,6 +59,7 @@ static void poll_noc_rx_buffer(int pcie_eth_if, uint32_t c2h_q)
 		pkt_count[pcie_eth_if]++;
 		dbg_printf("%d packets handled, total %llu\n", buf->pkt_count, pkt_count[pcie_eth_if]);
 	}
+	dbg_printf("%ld packets handled on c2hq %ld\n", local_pkt_count, c2h_q);
 
 	if (!do_flush) {
 		netdev_c2h_flush(cfg, c2h_q, __builtin_k1_lwu(&cfg->interrupt_status));

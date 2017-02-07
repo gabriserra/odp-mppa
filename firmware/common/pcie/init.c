@@ -43,27 +43,49 @@ static int pcie_init_buff_pools()
 	mppa_pcie_noc_rx_buf_t *bufs[MPPA_PCIE_MULTIBUF_BURST];
 	unsigned i, j;
 	uint32_t buf_left;
-	int n_pools = 1;
+	unsigned n_pools = 0;
+	unsigned n_mbufs = 0;
+
 	for (i = 0; i < eth_ctrl->if_count; ++i) {
 		n_pools += eth_ctrl->configs[i].n_rxqs;
+		/* Buffer for all Rxs + spares */
+		n_mbufs += 2 * BSP_NB_CLUSTER_MAX * MPPA_PCIE_NOC_RX_NB;
+		/* Buffer between Noc2PCI Thr and Host */
+		for (j = 0; j < eth_ctrl->configs[i].n_rxqs; ++j) {
+			struct mpodp_ring_buff_desc *bDesc =
+				(struct mpodp_ring_buff_desc*)(unsigned long)
+				eth_ctrl->configs[i].c2h_addr[j];
+			n_mbufs += bDesc->count;
+		}
+		/* Buffer between Rx thr and NoC2PCI Thr *
+		 * To be divided among the different full rxq */
+		n_mbufs += 2 * MPPA_PCIE_PKT_BURSTINESS * BSP_NB_CLUSTER_MAX;
 	}
-	buf_pool = calloc(MPPA_PCIE_MULTIBUF_COUNT * n_pools,
+
+	buf_pool = calloc(n_mbufs,
 			  sizeof(mppa_pcie_noc_rx_buf_t *));
 	if (!buf_pool) {
 		fprintf(stderr, "Failed to alloc pool descriptor\n");
 		return 1;
 	}
-	buffer_ring_init(&g_free_buf_pool, buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
+	buffer_ring_init(&g_free_buf_pool, buf_pool, n_mbufs);
+	dbg_printf("Free buf pool: %d elnts\n", n_mbufs);
+	buf_pool += n_mbufs;
 
 	for (i = 0; i < eth_ctrl->if_count; i++) {
+		/* Divide 2 * MPPA_PCIE_PKT_BURSTINESS per clusters among the rxqs */
+		int n_bufs = (2 * MPPA_PCIE_PKT_BURSTINESS * BSP_NB_CLUSTER_MAX + eth_ctrl->configs[i].n_rxqs - 1) /
+			eth_ctrl->configs[i].n_rxqs;
 		for (j = 0; j < eth_ctrl->configs[i].n_rxqs; ++j) {
-			buf_pool += MPPA_PCIE_MULTIBUF_COUNT;
-			buffer_ring_init(&g_full_buf_pool[i][j], buf_pool, MPPA_PCIE_MULTIBUF_COUNT);
+			buf_pool = calloc(n_bufs,
+					  sizeof(mppa_pcie_noc_rx_buf_t *));
+			buffer_ring_init(&g_full_buf_pool[i][j], buf_pool, n_bufs);
+			dbg_printf("Full buf pool[%d][%d]: %d elnts\n", i, j, n_bufs);
 		}
 	}
 
-	for (i = 0; i < MPPA_PCIE_MULTIBUF_COUNT; i+= j) {
-		for (j = 0; j < MPPA_PCIE_MULTIBUF_BURST && i + j < MPPA_PCIE_MULTIBUF_COUNT; ++j){
+	for (i = 0; i < n_mbufs; i+= j) {
+		for (j = 0; j < MPPA_PCIE_MULTIBUF_BURST && i + j < n_mbufs; ++j){
 			bufs[j] = (mppa_pcie_noc_rx_buf_t *) g_pkt_base_addr;
 			g_pkt_base_addr += sizeof(mppa_pcie_noc_rx_buf_t);
 
@@ -74,7 +96,8 @@ static int pcie_init_buff_pools()
 		buffer_ring_push_multi(&g_free_buf_pool, bufs, j, &buf_left);
 	}
 
-	dbg_printf("Allocation done\n");
+	dbg_printf("Allocation done %luB\n",
+		   (unsigned long)(g_pkt_base_addr) - DDR_BUFFER_BASE_ADDR);
 	return 0;
 }
 
