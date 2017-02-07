@@ -47,6 +47,16 @@
 #define MPODP_MAX_RX_QUEUES           1
 
 /**
+ * Maximum number of elements in Rx queues
+ */
+#define MPODP_MAX_C2H_COUNT           256
+
+/**
+ * Maximum number of elements in Tx queues
+ */
+#define MPODP_MAX_H2C_COUNT           32
+
+/**
  * Flags for tx flags
  */
 

@@ -319,6 +319,9 @@ int netdev_configure_interface(const eth_if_cfg_t *cfg)
 
 	if (cfg->n_c2h_q > MPODP_MAX_RX_QUEUES)
 		return -1;
+	if (cfg->n_c2h_entries > MPODP_MAX_C2H_COUNT)
+		return -1;
+
 	if_cfg->n_rxqs = cfg->n_c2h_q;
 	for (i = 0; i < cfg->n_c2h_q; ++i) {
 		ret = netdev_setup_c2h(if_cfg, i, cfg);
@@ -328,6 +331,9 @@ int netdev_configure_interface(const eth_if_cfg_t *cfg)
 
 	if (cfg->n_h2c_q > MPODP_MAX_TX_QUEUES)
 		return -1;
+	if (cfg->n_h2c_entries > MPODP_MAX_C2H_COUNT)
+		return -1;
+
 	if_cfg->n_txqs = cfg->n_h2c_q;
 	for (i = 0; i < cfg->n_h2c_q; ++i) {
 		ret = netdev_setup_h2c(if_cfg, i, cfg);
