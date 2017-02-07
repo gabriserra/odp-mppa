@@ -56,7 +56,7 @@ int main(int argc, char *const argv[])
 		if_cfgs[i].flags = 0;
 		if_cfgs[i].if_id = i;
 		if_cfgs[i].n_c2h_q = 1;
-		if_cfgs[i].n_h2c_q = 2;
+		if_cfgs[i].n_h2c_q = MPODP_MAX_TX_QUEUES;
 		memcpy(if_cfgs[i].mac_addr, "\x02\xde\xad\xbe\xef", 5);
 		if_cfgs[i].mac_addr[MAC_ADDR_LEN - 1] = i + ((__k1_get_cluster_id() - 128) << 1);
 	}
