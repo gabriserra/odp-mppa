@@ -29,7 +29,7 @@ ifce = "modp0.0.0.0"
 
 for size in packet_sizes:
 
-	test_name = "odp_pcie_cluster_to_host:" + os.environ['OS_PLAT_NAME'] +":pktsize:" + str(size) + " "
+	test_name = "odp_pcie_cluster_to_host_multiq:" + os.environ['OS_PLAT_NAME'] +":pktsize:" + str(size) + " "
 	jtag_cmd = [
 		"k1-jtag-runner",
 		"--multibinary=./pcie_cluster_to_host_multiq_perf_multibin.mpk",
