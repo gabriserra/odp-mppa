@@ -7,7 +7,7 @@ fi
 ROOTDIR=${1}
 
 if [ -e ${ROOTDIR}/.git ]; then
-	hash=$(git --git-dir=${ROOTDIR}/.git describe --match 'v[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*'\
+	hash=$(git --git-dir=${ROOTDIR}/.git describe --match 'release-*'\
 	       | tr -d "\n")
 	if [[ $(git --git-dir=${ROOTDIR}/.git diff --shortstat 2> /dev/null \
 		| tail -n1) != "" ]]; then
@@ -16,7 +16,8 @@ if [ -e ${ROOTDIR}/.git ]; then
 
 	echo -n "${hash}${dirty}">${ROOTDIR}/.scmversion
 
-	sed -i "s|-|.git|" ${ROOTDIR}/.scmversion
+	sed -i "s|^release-||g" ${ROOTDIR}/.scmversion
+	sed -i "s|-\([^k]\)|.git\1|" ${ROOTDIR}/.scmversion
 	sed -i "s|-|.|g" ${ROOTDIR}/.scmversion
 	sed -i "s|^v||g" ${ROOTDIR}/.scmversion
 elif [ ! -e ${ROOTDIR}/.git -a ! -f ${ROOTDIR}/.scmversion ]; then
