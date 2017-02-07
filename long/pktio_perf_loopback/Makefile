@@ -10,6 +10,7 @@ $(TEST_NAME)-hw-cmd := k1-jtag-runner --multibinary=$($(TEST_NAME)-multibinary) 
 	--exec-multibin=IODDR1:$(IOUNIFIED_NAME) -- -c $(TEST_NAME) -a -i -a e0,e1:tags=60 -a -p
 $(TEST_NAME)-labels += jtag
 $(TEST_NAME)-hw-no-remote := 1
+$(TEST_NAME)-hw-timeout := 45
 host-tests += $(TEST_NAME)
 endif
 
