@@ -39,12 +39,12 @@
 /**
  * Maximum number of Tx queues
  */
-#define MPODP_MAX_TX_QUEUES           2
+#define MPODP_MAX_TX_QUEUES           16
 
 /**
  * Maximum number of Rx queues
  */
-#define MPODP_MAX_RX_QUEUES           1
+#define MPODP_MAX_RX_QUEUES           16
 
 /**
  * Maximum number of elements in Rx queues
