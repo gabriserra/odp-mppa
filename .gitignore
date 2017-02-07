@@ -63,6 +63,8 @@ platform/mppa/include/odp/rpc/helpers.h
 platform/mppa/include/odp/rpc/api.h
 platform/mppa/odp_rpc.c
 platform/mppa/include/odp/rpc/vg.h
+platform/mppa/include/odp/rpc/rpc_byteorder.h
+platform/mppa/include/utils/
 firmware/common/internal/debug.h
 firmware/common/internal/cache.h
 firmware/common/internal/atomic.h
