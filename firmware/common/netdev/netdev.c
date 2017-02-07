@@ -308,8 +308,11 @@ int netdev_configure_interface(const eth_if_cfg_t *cfg)
 	if (!eth_ctrl)
 		return -1;
 
-	if (cfg->if_id >= MPODP_MAX_IF_COUNT)
+	if (cfg->if_id >= MPODP_MAX_IF_COUNT) {
+		fprintf(stderr, "Could not create pcie interface %d. Id too large\n",
+			cfg->if_id);
 		return -1;
+	}
 
 	if_cfg = &eth_ctrl->configs[cfg->if_id];
 	if_cfg->mtu = cfg->mtu;
@@ -317,28 +320,45 @@ int netdev_configure_interface(const eth_if_cfg_t *cfg)
 	if_cfg->interrupt_status = 1;
 	memcpy(if_cfg->mac_addr, cfg->mac_addr, MAC_ADDR_LEN);
 
-	if (cfg->n_c2h_q > MPODP_MAX_RX_QUEUES)
+	if (cfg->n_c2h_q > MPODP_MAX_RX_QUEUES) {
+		fprintf(stderr, "Interface %d has too many C2H queues (%lu requested, max is %d)\n",
+			cfg->if_id, cfg->n_c2h_q, MPODP_MAX_RX_QUEUES);
 		return -1;
-	if (cfg->n_c2h_entries > MPODP_MAX_C2H_COUNT)
+	}
+	if (cfg->n_c2h_entries > MPODP_MAX_C2H_COUNT){
+		fprintf(stderr, "Interface %d has too many C2H entries (%lu requested, max is %d)\n",
+			cfg->if_id, cfg->n_c2h_entries, MPODP_MAX_C2H_COUNT);
 		return -1;
-
+	}
 	if_cfg->n_rxqs = cfg->n_c2h_q;
 	for (i = 0; i < cfg->n_c2h_q; ++i) {
 		ret = netdev_setup_c2h(if_cfg, i, cfg);
-		if (ret)
+		if (ret) {
+			fprintf(stderr, "Memory allocation failed for PCIE if %d C2Hq %lu\n",
+				cfg->if_id, i);
 			return ret;
+		}
 	}
 
-	if (cfg->n_h2c_q > MPODP_MAX_TX_QUEUES)
+	if (cfg->n_h2c_q > MPODP_MAX_TX_QUEUES) {
+		fprintf(stderr, "Interface %d has too many H2C queues (%lu requested, max is %d)\n",
+			cfg->if_id, cfg->n_h2c_q, MPODP_MAX_RX_QUEUES);
 		return -1;
-	if (cfg->n_h2c_entries > MPODP_MAX_C2H_COUNT)
+	}
+	if (cfg->n_h2c_entries > MPODP_MAX_H2C_COUNT){
+		fprintf(stderr, "Interface %d has too many H2C entries (%lu requested, max is %d)\n",
+			cfg->if_id, cfg->n_h2c_entries, MPODP_MAX_H2C_COUNT);
 		return -1;
+	}
 
 	if_cfg->n_txqs = cfg->n_h2c_q;
 	for (i = 0; i < cfg->n_h2c_q; ++i) {
 		ret = netdev_setup_h2c(if_cfg, i, cfg);
-		if (ret)
+		if (ret){
+			fprintf(stderr, "Memory allocation failed for PCIE if %d H2Cq %lu\n",
+				cfg->if_id, i);
 			return ret;
+		}
 	}
 	return 0;
 }
