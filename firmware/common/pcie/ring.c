@@ -1,13 +1,12 @@
 #include <HAL/hal/core/atomic.h>
 #include "ring.h"
 
-static inline int atomic_u32_cmp_xchg_strong_mm(
-		odp_atomic_u32_t *atom,
-		uint32_t *exp,
-		uint32_t val)
+static inline int u32_xchg(volatile uint32_t *atom,
+			   uint32_t *exp,
+			   uint32_t val)
 {
 	__k1_uint64_t tmp = 0;
-	tmp = __builtin_k1_acwsu((void *)&atom->v, val, *exp );
+	tmp = __builtin_k1_acws((void *)atom, val, *exp );
 	if((tmp & 0xFFFFFFFF) == *exp){
 		return 1;
 	}else{
@@ -32,12 +31,12 @@ int buffer_ring_get_multi(buffer_ring_t *ring,
 
 	do {
 		n_bufs = n_buffers;
-		cons_head =  odp_atomic_load_u32(&ring->cons_head);
-		prod_tail = odp_atomic_load_u32(&ring->prod_tail);
+		cons_head =  ring->cons_head;
+		prod_tail = ring->prod_tail;
+
 		/* No Buf available */
-		if(cons_head == prod_tail){
+		if(cons_head == prod_tail)
 			return 0;
-		}
 
 		if(prod_tail > cons_head) {
 			/* Linear buffer list */
@@ -53,22 +52,21 @@ int buffer_ring_get_multi(buffer_ring_t *ring,
 		if(cons_next > ring->buf_num)
 			cons_next = cons_next - ring->buf_num;
 
-		if(atomic_u32_cmp_xchg_strong_mm(&ring->cons_head, &cons_head,
-						      cons_next)){
+		if(u32_xchg(&ring->cons_head, &cons_head, cons_next))
 			break;
-		}
+
 	} while(1);
 
 	for (unsigned i = 0, idx = cons_head; i < n_bufs; ++i, ++idx){
 		if(unlikely(idx == ring->buf_num))
 			idx = 0;
-		buffers[i] = LOAD_PTR(ring->buf_ptrs[idx]);
+		buffers[i] = ring->buf_ptrs[idx];
 	}
 
-	while (odp_atomic_load_u32(&ring->cons_tail) != cons_head)
+	while (ring->cons_tail != cons_head)
 		odp_spin();
 
-	odp_atomic_store_u32(&ring->cons_tail, cons_next);
+	ring->cons_tail = cons_next;
 
 	if (left) {
 		/* Check for low watermark condition */
@@ -88,15 +86,14 @@ void buffer_ring_push_multi(buffer_ring_t *ring,
 	uint32_t prod_head, cons_tail, prod_next;
 
 	do {
-		prod_head =  odp_atomic_load_u32(&ring->prod_head);
+		prod_head =  ring->prod_head;
 
 		prod_next = prod_head + n_buffers;
 		if(prod_next > ring->buf_num)
 			prod_next = prod_next - ring->buf_num;
 
-		if(atomic_u32_cmp_xchg_strong_mm(&ring->prod_head, &prod_head,
-						      prod_next)){
-			cons_tail = odp_atomic_load_u32(&ring->cons_tail);
+		if(u32_xchg(&ring->prod_head, &prod_head, prod_next)){
+			cons_tail = ring->cons_tail;
 			break;
 
 		}
@@ -106,12 +103,12 @@ void buffer_ring_push_multi(buffer_ring_t *ring,
 		if(unlikely(idx == ring->buf_num))
 			idx = 0;
 
-		STORE_PTR(ring->buf_ptrs[idx], buffers[i]);
+		ring->buf_ptrs[idx] = buffers[i];
 	}
-	while (odp_atomic_load_u32(&ring->prod_tail) != prod_head)
+	while (ring->prod_tail != prod_head)
 		odp_spin();
 
-	odp_atomic_store_u32(&ring->prod_tail, prod_next);
+	ring->prod_tail = prod_next;
 
 	if (left) {
 		uint32_t bufcount = (prod_next - cons_tail);
