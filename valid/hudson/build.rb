@@ -52,8 +52,9 @@ repo = Git.new(odp_clone,workspace)
 local_valid = options["local-valid"]
 
 clean = Target.new("clean", repo, [])
+version_check = Target.new("version_check", repo, [])
 changelog = Target.new("changelog", repo, [])
-build = Target.new("build", repo, [changelog])
+build = Target.new("build", repo, [changelog, version_check])
 install = Target.new("install", repo, [build])
 report_perf = Target.new("report_perf", repo, [])
 valid = ParallelTarget.new("valid", repo, [install])
@@ -69,7 +70,7 @@ dkms = Target.new("dkms", repo, [])
 package = Target.new("package", repo, [install, apps, long_build, dkms])
 
 
-b = Builder.new("odp", options, [clean, changelog, build, valid, valid_packages,
+b = Builder.new("odp", options, [clean, changelog, version_check, build, valid, valid_packages,
                                  long_build, long, apps, dkms, package, install, report_perf])
 
 b.logsession = "odp"
@@ -142,9 +143,37 @@ b.target("changelog") do
 end
 
 
+b.target("version_check") do
+    b.run(" echo 'Checking header versions vs file versions'")
+    tag=`git describe --match 'release-*'`.chomp()
+
+    if tag !~ /release-([0-9]+)\.([0-9]+)\.([0-9]+)\.k([0-9]+)/ then
+        raise("Invalid release tag")
+    end
+    generation=$1
+    major=$2
+    minor=$3
+    kal_ver=$4
+    (version,releaseID,sha1) = repo.describe()
+
+
+   	file_gen=`grep ODP_VERSION_API_GENERATION include/odp/api/spec/version.h  | awk '{ print $NF}'`.chomp()
+   	file_maj=`grep ODP_VERSION_API_MAJOR include/odp/api/spec/version.h  | awk '{ print $NF}'`.chomp()
+   	file_min=`grep ODP_VERSION_API_MINOR include/odp/api/spec/version.h  | awk '{ print $NF}'`.chomp()
+   	file_kal_ver=`grep ODP_VERSION_KALRAY_VER platform/mppa/include/odp/api/version.h  | awk '{ print $NF}'`.chomp()
+
+    raise ("Generation mismatch") if generation != file_gen
+    raise ("Major mismatch") if major != file_maj
+    raise ("Minor mismatch") if minor != file_min
+    raise ("Kalray Version mismatch") if kal_ver != file_kal_ver
+
+    b.run("echo 'Header and tag version match'")
+end
+
 b.target("build") do
     b.logtitle = "Report for odp build."
     cd odp_path
+
     b.run(:cmd => "make build CONFIGS='#{configs.join(" ")}'")
 end
 
