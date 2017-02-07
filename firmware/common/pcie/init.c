@@ -62,13 +62,13 @@ static int pcie_init_buff_pools()
 		n_mbufs += 2 * MPPA_PCIE_PKT_BURSTINESS * BSP_NB_CLUSTER_MAX;
 	}
 
-	buf_pool = calloc(n_mbufs,
+	buf_pool = calloc(n_mbufs + 1,
 			  sizeof(mppa_pcie_noc_rx_buf_t *));
 	if (!buf_pool) {
 		fprintf(stderr, "Failed to alloc pool descriptor\n");
 		return 1;
 	}
-	buffer_ring_init(&g_free_buf_pool, buf_pool, n_mbufs);
+	buffer_ring_init(&g_free_buf_pool, buf_pool, n_mbufs + 1);
 	dbg_printf("Free buf pool: %d elnts\n", n_mbufs);
 	buf_pool += n_mbufs;
 
