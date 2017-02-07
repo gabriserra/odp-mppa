@@ -83,11 +83,18 @@ void buffer_ring_push_multi(buffer_ring_t *ring,
 				mppa_pcie_noc_rx_buf_t *buffers[],
 				unsigned n_buffers, uint32_t *left)
 {
-	uint32_t prod_head, cons_tail, prod_next;
+	uint32_t prod_head, cons_tail, prod_next, slotcount;
 
 	do {
 		prod_head =  ring->prod_head;
 
+		slotcount = ring->cons_tail > prod_head ?
+			(ring->cons_tail - 1 - prod_head) :
+			(ring->cons_tail + ring->buf_num - 1 - prod_head);
+
+		/* Stall until we can push all at once */
+		if (slotcount < n_buffers)
+			continue;
 		prod_next = prod_head + n_buffers;
 		if(prod_next > ring->buf_num)
 			prod_next = prod_next - ring->buf_num;
