@@ -783,6 +783,9 @@ int rx_thread_link_start(rx_config_t *rx_config)
 			th->pools[ifce->pool_id].n_rx += nrx_per_th;
 			memset(&th->ifce[rx_config->pktio_id], sizeof(rx_ifce_th_t), 0);
 
+			th->min_mask = (uint8_t) -1;
+			th->max_mask = 0;
+
 			for (int j = 0; j < 4; ++j) {
 				th->ev_masks[j] |= th->ifce[rx_config->pktio_id].ev_masks[j];
 				if (th->ifce[rx_config->pktio_id].ev_masks[j]) {
