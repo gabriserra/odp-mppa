@@ -25,9 +25,12 @@ RPCFIRMWARE_PATH := $(K1_TOOLCHAIN_DIR)/kalray_internal/rpc-firmwares
 FIRMWARES := $(patsubst firmware/%/Makefile, %, $(wildcard firmware/*/Makefile))
 APPS      := $(patsubst apps/%/Makefile, %, $(wildcard apps/*/Makefile))
 LONGS     := $(patsubst long/%/Makefile, %, $(wildcard long/*/Makefile))
-RPCINCLUDES := $(shell find $(RPCFIRMWARE_PATH)/include/ -name *.h)
+
+RPCHDRFILES := c2c bas defines fp rpc eth helpers api
+RPCINCLUDES := $(foreach file, $(RPCHDRFILES), $(RPCFIRMWARE_PATH)/include/odp/rpc/$(file).h)
 RPCSRCS     := $(shell find $(RPCFIRMWARE_PATH)/platform/ -type f)
-RPCMODS    := $(shell find $(RPCFIRMWARE_PATH)/firmware/ -type f)
+RPCMODNAMES := internal fp c2c eth rpc
+RPCMODS    := $(foreach mod,$(RPCMODNAMES), $(shell find $(RPCFIRMWARE_PATH)/firmware/common/$(mod) -type f))
 RPCINCLUDES_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, platform/mppa/%, $(RPCINCLUDES))
 RPCSRCS_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, %, $(RPCSRCS))
 RPCMODS_INST := $(patsubst $(RPCFIRMWARE_PATH)/%, %, $(RPCMODS))
