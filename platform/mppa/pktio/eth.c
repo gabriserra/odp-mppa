@@ -396,20 +396,33 @@ static int eth_set_state(pktio_entry_t * const pktio_entry, int enabled)
 		.inl_data = state_cmd.inl_data
 	};
 	uint8_t *payload;
+	uint64_t start = __k1_read_dsu_timestamp();
 
-	mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(slot_id, cluster_id),
-					 mppa_rpc_odp_get_io_tag_id(cluster_id),
-					 &cmd, NULL);
+	do {
+		mppa_rpc_odp_do_query(mppa_rpc_odp_get_io_dma_id(slot_id, cluster_id),
+				      mppa_rpc_odp_get_io_tag_id(cluster_id),
+				      &cmd, NULL);
 
-	ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, 20 * MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
-	if (ret <= 0)
-		return 1;
+		ret = mppa_rpc_odp_wait_ack(&ack_msg, (void**)&payload, MPPA_RPC_ODP_TIMEOUT_1S, "[ETH]");
+		if (ret <= 0)
+			return 1;
 
-	ack.inl_data = ack_msg->inl_data;
-	if (ack.status) {
-		fprintf(stderr, "[ETH] Error: Server declined change of eth state\n");
-		if (ack_msg->err_str && ack_msg->data_len > 0)
-			fprintf(stderr, "[ETH] Error Log: %s\n", payload);
+		ack.inl_data = ack_msg->inl_data;
+		if (ack.status) {
+			fprintf(stderr, "[ETH] Error: Server declined change of eth state\n");
+			if (ack_msg->err_str && ack_msg->data_len > 0)
+				fprintf(stderr, "[ETH] Error Log: %s\n", payload);
+			return 1;
+		}
+		/* If we are trying to enable the link and no_wait_link is not set, loop until the link
+		 * is truely up or until we timeout */
+	} while(enabled && !eth->no_wait_link && !ack.cmd.eth_state.link_state &&
+		__k1_read_dsu_timestamp() - start < 20ULL * __bsp_frequency);
+
+	eth->link_state = ack.cmd.eth_state.link_state;
+
+	if (!eth->link_state && enabled && !eth->no_wait_link){
+		fprintf(stderr, "[ETH] Error: Failed to bring lane up\n");
 		return 1;
 	}
 
