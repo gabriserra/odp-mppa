@@ -788,7 +788,7 @@ int rx_thread_link_start(rx_config_t *rx_config)
 
 			for (int j = 0; j < 4; ++j) {
 				th->ev_masks[j] |= th->ifce[rx_config->pktio_id].ev_masks[j];
-				if (th->ifce[rx_config->pktio_id].ev_masks[j]) {
+				if (th->ev_masks[j]) {
 					if (j < th->min_mask)
 						th->min_mask = j;
 					if (j > th->max_mask)
