@@ -30,6 +30,7 @@
 ODP_STATIC_ASSERT(MAX_ETH_PORTS * MAX_ETH_SLOTS <= MAX_RX_ETH_IF,
 		   "MAX_RX_ETH_IF__ERROR");
 
+#define NOC_ETH_IFACE_ID       0
 #define N_RX_P_ETH 20
 #define NOC_ETH_UC_COUNT 2
 
@@ -57,6 +58,8 @@ typedef union eth_tx_metadata_s {
     uint32_t reserved_2     : 10;
   } _;
 } eth_tx_metadata_t;
+
+static int g_link_cnoc_rx_id[MAX_ETH_SLOTS] = { [ 0 ... MAX_ETH_SLOTS - 1] = -1};
 
 /**
  * #############################
@@ -113,6 +116,7 @@ static int eth_rpc_send_eth_open(odp_pktio_param_t * params, pkt_eth_t *eth)
 			.verbose = eth->verbose,
 			.min_payload = eth->min_payload,
 			.max_payload = eth->max_payload,
+			.link_cnoc_rx = g_link_cnoc_rx_id[eth->slot_id],
 		}
 	};
 	if (params) {
@@ -182,7 +186,6 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 	eth->slot_id = slot_id;
 	rx_options_default(&eth->rx_opts);
 	eth->rx_opts.nRx = N_RX_P_ETH;
-
 
 	pptr = eptr;
 	if (*pptr == 'p') {
@@ -270,6 +273,16 @@ static int eth_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		ODP_ERR("Cannot enable fc=1 on an ETH interface");
 		return -1;
 	}
+
+	if (g_link_cnoc_rx_id[slot_id] < 0) {
+		ret = mppa_noc_cnoc_rx_alloc_auto(NOC_ETH_IFACE_ID,
+						  (unsigned *)&g_link_cnoc_rx_id[slot_id],
+						  MPPA_NOC_BLOCKING);
+		if (ret != MPPA_NOC_RET_SUCCESS)
+			return 1;
+	}
+	/* Clear link mask to make sure we don't use a previous state */
+	mppa_cnoc[NOC_ETH_IFACE_ID]->message_ram[g_link_cnoc_rx_id[slot_id]].dword = 0ULL;
 
 	uintptr_t ucode;
 	ucode = (uintptr_t)ucode_eth_v2;
@@ -616,12 +629,11 @@ static int eth_stats(pktio_entry_t *const pktio_entry,
 static int eth_link_status(pktio_entry_t *pktio_entry)
 {
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
-	mppa_rpc_odp_ack_eth_get_stat_t ack_stat;
-	mppa_rpc_odp_payload_eth_get_stat_t *rpc_stats = eth_rpc_stats(eth, &ack_stat);
-	if (!rpc_stats)
-		return -1;
+	const int eth_if = eth->port_id % 4;
+	uint64_t link_mask =
+		mppa_cnoc[NOC_ETH_IFACE_ID]->message_ram[g_link_cnoc_rx_id[eth->slot_id]].dword;
 
-	eth->link_state = ack_stat.link_status;
+	eth->link_state = !!(link_mask & (1ULL << eth_if));
 	return eth->link_state;
 }
 
