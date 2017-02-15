@@ -1435,6 +1435,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 static void print_info(char *progname, appl_args_t *appl_args)
 {
 	int i;
+	return;
 
 	printf("\n"
 	       "ODP system info\n"
