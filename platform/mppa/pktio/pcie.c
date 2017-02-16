@@ -81,6 +81,7 @@ static int pcie_init_cnoc_rx(void)
 
 static int pcie_init(void)
 {
+	mppa_rpc_odp_register_print_helper(MPPA_RPC_ODP_CLASS_PCIE, mppa_odp_rpc_pcie_print_msg);
 	if (rx_thread_init())
 		return 1;
 

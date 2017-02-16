@@ -149,6 +149,7 @@ __LIB__libodp_la_SOURCES = \
 			   pktio/io_ops.c \
 			   pktio/eth.c \
 			   pktio/pcie.c \
+			   pktio/pcie_print.c \
 			   pktio/ioddr.c \
 			   pktio/cluster.c \
 			   pktio/drop.c \
