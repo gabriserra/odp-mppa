@@ -630,7 +630,13 @@ static int eth_link_status(pktio_entry_t *pktio_entry)
 {
 	pkt_eth_t *eth = &pktio_entry->s.pkt_eth;
 	const int eth_if = eth->port_id % 4;
-	uint64_t link_mask =
+	uint64_t link_mask;
+
+	/* Looopback link are always up */
+	if (eth->loopback)
+		return 1;
+
+	link_mask =
 		mppa_cnoc[NOC_ETH_IFACE_ID]->message_ram[g_link_cnoc_rx_id[eth->slot_id]].dword;
 
 	eth->link_state = !!(link_mask & (1ULL << eth_if));
