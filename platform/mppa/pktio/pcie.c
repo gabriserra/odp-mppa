@@ -112,6 +112,7 @@ static int pcie_rpc_send_pcie_open(pkt_pcie_t *pcie)
 			.min_rx = pcie->rx_config.min_port,
 			.max_rx = pcie->rx_config.max_port,
 			.cnoc_rx = pcie->cnoc_rx,
+			.verbose = pcie->verbose,
 		}
 	};
 	mppa_rpc_odp_t cmd = {
@@ -208,6 +209,9 @@ static int pcie_open(odp_pktio_t id ODP_UNUSED, pktio_entry_t *pktio_entry,
 		if (!strncmp(pptr, "nofree", strlen("nofree"))){
 			pptr += strlen("nofree");
 			pcie->tx_config.nofree = 1;
+		} else if (!strncmp(pptr, "verbose", strlen("verbose"))){
+			pptr += strlen("verbose");
+			pcie->verbose = 1;
 		} else {
 			/* Unknown parameter */
 			ODP_ERR("Invalid option %s\n", pptr);

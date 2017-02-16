@@ -46,7 +46,7 @@ static void pcie_open(unsigned remoteClus, mppa_rpc_odp_t * msg,
 	clus->rx_enabled = 1;
 
 	if (pcietool_setup_clus2pcie(remoteClus, pcie_if, nocIf,
-				     open_cmd.cnoc_rx, 0 /* VERBOSE */, answer))
+				     open_cmd.cnoc_rx, open_cmd.verbose, answer))
 		goto err;
 	if (pcietool_setup_pcie2clus(remoteClus, pcie_if, nocIf,
 				     externalAddress,

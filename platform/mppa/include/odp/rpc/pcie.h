@@ -7,7 +7,7 @@
 #define HAS_ODP_RPC_PCIE
 
 /** Version of the PCIE CoS */
-#define MPPA_RPC_ODP_PCIE_VERSION 0x2
+#define MPPA_RPC_ODP_PCIE_VERSION 0x3
 
 #define PCIE_ALEN 6
 
@@ -31,6 +31,7 @@ typedef union {
 		uint8_t min_rx;
 		uint8_t max_rx;
 		uint8_t cnoc_rx;
+		uint8_t verbose : 1;
 	};
 	mppa_rpc_odp_inl_data_t inl_data;
 } mppa_rpc_odp_cmd_pcie_open_t;
