@@ -24,9 +24,9 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 	uint16_t c2h_q = iface->rx_cfgs[rx_id].c2h_q;
 	typeof(mppa_dnoc[iface->iface_id]->rx_queues[0]) * const rx_queue =
 		&mppa_dnoc[iface->iface_id]->rx_queues[rx_id];
-	tx_credit_t *tx_credit = iface->rx_cfgs[rx_id].tx_credit;
+	mppa_pcie_link_cluster_status_t *clus = iface->rx_cfgs[rx_id].cluster;
 
-	if ( rx_id != tx_credit->next_tag )
+	if ( rx_id != clus->c2p_next_tag )
 		return -1;
 
 	if ( iface->rx_cfgs[rx_id].broken == 0 ) {
@@ -102,18 +102,21 @@ static int reload_rx(rx_iface_t *iface, int rx_id)
 		err_printf("Broken Rx tag should not happen!!!\n");
 	}
 
-	tx_credit->next_tag = ( ( tx_credit->next_tag + 1 ) > tx_credit->max_tx_tag ) ?
-		tx_credit->min_tx_tag : tx_credit->next_tag + 1;
+	clus->c2p_next_tag = ( ( clus->c2p_next_tag + 1 ) > clus->c2p_max_rx ) ?
+		clus->c2p_min_rx : clus->c2p_next_tag + 1;
 
-	if ( ( ( tx_credit->next_tag - tx_credit->min_tx_tag ) % CREDIT_CHUNK ) == 0 ) {
-		tx_credit->credit += CREDIT_CHUNK;
+	if ( ( ( clus->c2p_next_tag - clus->c2p_min_rx ) % CREDIT_CHUNK ) == 0 ) {
+		const unsigned cnoc_tx = pcie_status.link[pcie_eth_if].cnoc_tx;
+
+		clus->c2p_credit += CREDIT_CHUNK;
 		ret = mppa_noc_cnoc_tx_configure(iface->iface_id,
-				tx_credit->cnoc_tx,
-				tx_credit->config,
-				tx_credit->header);
+						 cnoc_tx,
+						 clus->c2p_config,
+						 clus->c2p_header);
 		assert(ret == MPPA_NOC_RET_SUCCESS);
-		mppa_noc_cnoc_tx_push(iface->iface_id, tx_credit->cnoc_tx, tx_credit->credit);
-		dbg_printf("Send %llu credits to %d\n", tx_credit->credit, tx_credit->cluster);
+		mppa_noc_cnoc_tx_push(iface->iface_id, cnoc_tx, clus->c2p_credit);
+		dbg_printf("Send %llu credits to %d\n", clus->c2p_credit,
+			   clus - &pcie_status.link[pcie_eth_if].cluster[0]);
 	}
 
 

@@ -35,7 +35,7 @@ struct mppa_pcie_g_eth_if_cfg {
 };
 
 static void *g_pkt_base_addr = (void *) DDR_BUFFER_BASE_ADDR;
-
+mppa_pcie_status_t pcie_status;
 
 static int pcie_init_buff_pools()
 {
@@ -113,6 +113,8 @@ int pcie_start()
 		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_TX);
 		mppa_noc_interrupt_line_disable(i, MPPA_NOC_INTERRUPT_LINE_DNOC_RX);
 	}
+
+	_init_mppa_pcie_status(&pcie_status);
 
 	pcie_init_buff_pools();
 	pcie_start_tx_rm();

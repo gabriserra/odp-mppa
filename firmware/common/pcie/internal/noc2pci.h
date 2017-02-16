@@ -24,6 +24,8 @@
  
 #define END_OF_PACKETS		(1 << 0)
 
+struct mppa_pcie_link_cluster_status;
+
 typedef union {
 	struct {
 		uint16_t pkt_size;
@@ -50,7 +52,7 @@ typedef struct rx_cfg {
 	uint8_t pcie_eth_if; /* PCIe ethernet interface */
 	uint8_t c2h_q;
 	uint8_t broken;
-	tx_credit_t *tx_credit;
+	struct mppa_pcie_link_cluster_status *cluster;
 } rx_cfg_t;
 
 typedef struct rx_iface {
@@ -65,5 +67,10 @@ typedef struct rx_thread {
 } rx_thread_t;
 
 extern rx_thread_t g_rx_threads[RX_THREAD_COUNT];
+
+int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
+		  unsigned int c2h_q, struct mppa_pcie_link_cluster_status *clus_status,
+		  mppa_rpc_odp_answer_t *answer);
+
 
 #endif
