@@ -46,15 +46,77 @@ struct mppa_pcie_eth_dnoc_tx_cfg {
 	unsigned int h2c_q;
 };
 
+typedef struct mppa_pcie_link_cluster_status {
+	struct {
+		uint8_t opened : 1;
+		uint8_t rx_enabled : 1;
+		uint8_t tx_enabled : 1;
+	};
+	int p2c_nocIf;
+	int p2c_txId;
+	int p2c_min_rx;
+	int p2c_max_rx;
+	int p2c_q;
+
+	int c2p_nocIf;
+	int c2p_min_rx;
+	int c2p_max_rx;
+	int c2p_next_tag;
+	uint64_t c2p_credit;
+	int c2p_remote_cnoc_rx;
+	int c2p_q;
+
+	mppa_cnoc_config_t c2p_config;
+	mppa_cnoc_header_t c2p_header;
+
+} mppa_pcie_link_cluster_status_t;
+
+typedef struct {
+	int enabled;
+	int cnoc_tx;
+	mppa_pcie_link_cluster_status_t cluster[RPC_MAX_CLIENTS];
+} mppa_pcie_link_status;
+
+typedef struct {
+	mppa_pcie_link_status link[MPODP_MAX_IF_COUNT];
+} mppa_pcie_status_t;
+
+static inline void _init_mppa_pcie_link_cluster_status(mppa_pcie_link_cluster_status_t *status)
+{
+	status->opened = 0;
+	status->tx_enabled = 0;
+	status->rx_enabled = 0;
+
+	status->p2c_nocIf = -1;
+	status->p2c_txId = -1;
+	status->p2c_min_rx = status->p2c_max_rx = -1;
+
+	status->c2p_nocIf = -1;
+	status->c2p_min_rx = status->c2p_max_rx = -1;
+}
+
+static inline void _init_mppa_pcie_link_status(mppa_pcie_link_status *status)
+{
+	status->enabled = 0;
+	status->cnoc_tx = -1;
+	for (int i = 0; i < RPC_MAX_CLIENTS; ++i) {
+		_init_mppa_pcie_link_cluster_status(&status->cluster[i]);
+	}
+}
+
+static inline void _init_mppa_pcie_status(mppa_pcie_status_t *status)
+{
+	for (int i = 0; i < MPODP_MAX_IF_COUNT; ++i) {
+		_init_mppa_pcie_link_status(&status->link[i]);
+	}
+}
+extern mppa_pcie_status_t pcie_status;
 void
 pcie_start_rx_rm();
 
 void
 pcie_start_tx_rm();
 
-int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
-		  unsigned c2h_q, tx_credit_t *tx_credit,
-		  mppa_rpc_odp_answer_t *answer);
 
 static inline unsigned pcie_cluster_to_h2c_q(unsigned pcie_eth_if_id,
 					     unsigned remoteClus)
@@ -67,6 +129,20 @@ static inline unsigned pcie_cluster_to_c2h_q(unsigned pcie_eth_if_id,
 {
 	return remoteClus % eth_ctrl->configs[pcie_eth_if_id].n_rxqs;
 }
+int pcietool_open_cluster(unsigned remoteClus, int if_id,
+			  mppa_rpc_odp_answer_t *answer);
+
+int pcietool_setup_pcie2clus(unsigned remoteClus, int if_id,
+			     int nocIf, int externalAddress,
+			     int min_rx, int max_rx,
+			     mppa_rpc_odp_answer_t *answer);
+
+int pcietool_setup_clus2pcie(unsigned remoteClus, int if_id, int nocIf,
+			     int remote_cnoc_rx, int verbose,
+			     mppa_rpc_odp_answer_t *answer);
+
+int pcietool_enable_cluster(unsigned remoteClus, unsigned if_id,
+			    mppa_rpc_odp_answer_t *answer);
 
 static inline
 int no_printf(__attribute__((unused)) const char *fmt , ...)

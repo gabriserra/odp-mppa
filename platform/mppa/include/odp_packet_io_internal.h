@@ -154,6 +154,9 @@ typedef struct {
 	uint8_t mac_addr[ETH_ALEN];     /**< Interface Mac address */
 	uint16_t mtu;                   /**< Interface MTU */
 
+	struct {
+		uint8_t verbose : 1;
+	};
 	/* Rx Data */
 	rx_opts_t rx_opts;
 	rx_config_t rx_config;

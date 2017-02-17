@@ -7,7 +7,7 @@
 #define HAS_ODP_RPC_PCIE
 
 /** Version of the PCIE CoS */
-#define MPPA_RPC_ODP_PCIE_VERSION 0x2
+#define MPPA_RPC_ODP_PCIE_VERSION 0x3
 
 #define PCIE_ALEN 6
 
@@ -18,7 +18,7 @@ typedef enum {
 } mppa_rpc_odp_cmd_pcie_e;
 
 #define MPPA_RPC_ODP_CMD_NAMES_PCIE			\
-	"PCIE OPEN",				\
+	"PCIE OPEN",					\
 		"PCIE CLOSE"
 
 /**
@@ -31,6 +31,7 @@ typedef union {
 		uint8_t min_rx;
 		uint8_t max_rx;
 		uint8_t cnoc_rx;
+		uint8_t verbose : 1;
 	};
 	mppa_rpc_odp_inl_data_t inl_data;
 } mppa_rpc_odp_cmd_pcie_open_t;
@@ -59,6 +60,9 @@ typedef union {
 MPPA_RPC_ODP_CHECK_STRUCT_SIZE(mppa_rpc_odp_cmd_pcie_clos_t);
 
 MPPA_RPC_ODP_DEFINE_ACK(pcie, mppa_rpc_odp_ack_pcie_open_t pcie_open;);
+
+/* Print helper for PCIE */
+int mppa_odp_rpc_pcie_print_msg(const mppa_rpc_odp_t * cmd, const uint8_t *payload);
 
 
 #endif /* __MPPA_RPC_ODP_PCIE_H__ */

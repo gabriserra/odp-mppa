@@ -136,7 +136,8 @@ static int pcie_configure_rx(rx_iface_t *iface, int dma_if, int rx_id)
 
 int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 		  unsigned int c2h_q,
-		  tx_credit_t *tx_credit, mppa_rpc_odp_answer_t *answer)
+		  struct mppa_pcie_link_cluster_status *clus_status,
+		  mppa_rpc_odp_answer_t *answer)
 {
 	int rx_thread_num = if_id / RX_THREAD_COUNT;
 	int th_iface_id = if_id % IF_PER_THREAD;
@@ -157,7 +158,7 @@ int pcie_setup_rx(int if_id, unsigned int rx_id, unsigned int pcie_eth_if,
 	iface->rx_cfgs[rx_id].pcie_eth_if = pcie_eth_if;
 	iface->rx_cfgs[rx_id].c2h_q = c2h_q;
 	iface->rx_cfgs[rx_id].broken = 0;
-	iface->rx_cfgs[rx_id].tx_credit = tx_credit;
+	iface->rx_cfgs[rx_id].cluster = clus_status;
 
 	__k1_mb();
 
