@@ -86,16 +86,32 @@ valid_type = "sim"
 if ENV["label"].to_s() != "" then
     case ENV["label"]
     when /MPPADevelopers-ab01b*/, /MPPAEthDevelopers-ab01b*/
-        valid_configs = [ "k1b-kalray-nodeos_developer", "k1b-kalray-mos_developer" ]
+        valid_configs = [
+            "k1b-kalray-nodeos_developer",
+            "k1b-kalray-mos_developer",
+            "k1b-kalray-nodeos_developer-crypto",
+            "k1b-kalray-mos_developer-crypto",
+        ]
         valid_type = "jtag"
     when /KONIC80Developers*/, /MPPA_KONIC80_Developers*/
-        valid_configs = [ "k1b-kalray-nodeos_konic80", "k1b-kalray-mos_konic80" ]
+        valid_configs = [
+            "k1b-kalray-nodeos_konic80",
+            "k1b-kalray-mos_konic80",
+            "k1b-kalray-nodeos_konic80-crypto",
+            "k1b-kalray-mos_konic80-crypto",
+        ]
         valid_type = "jtag"
     when /MPPA_EMB01b_centos7-with-eth-loopback/
-        valid_configs = [ "k1b-kalray-mos_emb01" ]
+        valid_configs = [
+            "k1b-kalray-mos_emb01",
+            "k1b-kalray-mos_emb01-crypto",
+        ]
         valid_type = "remote"
     when /MPPA_AB04_Developers-with-loopback/
-        valid_configs = [ "k1b-kalray-mos_ab04" ]
+        valid_configs = [
+            "k1b-kalray-mos_ab04",
+            "k1b-kalray-mos_ab04-crypto",
+        ]
         valid_type = "jtag"
     when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
         # Validate nothing.
@@ -108,7 +124,12 @@ if ENV["label"].to_s() != "" then
         valid_configs = "k1b-kalray-nodeos_simu", "k1b-kalray-mos_simu"
         valid_type = "sim"
     when /MPPAExplorers_k1b*/
-        valid_configs = [ "k1b-kalray-nodeos_explorer", "k1b-kalray-mos_explorer" ]
+        valid_configs = [
+            "k1b-kalray-nodeos_explorer",
+            "k1b-kalray-mos_explorer",
+            "k1b-kalray-nodeos_explorer-crypto",
+            "k1b-kalray-mos_explorer-crypto",
+        ]
         valid_type = "jtag"
     else
         raise("Unsupported label #{ENV["label"]}!")
@@ -293,10 +314,16 @@ b.target("package") do
     cd odp_path
 
     b.run(:cmd => "cd install/; tar cf ../odp.tar "+
-                  "$(ls -d local/k1tools/lib/odp/* | grep -v -- -debug) "+
+                  "$(ls -d local/k1tools/lib/odp/* | grep -v -- -debug | grep -v -- -crypto ) ",
+          :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-crypto.tar "+
+                  "$(ls -d local/k1tools/lib/odp/* | grep -v -- -debug | grep  -- -crypto ) ",
+          :env => $env)
+    b.run(:cmd => "cd install/; tar cf ../odp-common.tar "+
                   "$(ls -d local/k1tools/share/odp/firmware/* | grep -v -- -debug) "+
                   "local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ "+
                   "local/k1tools/k1*/include local/k1tools/lib64", :env => $env)
+
     b.run(:cmd => "cd install/; tar cf ../odp-doc.tar local/k1tools/share/doc/ ", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-tests.tar "+
                   "$(ls -d local/k1tools/share/odp/tests/* | grep -v -- -debug) "+
@@ -305,6 +332,7 @@ b.target("package") do
     b.run(:cmd => "cd install/; tar cf ../odp-runtime.tar local/k1tools/share/odp/apps/odp-netdev", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-headers-internal.tar local/k1tools/kalray_internal/odp", :env => $env)
+    b.run(:cmd => "touch install/local/k1tools/lib/odp/foo-debug", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-debug.tar "+
                   "$(ls -d local/k1tools/lib/odp/* | grep -- -debug) "+
                   "$(ls -d local/k1tools/share/odp/firmware/* | grep -- -debug) " +
@@ -320,6 +348,7 @@ b.target("package") do
     depends.push b.depends_info_struct.new("k1-re","=", options["k1version"], "")
     depends.push b.depends_info_struct.new("k1-dev","=", options["k1version"], "")
     depends.push b.depends_info_struct.new("k1-odp-doc","=", release_info.full_version)
+    depends.push b.depends_info_struct.new("k1-odp-common","=", release_info.full_version)
     depends.push b.depends_info_struct.new("k1-mppapcie-odp-dkms","=", release_info.full_version)
 
     if not options["librariesversion"].to_s.empty? then
@@ -328,6 +357,36 @@ b.target("package") do
 
     package_description = "K1 ODP package (k1-odp-#{version}-#{releaseID} sha1 #{sha1})."
     pinfo = b.package_info("k1-odp", release_info,
+                           package_description,
+                           depends, "/usr", workspace)
+    pinfo.license = "BSD"
+    b.create_package(tar_package, pinfo)
+
+    #K1 ODP Crypto
+    tar_package = File.expand_path("odp-crypto.tar")
+    depends = []
+    depends.push b.depends_info_struct.new("k1-re","=", options["k1version"], "")
+    depends.push b.depends_info_struct.new("k1-dev","=", options["k1version"], "")
+    depends.push b.depends_info_struct.new("k1-odp-doc","=", release_info.full_version)
+    depends.push b.depends_info_struct.new("k1-odp-common","=", release_info.full_version)
+    depends.push b.depends_info_struct.new("k1-mppapcie-odp-dkms","=", release_info.full_version)
+
+    if not options["librariesversion"].to_s.empty? then
+      depends.push b.depends_info_struct.new("k1-libraries","=", options["librariesversion"], "")
+    end
+
+    package_description = "K1 ODP Crypto package (k1-odp-#{version}-#{releaseID} sha1 #{sha1})."
+    pinfo = b.package_info("k1-odp-crypto", release_info,
+                           package_description,
+                           depends, "/usr", workspace)
+    pinfo.license = "BSD"
+    b.create_package(tar_package, pinfo)
+
+    #K1 ODP Common
+    tar_package = File.expand_path("odp-common.tar")
+    depends = []
+    package_description = "K1 ODP Common package (k1-odp-runtime-#{version}-#{releaseID} sha1 #{sha1})."
+    pinfo = b.package_info("k1-odp-common", release_info,
                            package_description,
                            depends, "/usr", workspace)
     pinfo.license = "BSD"

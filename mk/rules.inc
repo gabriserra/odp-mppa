@@ -25,7 +25,7 @@ $(eval ODP_$(1)_BOARD_NAME := $(lastword $(subst _, ,$(1))))
 $(eval ODP_$(1)_ARCH_BUILDDIR := $(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME))
 $(eval ODP_$(1)_CONFCACHEDIR := $(CONFCACHE_DIR)/$(ODP_$(1)_ARCH_BUILDDIR))
 $(eval ODP_$(1)_BUILDDIR := $(ARCH_DIR)/odp/$(ODP_$(1)_ARCH_BUILDDIR))
-$(eval ODP_$(1)_HOST := $(patsubst %-debug,%,$(1)))
+$(eval ODP_$(1)_HOST := $(patsubst %-crypto,%,$(patsubst %-debug,%,$(1))))
 
 $(ARCH_DIR)/cunit/$(1)/Makefile: $(TOP_DIR)/cunit/configure
 	mkdir -p $(ODP_$(1)_CONFCACHEDIR)

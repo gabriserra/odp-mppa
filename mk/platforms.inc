@@ -95,6 +95,36 @@ K1_CONFIGS += k1b-kalray-mos_simu
 #
 #
 #
+# Crypto configs
+#
+#
+#
+define CRYPTO_CONFIG_RULE
+#$(1) config name
+$(eval $(1)-crypto_CONF_ENV    := $($(1)_CONF_ENV))
+$(eval $(1)-crypto_CONF_OPTS   := $($(1)_CONF_OPTS) --enable-crypto)
+$(eval $(1)-crypto_CFLAGS      := $($(1)_CFLAGS))
+$(eval $(1)-crypto_LDFLAGS     := $($(1)_LDFLAGS))
+$(eval $(1)-crypto_PLATFORM    := $($(1)_PLATFORM))
+$(eval $(1)-crypto_INC_DIR     := $($(1)_INC_DIR))
+$(eval $(1)-crypto_MAKE_VALID  := $($(1)_MAKE_VALID))
+$(eval $(1)-crypto_INSTALL     := $($(1)_INSTALL))
+$(eval $(1)-crypto_VALID_TYPE  := $($(1)_VALID_TYPE))
+endef
+
+$(foreach config,$(_CONFIGS), \
+  $(eval $(call CRYPTO_CONFIG_RULE,$(config))) \
+  $(eval _CONFIGS += $(config)-crypto) \
+)
+
+$(foreach config,$(K1_CONFIGS), \
+  $(eval $(call CRYPTO_CONFIG_RULE,$(config))) \
+  $(eval K1_CONFIGS += $(config)-crypto) \
+)
+
+#
+#
+#
 # Debug configs
 #
 #
@@ -119,7 +149,7 @@ $(foreach config,$(_CONFIGS), \
 
 $(foreach config,$(K1_CONFIGS), \
   $(eval $(call DEBUG_CONFIG_RULE,$(config))) \
-  $(eval K1_CONFIGS += $(config)-debug) \
+  $(eval _CONFIGS += $(config)-debug) \
 )
 
 CONFIGS += $(K1_CONFIGS)
@@ -263,7 +293,7 @@ _ioeth-storage_CONFIGS += k1b-kalray_konic80
 
 $(foreach firmware,$(FIRMWARES), \
 	$(foreach flavour,$($(firmware)_CONFIGS), \
-		$(eval $(firmware)_CONFIGS += $(flavour)-debug) \
+		$(eval _$(firmware)_CONFIGS += $(flavour)-debug) \
 	) \
 	$(foreach flavour,$(_$(firmware)_CONFIGS), \
 		$(eval _$(firmware)_CONFIGS += $(flavour)-debug) \
@@ -301,6 +331,15 @@ BOARD_ab04_VER      := hw
 BOARDS              += ab04
 
 $(foreach B, $(_BOARDS), \
+ $(eval BOARD_$(B)-crypto     := $(BOARD_$(B))) \
+ $(eval BOARD_$(B)-crypto_VER := $(BOARD_$(B)_VER)-crypto) \
+ $(eval _BOARDS += $(B)-crypto))
+$(foreach B, $(BOARDS), \
+ $(eval BOARD_$(B)-crypto     := $(BOARD_$(B))) \
+ $(eval BOARD_$(B)-crypto_VER := $(BOARD_$(B)_VER)-crypto) \
+ $(eval BOARDS += $(B)-crypto))
+
+$(foreach B, $(_BOARDS), \
  $(eval BOARD_$(B)-debug     := $(BOARD_$(B))) \
  $(eval BOARD_$(B)-debug_VER := $(BOARD_$(B)_VER)-debug) \
  $(eval _BOARDS += $(B)-debug))
@@ -321,7 +360,7 @@ OSs += mos
 OS_nodeos := nodeos
 OSs += nodeos
 
-LONG_CONFIGS ?= $(foreach OS, $(OSs),\
+LONG_CONFIGS := $(foreach OS, $(OSs),\
 					 $(foreach BOARD, $(BOARDS), k1b-kalray-$(OS)_$(BOARD)))
 _LONG_CONFIGS ?= $(foreach OS, $(OSs) $(_OSs),\
 					 $(foreach BOARD, $(BOARDS) $(_BOARDS), k1b-kalray-$(OS)_$(BOARD)))

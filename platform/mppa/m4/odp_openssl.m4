@@ -1,11 +1,11 @@
 ##########################################################################
 # Enable/disable crypto support
 ##########################################################################
-crypto=yes
+crypto=no
 AC_ARG_ENABLE([crypto],
     [  --disable-crypto        disable crypto support],
-    [if test x$enableval = xno; then
-        crypto=no
+    [if test x$enableval = xyes; then
+        crypto=yes
     fi])
 
 ##########################################################################

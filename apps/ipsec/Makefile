@@ -2,6 +2,7 @@ APP_DIR   := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 TEST_NAME := $(lastword $(subst /, ,$(APP_DIR)))
 
 ODP_TOOLCHAIN_DIR ?= $(K1_TOOLCHAIN_DIR)
+ODP_ARCH := k1b-kalray-mos_konic80-crypto
 include $(ODP_TOOLCHAIN_DIR)/share/odp/build/apps/Makefile.apps
 
 cflags += -I$(APP_DIR)

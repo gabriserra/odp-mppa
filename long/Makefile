@@ -23,7 +23,7 @@ include $(ODP_TOOLCHAIN_DIR)/share/odp/build/apps/Makefile.apps
 CUNIT_COMMON_SRC := $(ODP_SRC_DIR)/test/validation/common/odp_cunit_common.c
 CUNIT_INSTALL_DIR = $(ODP_TOOLCHAIN_DIR)/kalray_internal/cunit/$(REAL_ODP_ARCH)
 
-IOPCIE_ELF := $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/$(OS_BOARD_NAME)/$(CORE_ARCH)/iopcie.kelf
+IOPCIE_ELF := $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/$(FIRMWARE_BOARD_NAME)/$(CORE_ARCH)/iopcie.kelf
 $(IOPCIE_ELF)-nameinmpk = iopcie
 IOPCIE_NAME := iopcie
 
@@ -34,7 +34,7 @@ cluster-lflags += -L$(CUNIT_INSTALL_DIR)/lib/ -lcunit
 
 
 ifneq ($(BOARD_NAME),explorer)
-IOUNIFIED_ELF := $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/$(OS_BOARD_NAME)/$(CORE_ARCH)/iounified.kelf
+IOUNIFIED_ELF := $(ODP_TOOLCHAIN_DIR)/share/odp/firmware/$(FIRMWARE_BOARD_NAME)/$(CORE_ARCH)/iounified.kelf
 $(IOUNIFIED_ELF)-nameinmpk = iounified
 IOUNIFIED_NAME := iounified
 endif
