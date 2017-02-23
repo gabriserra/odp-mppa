@@ -423,13 +423,13 @@ static int cluster_mac_addr_get(pktio_entry_t *pktio_entry,
 	return ETH_ALEN;
 }
 
-static int cluster_send_recv_pkt_count(pkt_cluster_t *pktio_clus)
+static int cluster_send_recv_pkt_count(pkt_cluster_t *pktio_clus, uint64_t pkt_count)
 {
 	if (cluster_configure_cnoc_tx(pktio_clus) != 0)
 		return 1;
 
 	mppa_noc_cnoc_tx_push(NOC_CLUS_IFACE_ID, g_cnoc_tx_id,
-			      pktio_clus->remote.pkt_count);
+			      pkt_count);
 
 	return 0;
 }
@@ -442,6 +442,7 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 	int n_packet;
 	pkt_cluster_t *clus = &pktio_entry->s.pkt_cluster;
 	odp_buffer_ring_t *ring;
+	uint64_t pkt_count;
 
 	if (clus->remote.cnoc_rx < 0) {
 		/* We need to sync with the target first */
@@ -460,8 +461,10 @@ static int cluster_recv(pktio_entry_t *const pktio_entry,
 		return 0;
 
 	odp_spinlock_lock(&g_cnoc_tx_lock);
-	clus->remote.pkt_count += n_packet;
-	if (cluster_send_recv_pkt_count(clus) != 0) {
+	pkt_count = LOAD_U64(clus->remote.pkt_count) + n_packet;
+	STORE_U64(clus->remote.pkt_count, pkt_count);
+
+	if (cluster_send_recv_pkt_count(clus, pkt_count) != 0) {
 		odp_spinlock_unlock(&g_cnoc_tx_lock);
 		return 1;
 	}
