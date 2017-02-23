@@ -119,7 +119,7 @@ $(foreach config,$(_CONFIGS), \
 
 $(foreach config,$(K1_CONFIGS), \
   $(eval $(call CRYPTO_CONFIG_RULE,$(config))) \
-  $(eval K1_CONFIGS += $(config)-crypto) \
+  $(eval _CONFIGS += $(config)-crypto) \
 )
 
 #
@@ -337,7 +337,7 @@ $(foreach B, $(_BOARDS), \
 $(foreach B, $(BOARDS), \
  $(eval BOARD_$(B)-crypto     := $(BOARD_$(B))) \
  $(eval BOARD_$(B)-crypto_VER := $(BOARD_$(B)_VER)-crypto) \
- $(eval BOARDS += $(B)-crypto))
+ $(eval _BOARDS += $(B)-crypto))
 
 $(foreach B, $(_BOARDS), \
  $(eval BOARD_$(B)-debug     := $(BOARD_$(B))) \

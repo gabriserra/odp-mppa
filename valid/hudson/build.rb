@@ -89,28 +89,28 @@ if ENV["label"].to_s() != "" then
         valid_configs = [
             "k1b-kalray-nodeos_developer",
             "k1b-kalray-mos_developer",
-            "k1b-kalray-nodeos_developer-crypto",
-            "k1b-kalray-mos_developer-crypto",
+            #"k1b-kalray-nodeos_developer-crypto",
+            #"k1b-kalray-mos_developer-crypto",
         ]
         valid_type = "jtag"
     when /KONIC80Developers*/, /MPPA_KONIC80_Developers*/
         valid_configs = [
             "k1b-kalray-nodeos_konic80",
             "k1b-kalray-mos_konic80",
-            "k1b-kalray-nodeos_konic80-crypto",
-            "k1b-kalray-mos_konic80-crypto",
+            #"k1b-kalray-nodeos_konic80-crypto",
+            #"k1b-kalray-mos_konic80-crypto",
         ]
         valid_type = "jtag"
     when /MPPA_EMB01b_centos7-with-eth-loopback/
         valid_configs = [
             "k1b-kalray-mos_emb01",
-            "k1b-kalray-mos_emb01-crypto",
+            #"k1b-kalray-mos_emb01-crypto",
         ]
         valid_type = "remote"
     when /MPPA_AB04_Developers-with-loopback/
         valid_configs = [
             "k1b-kalray-mos_ab04",
-            "k1b-kalray-mos_ab04-crypto",
+            #"k1b-kalray-mos_ab04-crypto",
         ]
         valid_type = "jtag"
     when "fedora19-64","debian6-64", /MPPADevelopers*/, /MPPAEthDevelopers*/
@@ -127,8 +127,8 @@ if ENV["label"].to_s() != "" then
         valid_configs = [
             "k1b-kalray-nodeos_explorer",
             "k1b-kalray-mos_explorer",
-            "k1b-kalray-nodeos_explorer-crypto",
-            "k1b-kalray-mos_explorer-crypto",
+            #"k1b-kalray-nodeos_explorer-crypto",
+            #"k1b-kalray-mos_explorer-crypto",
         ]
         valid_type = "jtag"
     else
@@ -316,9 +316,13 @@ b.target("package") do
     b.run(:cmd => "cd install/; tar cf ../odp.tar "+
                   "$(ls -d local/k1tools/lib/odp/* | grep -v -- -debug | grep -v -- -crypto ) ",
           :env => $env)
+
+    b.run(:cmd => "touch install/local/k1tools/lib/odp/.crypto", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-crypto.tar "+
+                  "local/k1tools/lib/odp/.crypto " +
                   "$(ls -d local/k1tools/lib/odp/* | grep -v -- -debug | grep  -- -crypto ) ",
           :env => $env)
+
     b.run(:cmd => "cd install/; tar cf ../odp-common.tar "+
                   "$(ls -d local/k1tools/share/odp/firmware/* | grep -v -- -debug) "+
                   "local/k1tools/share/odp/build/ local/k1tools/share/odp/skel/ "+
@@ -332,6 +336,7 @@ b.target("package") do
     b.run(:cmd => "cd install/; tar cf ../odp-runtime.tar local/k1tools/share/odp/apps/odp-netdev", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-cunit.tar local/k1tools/kalray_internal/cunit", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-headers-internal.tar local/k1tools/kalray_internal/odp", :env => $env)
+
     b.run(:cmd => "touch install/local/k1tools/lib/odp/foo-debug", :env => $env)
     b.run(:cmd => "cd install/; tar cf ../odp-debug.tar "+
                   "$(ls -d local/k1tools/lib/odp/* | grep -- -debug) "+
