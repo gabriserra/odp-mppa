@@ -25,13 +25,14 @@ $(eval ODP_$(1)_BOARD_NAME := $(lastword $(subst _, ,$(1))))
 $(eval ODP_$(1)_ARCH_BUILDDIR := $(ODP_$(1)_BOARD_NAME)/$(ODP_$(1)_OS_NAME))
 $(eval ODP_$(1)_CONFCACHEDIR := $(CONFCACHE_DIR)/$(ODP_$(1)_ARCH_BUILDDIR))
 $(eval ODP_$(1)_BUILDDIR := $(ARCH_DIR)/odp/$(ODP_$(1)_ARCH_BUILDDIR))
-$(eval ODP_$(1)_DEBUG_BUILDDIR := $(ARCH_DIR)/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR))
+$(eval ODP_$(1)_HOST := $(patsubst %-crypto,%,$(patsubst %-debug,%,$(1))))
+
 $(ARCH_DIR)/cunit/$(1)/Makefile: $(TOP_DIR)/cunit/configure
 	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
 	 $$< --srcdir=$(TOP_DIR)/cunit --prefix=$(CUNIT_INST_DIR)/$(1) \
-	--enable-debug --enable-automated --enable-basic --host=$(1) \
+	--enable-debug --enable-automated --enable-basic --host=$(ODP_$(1)_HOST) \
 	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/cunit-config.cache
 
 cunit-$(1)-build: $(ARCH_DIR)/cunit/$(1)/CUnit/Sources/.libs/libcunit.a
@@ -46,40 +47,20 @@ cunit-$(1)-valid:
 cunit-$(1)-clean:
 	rm -Rf $(ARCH_DIR)/cunit/$(1) $(CUNIT_INST_DIR)/$(1)
 
-odp-debug-$(1)-configure: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile
-$(ODP_$(1)_DEBUG_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/libcunit.a $(MAKE_DEPS)
-	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
-	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
-	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
-	 $$< --host=$(1) --with-platform=$($(1)_PLATFORM) \
-	--with-cunit-path=$(CUNIT_INST_DIR)/$(1)/ --enable-test-vald \
-	--prefix=$(K1ST_DIR) \
-	--datarootdir=$(K1ST_DIR)share/odp-debug/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
-	--libdir=$(K1ST_DIR)lib/odp-debug/$(ODP_$(1)_ARCH_BUILDDIR) \
-	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
-	--oldincludedir=$(K1ST_DIR)kalray_internal/odp/$($(1)_INC_DIR)/include \
-	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) $(_DEBUG_CONF_FLAGS) \
-	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-debug-config.cache
-
-odp-debug-$(1)-build: $(ODP_$(1)_DEBUG_BUILDDIR)/Makefile $(odp-build_DEPS)
-	$$(MAKE) -C$$$$(basename $$@)V=1 all
-odp-debug-$(1)-clean:
-	rm -Rf $(ODP_$(1)_DEBUG_BUILDDIR)
-
 odp-$(1)-configure: $(ODP_$(1)_BUILDDIR)/Makefile
 $(ODP_$(1)_BUILDDIR)/Makefile: $(TOP_DIR)/configure $(CUNIT_INST_DIR)/$(1)/lib/libcunit.a $(MAKE_DEPS)
 	mkdir -p $(ODP_$(1)_CONFCACHEDIR)
 	mkdir -p $$$$(dirname $$@) && cd $$$$(dirname $$@) && \
 	$($(1)_CONF_ENV) CPPFLAGS="$($(1)_CFLAGS)" LDFLAGS="$($(1)_LDFLAGS) $($(1)_CFLAGS)" \
-	 $$< --host=$(1) --with-platform=$($(1)_PLATFORM) \
+	 $$< --host=$(ODP_$(1)_HOST) --with-platform=$($(1)_PLATFORM) \
 	--with-cunit-path=$(CUNIT_INST_DIR)/$(1)/ --enable-test-vald \
 	--prefix=$(K1ST_DIR) --enable-user-guides \
 	--datarootdir=$(K1ST_DIR)share/odp/tests/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--libdir=$(K1ST_DIR)lib/odp/$(ODP_$(1)_ARCH_BUILDDIR) \
 	--includedir=$(K1ST_DIR)$($(1)_INC_DIR)/include \
 	--oldincludedir=$(K1ST_DIR)kalray_internal/odp/$($(1)_INC_DIR)/include \
-	--enable-test-perf $(DEBUG_FLAGS) $($(1)_CONF_OPTS) --disable-debug-print $(DEBUG_CONF_FLAGS) \
-	--cache-file=$(ODP_$(1)_CONFCACHEDIR)/odp-config.cache
+	--enable-test-perf  --disable-debug-print \
+	$($(1)_CONF_OPTS)
 
 odp-$(1)-build: $(ODP_$(1)_BUILDDIR)/Makefile $(odp-build_DEPS)
 	$$(MAKE) -C$$$$(dirname $$<) V=1 all

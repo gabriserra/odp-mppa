@@ -24,7 +24,7 @@ extern "C" {
  * Kalray Release Version
  * Reset for each Generation and or Major API update
  */
-#define ODP_VERSION_KALRAY_VER 7
+#define ODP_VERSION_KALRAY_VER 8
 
 #ifdef __cplusplus
 }

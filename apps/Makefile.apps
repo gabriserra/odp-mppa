@@ -15,6 +15,7 @@ SYSTEM_NAME = $(subst -kalray,,$(ODP_ARCH))
 CORE_ARCH = $(firstword $(subst -, ,$(ODP_ARCH)))
 OS_PLAT_NAME  = $(firstword $(subst _, ,$(ODP_ARCH)))
 OS_BOARD_NAME = $(lastword $(subst _, ,$(ODP_ARCH)))
+FIRMWARE_BOARD_NAME = $(patsubst %-crypto,%,$(OS_BOARD_NAME))
 
 # extract OS name and board name
 REAL_OS_NAME = $(lastword $(subst -, ,$(OS_PLAT_NAME)))
@@ -75,12 +76,12 @@ $(TEST_MULTIBIN_NAME)-objs := $(realpath .)/firmware-$(OS_BOARD_NAME)/firmware.k
 
 build-firmware:
 	+mkdir -p ./firmware-$(OS_BOARD_NAME) && cd ./firmware-$(OS_BOARD_NAME) && \
-	$(MAKE) -f $(APP_DIR)/firmware/Makefile ODP_FIRMWARE_CONFIG="k1b-kalray_$(OS_BOARD_NAME)" \
+	$(MAKE) -f $(APP_DIR)/firmware/Makefile ODP_FIRMWARE_CONFIG="k1b-kalray_$(FIRMWARE_BOARD_NAME)" \
 	ODP_TOOLCHAIN_DIR="$(ODP_TOOLCHAIN_DIR)" all
 
 clean-firmware:
 	if [ -d ./firmware-$(OS_BOARD_NAME) ]; then cd ./firmware-$(OS_BOARD_NAME) && \
-	$(MAKE) -f $(APP_DIR)/firmware/Makefile ODP_FIRMWARE_CONFIG="k1b-kalray_$(OS_BOARD_NAME)" \
+	$(MAKE) -f $(APP_DIR)/firmware/Makefile ODP_FIRMWARE_CONFIG="k1b-kalray_$(FIRMWARE_BOARD_NAME)" \
 	ODP_TOOLCHAIN_DIR="$(ODP_TOOLCHAIN_DIR)" clean; else true; fi
 endif
 endif

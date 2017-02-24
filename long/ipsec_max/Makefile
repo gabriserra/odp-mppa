@@ -1,5 +1,8 @@
 APP_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
+#Disable this test if crypto is not enabled
+ifneq ($(ODP_ARCH),$(patsubst %-crypto,%,$(ODP_ARCH)))
+
 include $(APP_DIR)/../Makefile
 
 cflags += . -std=gnu11 -O3 -g0
@@ -23,6 +26,11 @@ $(TEST_NAME)-labels := jtag
 $(TEST_NAME)-hw-timeout := $(TIMEOUT)
 $(TEST_NAME)-hw-no-remote := 1
 host-tests += $(TEST_NAME)
+endif
+else
+all:
+install:
+clean:
 endif
 
 include $(K1_TOOLCHAIN_DIR)/share/make/Makefile.kalray
