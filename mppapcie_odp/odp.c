@@ -105,16 +105,9 @@ static void mpodp_poll_controller(struct net_device *netdev)
 static int mpodp_open(struct net_device *netdev)
 {
 	struct mpodp_if_priv *priv = netdev_priv(netdev);
-	int i;
-	int ready = 1;
-	for (i = 0; i < priv->n_txqs; ++i) {
-		struct mpodp_txq *txq = &priv->txqs[i];
-		/* Check if this txq is ready */
-		if (atomic_read(&txq->head) == 0) {
-			ready = 0;
-			break;
-		}
-	}
+	int ready;
+
+	ready = mpodp_tx_update_cache(priv);
 
 	netif_tx_start_all_queues(netdev);
 	napi_enable(&priv->napi);
@@ -127,7 +120,6 @@ static int mpodp_open(struct net_device *netdev)
 	if (ready) {
 		if (netif_msg_link(priv))
 			netdev_info(priv->netdev, "Interface is ready\n");
-		mpodp_tx_update_cache(priv);
 		netif_carrier_on(netdev);
 		napi_schedule(&priv->napi);
 	} else {
@@ -424,7 +416,6 @@ static struct net_device *mpodp_create(struct mppa_pcie_device *pdata,
 		}
 
 		atomic_set(&txq->submitted, 0);
-		atomic_set(&txq->head, readl(txq->head_addr));
 		atomic_set(&txq->done, 0);
 		atomic_set(&txq->autoloop_cur, 0);
 

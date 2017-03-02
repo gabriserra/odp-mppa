@@ -80,8 +80,6 @@ struct mpodp_txq {
 	/* Current idx in the autoloop MPPA RB */
 	atomic_t autoloop_cur;
 
-	/* Current Tx head on the MPPA (equals number of targets) */
-	atomic_t head;
 	/* Host mapped addres to reload tx_head from the MPPA */
 	u8 __iomem *head_addr;
 
@@ -173,7 +171,7 @@ u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
 
 void mpodp_set_ethtool_ops(struct net_device *netdev);
 void mpodp_tx_timeout(struct net_device *netdev);
-void mpodp_tx_update_cache(struct mpodp_if_priv *priv);
+int mpodp_tx_update_cache(struct mpodp_if_priv *priv);
 void mpodp_tx_timer_cb(unsigned long data);
 int mpodp_clean_tx(struct mpodp_if_priv *priv, unsigned budget);
 

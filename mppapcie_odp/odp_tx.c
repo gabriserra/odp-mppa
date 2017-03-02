@@ -109,7 +109,7 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 	unsigned int worked = 0;
 	union mppa_timestamp ts;
 	uint32_t tx_done, first_tx_done, last_tx_done, tx_submitted,
-		tx_size, tx_head;
+		tx_size;
 
 	tx_submitted = atomic_read(&txq->submitted);
 	tx_done = atomic_read(&txq->done);
@@ -117,21 +117,9 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 	last_tx_done = first_tx_done;
 
 	tx_size = txq->size;
-	tx_head = atomic_read(&txq->head);
 
-	if (!tx_head) {
-		/* No carrier yet. Check if there are any buffers yet */
-		tx_head = readl(txq->head_addr);
-		if (tx_head) {
-			/* We now have buffers */
-			atomic_set(&txq->head, tx_head);
-
-			if (netif_msg_link(priv))
-				netdev_info(netdev,"txq[%d]  now has Tx (%u).\n",
-					    txq->id, tx_head);
-		}
+	if (!txq->cached_head)
 		return 0;
-	}
 
 	/* TX: 2nd step: update TX tail (DMA transfer completed) */
 	while (tx_done != tx_submitted && worked < budget) {
@@ -142,8 +130,8 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 
 		if (netif_msg_tx_done(priv))
 			netdev_info(netdev,
-				    "txq[%d] tx[%d]: transfer done (head: %d submitted: %d done: %d)\n",
-				    txq->id, tx_done, atomic_read(&txq->head),
+				    "txq[%d] tx[%d]: transfer done (submitted: %d done: %d)\n",
+				    txq->id, tx_done,
 				    tx_submitted, tx_done);
 
 		/* get TX slot */
@@ -168,8 +156,8 @@ static int mpodp_clean_tx_unlocked(struct mpodp_if_priv *priv,
 	while (first_tx_done != last_tx_done) {
 		if (netif_msg_tx_done(priv))
 			netdev_info(netdev,
-				    "txq[%d] tx[%d]: done (head: %d submitted: %d done: %d)\n",
-				    txq->id, first_tx_done, atomic_read(&txq->head),
+				    "txq[%d] tx[%d]: done (submitted: %d done: %d)\n",
+				    txq->id, first_tx_done,
 				    tx_submitted, tx_done);
 
 		/* get TX slot */
@@ -454,69 +442,61 @@ u16 mpodp_select_queue(struct net_device *dev, struct sk_buff *skb
 	return __skb_tx_hash(dev, skb, dev->real_num_tx_queues);
 #endif
 }
-void mpodp_tx_update_cache(struct mpodp_if_priv *priv)
+int mpodp_tx_update_cache(struct mpodp_if_priv *priv)
 {
 	int i;
+	int ready = 1;
+
 	for (i = 0; i < priv->n_txqs; ++i) {
 		struct mpodp_txq *txq = &priv->txqs[i];
+		uint32_t tx_head;
+		struct mpodp_cache_entry *entry;
+
+		if (txq->cached_head == txq->size)
+			continue;
 
 		/* check for new descriptors */
-		if (atomic_read(&txq->head) != 0 &&
-		    txq->cached_head != txq->size) {
-			uint32_t tx_head;
-			struct mpodp_cache_entry *entry;
+		tx_head = readl(txq->head_addr);
+		/* Nothing yet */
+		if (tx_head <= 0) {
+			ready = 0;
+			continue;
+		}
 
-			tx_head = readl(txq->head_addr);
-			/* Nothing yet */
-			if (tx_head < 0)
-				continue;
-
-			if (tx_head >= txq->mppa_size) {
-				if (netif_msg_tx_err(priv))
-					netdev_err(priv->netdev,
-						   "Invalid head %d set in Txq[%d]\n", tx_head, txq->id);
-				return;
-			}
-			/* In autoloop, we need to cache new elements */
-			while (txq->cached_head < tx_head) {
-				entry = &txq->cache[txq->cached_head];
-
-				entry->addr =
-					readq(entry->entry_addr +
-					      offsetof(struct mpodp_h2c_entry,
-						       pkt_addr));
-				txq->cached_head++;
-			}
+		if (tx_head >= txq->mppa_size) {
+			if (netif_msg_tx_err(priv))
+				netdev_err(priv->netdev,
+					"Invalid head %d set in Txq[%d]\n", tx_head, txq->id);
+			return -1;
+		}
+		/* In autoloop, we need to cache new elements */
+		while (txq->cached_head < tx_head) {
+			entry = &txq->cache[txq->cached_head];
+			entry->addr =
+				readq(entry->entry_addr +
+					offsetof(struct mpodp_h2c_entry,
+						pkt_addr));
+			txq->cached_head++;
 		}
 	}
+	return ready;
 }
 
 void mpodp_tx_timer_cb(unsigned long data)
 {
 	struct mpodp_if_priv *priv = (struct mpodp_if_priv *) data;
 	unsigned long worked = 0;
+	int ready;
 
 	worked = mpodp_clean_tx(priv, MPODP_MAX_TX_RECLAIM);
 
-	if (!netif_carrier_ok(priv->netdev)) {
-		int i, ready = 1;
-		for (i = 0; i < priv->n_txqs; ++i) {
-			struct mpodp_txq *txq = &priv->txqs[i];
+	ready = mpodp_tx_update_cache(priv);
 
-			/* Check if this txq is ready */
-			if (atomic_read(&txq->head) == 0) {
-				ready = 0;
-				break;
-			}
-		}
-		if (ready) {
-			mpodp_tx_update_cache(priv);
-			if (netif_msg_link(priv))
-				netdev_info(priv->netdev, "all queues are ready. Turning carrier ON\n");
-			netif_carrier_on(priv->netdev);
-		}
+	if (!netif_carrier_ok(priv->netdev) && ready) {
+		if (netif_msg_link(priv))
+			netdev_info(priv->netdev, "all queues are ready. Turning carrier ON\n");
+		netif_carrier_on(priv->netdev);
 	}
-	mpodp_tx_update_cache(priv);
 
 	mod_timer(&priv->tx_timer, jiffies +
 		  (worked < MPODP_MAX_TX_RECLAIM ?
